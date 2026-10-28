@@ -134,15 +134,28 @@ export const DatasetSchema = z
 
     const fail = (message: string) => ctx.addIssue({ code: "custom", message });
 
-    const consecutive = dataset.periods.every((period, i) => {
+    for (const [kind, ids] of [
+      ["region", dataset.regions.map((r) => r.id)],
+      ["market", dataset.markets.map((m) => m.id)],
+      ["product", dataset.products.map((p) => p.id)],
+    ] as const) {
+      const seen = new Set<string>();
+      for (const id of ids) {
+        if (seen.has(id)) fail(`Duplicate ${kind} id ${id}`);
+        seen.add(id);
+      }
+    }
+
+    for (let i = 1; i < dataset.periods.length; i++) {
       const previous = parsePeriod(dataset.periods[i - 1] ?? "");
-      return (
-        i === 0 ||
-        (previous?.kind === "month" &&
-          nextMonth(previous.year, previous.month) === period)
-      );
-    });
-    if (!consecutive) fail("Periods must be consecutive months in order");
+      if (
+        previous?.kind !== "month" ||
+        nextMonth(previous.year, previous.month) !== dataset.periods[i]
+      ) {
+        fail("Periods must be consecutive months in order");
+        break;
+      }
+    }
 
     for (const market of dataset.markets) {
       if (!regionIds.has(market.regionId)) {

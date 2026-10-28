@@ -293,3 +293,23 @@ describe("DatasetSchema: review fixes", () => {
     ).toContain("Periods must be consecutive months in order");
   });
 });
+
+describe("DatasetSchema: unique ids", () => {
+  it("rejects duplicate region, market and product ids", () => {
+    expect(
+      issuesOf({ ...validDataset, markets: [germany, germany] }),
+    ).toContain("Duplicate market id DE");
+    expect(
+      issuesOf({
+        ...validDataset,
+        regions: [...validDataset.regions, { id: "eu", name: "Europe again" }],
+      }),
+    ).toContain("Duplicate region id eu");
+    expect(
+      issuesOf({
+        ...validDataset,
+        products: [...validDataset.products, { id: "atlas", name: "Atlas 2" }],
+      }),
+    ).toContain("Duplicate product id atlas");
+  });
+});
