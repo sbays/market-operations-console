@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { formatMetric } from "@/domain/format";
 import type { EntityRef } from "@/domain/schema";
 import { latestQuarter, statusOf, valueAt } from "@/domain/selectors";
-import { loadDataset } from "./pack";
+import { loadDataset, loadFixtures } from "./pack";
 
 const dataset = loadDataset();
 
@@ -154,5 +155,67 @@ describe("story: what's driving the portfolio's forecast miss?", () => {
       .map((p) => ({ id: p.id, gap: productShortfall(p.id) }))
       .sort((a, b) => b.gap - a.gap);
     expect(shortfalls[0]?.id).toBe("cirrus");
+  });
+});
+
+describe("fixtures", () => {
+  const fixtures = loadFixtures();
+  const answers = fixtures.flatMap((f) =>
+    f.response.kind === "answer" ? [{ id: f.id, ...f.response }] : [],
+  );
+
+  it("answer the brief's four example questions", () => {
+    expect(fixtures.map((f) => f.question)).toEqual(
+      expect.arrayContaining([
+        "Which markets are at risk this quarter, and why?",
+        "Why did Germany's revenue dip in March 2026?",
+        "Compare APAC and Europe on growth and forecast attainment",
+        "What's driving the portfolio's forecast miss?",
+      ]),
+    );
+  });
+
+  it("include the awkward cases: low confidence, abstention, error and a long answer", () => {
+    expect(
+      answers.some((a) => a.confidence < 0.5 && a.uncertainty !== undefined),
+    ).toBe(true);
+    expect(fixtures.some((f) => f.response.kind === "abstention")).toBe(true);
+    expect(fixtures.some((f) => f.response.kind === "error")).toBe(true);
+    expect(answers.some((a) => a.text.length > 1500)).toBe(true);
+  });
+
+  it("cite only entities and periods that exist in the data", () => {
+    for (const answer of answers) {
+      for (const c of answer.citations) {
+        expect(
+          valueAt(dataset, c.ref, c.period, c.metric),
+          `${answer.id} [${c.id}]`,
+        ).toBeDefined();
+      }
+    }
+  });
+
+  it("pair every [n] marker with exactly one citation", () => {
+    for (const answer of answers) {
+      const markers = [...answer.text.matchAll(/\[(\d+)\]/g)].map((m) =>
+        Number(m[1]),
+      );
+      expect(new Set(markers).size, answer.id).toBe(markers.length);
+      expect(
+        [...markers].sort((a, b) => a - b),
+        answer.id,
+      ).toEqual(answer.citations.map((c) => c.id).sort((a, b) => a - b));
+    }
+  });
+
+  it("quote each cited number exactly as the dataset has it", () => {
+    for (const answer of answers) {
+      for (const c of answer.citations) {
+        const value = valueAt(dataset, c.ref, c.period, c.metric) ?? NaN;
+        expect(answer.text, `${answer.id} [${c.id}]`).toContain(
+          `${formatMetric(c.metric, value)} [${c.id}]`,
+        );
+      }
+    }
   });
 });
