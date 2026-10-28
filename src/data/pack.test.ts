@@ -234,3 +234,94 @@ describe("fixtures", () => {
     }
   });
 });
+
+/** Sentences in the fixture prose that quote no number but still make a claim about the data. */
+describe("fixture prose claims", () => {
+  const q3 = "2026-Q3" as const;
+  const at = (ref: EntityRef, metric: "growth" | "attainment" | "revenue") =>
+    valueAt(dataset, ref, q3, metric) ?? NaN;
+  const shortfall = (ref: EntityRef) =>
+    (valueAt(dataset, ref, q3, "forecast") ?? 0) -
+    (valueAt(dataset, ref, q3, "revenue") ?? 0);
+
+  it("Asia Pacific had the fastest growth of any region", () => {
+    const growth = dataset.regions.map((r) => ({
+      id: r.id,
+      growth: at({ level: "region", id: r.id }, "growth"),
+    }));
+    growth.sort((a, b) => b.growth - a.growth);
+    expect(growth[0]?.id).toBe("apac");
+  });
+
+  it("North America is comfortably on track (at least a point above the line)", () => {
+    expect(
+      at({ level: "region", id: "na" }, "attainment"),
+    ).toBeGreaterThanOrEqual(ON_TRACK_FROM + 0.01);
+  });
+
+  it("Germany is the only European market at risk, and most of Europe's shortfall", () => {
+    const european = dataset.markets.filter((m) => m.regionId === "eu");
+    const notOnTrack = european.filter(
+      (m) => statusOf(dataset, market(m.id), q3) !== "on-track",
+    );
+    expect(notOnTrack.map((m) => m.id)).toEqual(["DE"]);
+    const gaps = european
+      .map((m) => ({ id: m.id, gap: shortfall(market(m.id)) }))
+      .sort((a, b) => b.gap - a.gap);
+    expect(gaps[0]?.id).toBe("DE");
+  });
+
+  it("Latin America is held back by Brazil", () => {
+    expect(at(market("BR"), "attainment")).toBeLessThan(
+      at(market("MX"), "attainment"),
+    );
+    expect(shortfall(market("BR"))).toBeGreaterThan(shortfall(market("MX")));
+  });
+
+  it("Japan and India are both growing", () => {
+    expect(at(market("JP"), "growth")).toBeGreaterThan(0);
+    expect(at(market("IN"), "growth")).toBeGreaterThan(0);
+  });
+
+  it("Cirrus has been below forecast in every market in every month since April", () => {
+    for (const m of dataset.markets) {
+      for (const month of [
+        "2026-04",
+        "2026-05",
+        "2026-06",
+        "2026-07",
+        "2026-08",
+        "2026-09",
+      ] as const) {
+        expect(
+          valueAt(dataset, product(m.id, "cirrus"), month, "attainment"),
+          `${m.id} ${month}`,
+        ).toBeLessThan(1);
+      }
+    }
+  });
+
+  it("the United States is Cirrus's largest market", () => {
+    const revenue = dataset.markets
+      .map((m) => ({
+        id: m.id,
+        revenue: at(product(m.id, "cirrus"), "revenue"),
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+    expect(revenue[0]?.id).toBe("US");
+  });
+
+  it("Atlas has grown steadily in Germany", () => {
+    for (const quarter of [
+      "2025-Q4",
+      "2026-Q1",
+      "2026-Q2",
+      "2026-Q3",
+    ] as const) {
+      expect(
+        valueAt(dataset, product("DE", "atlas"), quarter, "growth"),
+        quarter,
+      ).toBeGreaterThan(0);
+    }
+  });
+});
