@@ -1,5 +1,6 @@
-# Install scripts stay off: sharp and unrs-resolver ship prebuilt platform binaries as optional
-# dependencies (e.g. @img/sharp-darwin-arm64), so their build steps are not needed.
+# Install scripts stay off: sharp, unrs-resolver and esbuild ship prebuilt platform binaries as optional
+# dependencies (e.g. @img/sharp-darwin-arm64, @esbuild/darwin-arm64), so their build steps are not needed.
 allowBuilds:
   sharp: false
   unrs-resolver: false
+  esbuild: false
