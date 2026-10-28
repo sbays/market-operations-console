@@ -50,6 +50,9 @@ export const MetricSchema = z.enum([
 ]);
 export type Metric = z.infer<typeof MetricSchema>;
 
+export const StatusSchema = z.enum(["on-track", "at-risk", "off-track"]);
+export type Status = z.infer<typeof StatusSchema>;
+
 const amount = z.number().nonnegative();
 
 /**
