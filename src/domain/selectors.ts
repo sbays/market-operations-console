@@ -12,6 +12,7 @@ import type {
   Quarter,
   Status,
 } from "./schema";
+import { PERCENT_DECIMALS } from "./format";
 import { monthsOfQuarter, parsePeriod, quarterKey } from "./period";
 
 /** Attainment thresholds for status, judged over a quarter. */
@@ -119,9 +120,15 @@ export function valueAt(
   }
 }
 
+/**
+ * Compares the attainment as it is displayed (rounded to PERCENT_DECIMALS), so a status
+ * badge can never disagree with the percentage shown beside it.
+ */
 export function statusForAttainment(attainment: number): Status {
-  if (attainment >= ON_TRACK_FROM) return "on-track";
-  if (attainment >= AT_RISK_FROM) return "at-risk";
+  const scale = 10 ** (PERCENT_DECIMALS + 2);
+  const displayed = Math.round(attainment * scale) / scale;
+  if (displayed >= ON_TRACK_FROM) return "on-track";
+  if (displayed >= AT_RISK_FROM) return "at-risk";
   return "off-track";
 }
 
