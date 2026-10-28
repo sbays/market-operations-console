@@ -21,10 +21,16 @@ const regions = [
   { id: "eu", name: "Europe" },
   { id: "apac", name: "Asia Pacific" },
   { id: "latam", name: "Latin America" },
-];
+] as const;
+type RegionId = (typeof regions)[number]["id"];
 
-/** Monthly revenue at the start of the history, in USD, and year-on-year growth by region. */
-const markets = [
+/** Monthly revenue at the start of the history, in USD. */
+const markets: {
+  id: string;
+  name: string;
+  regionId: RegionId;
+  base: number;
+}[] = [
   { id: "US", name: "United States", regionId: "na", base: 9_000_000 },
   { id: "CA", name: "Canada", regionId: "na", base: 1_600_000 },
   { id: "DE", name: "Germany", regionId: "eu", base: 4_400_000 },
@@ -39,12 +45,13 @@ const markets = [
   { id: "MX", name: "Mexico", regionId: "latam", base: 1_100_000 },
 ];
 
-const yearlyGrowth: Record<string, number> = {
+/** Year-on-year growth by region; `satisfies` makes a missing or mistyped region a compile error. */
+const yearlyGrowth = {
   na: 0.05,
   eu: 0.02,
   apac: 0.12,
   latam: 0.06,
-};
+} satisfies Record<RegionId, number>;
 
 /** Share of a market's revenue, unit price and typical market share by product. */
 const products = [
@@ -179,7 +186,7 @@ function generate(): Dataset {
   );
 
   const generatedMarkets = markets.map((market) => {
-    const growth = yearlyGrowth[market.regionId] ?? 0;
+    const growth = yearlyGrowth[market.regionId];
     const series = Object.fromEntries(
       products.map((product) => {
         // Index -HISTORY_MONTHS .. REPORTED_MONTHS-1; history only feeds priorYear.
