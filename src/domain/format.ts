@@ -3,6 +3,8 @@
  * The locale is fixed so server and client render identical strings (no hydration mismatch)
  * and AI-quoted numbers format exactly like source data.
  */
+import type { Metric, PeriodRef } from "./schema";
+
 export const LOCALE = "en-US";
 export const CURRENCY = "USD";
 
@@ -58,11 +60,27 @@ const QUARTER = /^(\d{4})-Q([1-4])$/;
 const MONTH = /^(\d{4})-(\d{2})$/;
 
 /** "2026-03" → "Mar 2026", "2026-Q3" → "Q3 2026". */
-export function formatPeriod(period: string): string {
+export function formatPeriod(period: PeriodRef): string {
   const quarter = QUARTER.exec(period);
   if (quarter) return `Q${quarter[2]} ${quarter[1]}`;
 
   const parts = MONTH.exec(period);
   if (!parts) throw new RangeError(`Not a period: ${period}`);
   return month.format(Date.UTC(Number(parts[1]), Number(parts[2]) - 1));
+}
+
+/** The single place that decides how each metric reads, for charts, tables and AI text alike. */
+export function formatMetric(metric: Metric, value: number): string {
+  switch (metric) {
+    case "revenue":
+    case "forecast":
+      return formatCurrency(value);
+    case "units":
+      return formatNumber(value);
+    case "attainment":
+    case "share":
+      return formatPercent(value);
+    case "growth":
+      return formatPercent(value, { signed: true });
+  }
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatCurrency,
+  formatMetric,
   formatNumber,
   formatPercent,
   formatPeriod,
@@ -47,5 +48,17 @@ describe("formatPeriod", () => {
 
   it("formats quarters as quarter and year", () => {
     expect(formatPeriod("2026-Q3")).toBe("Q3 2026");
+  });
+});
+
+describe("formatMetric", () => {
+  it("formats each metric the way the dashboard shows it", () => {
+    expect(formatMetric("revenue", 4_100_000)).toBe("$4.1M");
+    expect(formatMetric("forecast", 5_000_000)).toBe("$5M");
+    expect(formatMetric("units", 12_345)).toBe("12.3K");
+    expect(formatMetric("attainment", 0.931)).toBe("93.1%");
+    expect(formatMetric("share", 0.184)).toBe("18.4%");
+    expect(formatMetric("growth", 0.12)).toBe("+12.0%");
+    expect(formatMetric("growth", -0.035)).toBe("-3.5%");
   });
 });
