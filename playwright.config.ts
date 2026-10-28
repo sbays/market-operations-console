@@ -22,7 +22,7 @@ export default defineConfig({
       ? `pnpm start --port ${port}`
       : `pnpm build && pnpm start --port ${port}`,
     url: `http://127.0.0.1:${port}/console`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 180_000,
   },
 });
