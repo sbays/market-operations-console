@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { formatMetric } from "@/domain/format";
 import type { EntityRef } from "@/domain/schema";
-import { latestQuarter, statusOf, valueAt } from "@/domain/selectors";
+import {
+  latestQuarter,
+  ON_TRACK_FROM,
+  statusOf,
+  valueAt,
+} from "@/domain/selectors";
 import { loadDataset, loadFixtures } from "./pack";
 
 const dataset = loadDataset();
@@ -63,7 +68,7 @@ describe("story: why did Germany's revenue dip in March 2026?", () => {
   it("Germany is back on forecast by May", () => {
     expect(
       valueAt(dataset, market("DE"), "2026-05", "attainment"),
-    ).toBeGreaterThanOrEqual(0.97);
+    ).toBeGreaterThanOrEqual(ON_TRACK_FROM);
   });
 
   it("an anomaly explains the March dip", () => {
@@ -142,7 +147,10 @@ describe("story: what's driving the portfolio's forecast miss?", () => {
     return gap;
   }
 
-  it("the portfolio has been at risk for two quarters running", () => {
+  it("the portfolio has been at risk for two quarters running, after an on-track Q1", () => {
+    expect(statusOf(dataset, { level: "portfolio" }, "2026-Q1")).toBe(
+      "on-track",
+    );
     for (const quarter of lastTwoQuarters) {
       expect(statusOf(dataset, { level: "portfolio" }, quarter)).toBe(
         "at-risk",

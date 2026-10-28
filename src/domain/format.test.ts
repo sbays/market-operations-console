@@ -62,3 +62,10 @@ describe("formatMetric", () => {
     expect(formatMetric("growth", -0.035)).toBe("-3.5%");
   });
 });
+
+describe("formatPeriod: review fixes", () => {
+  it("refuses impossible months instead of rolling them over", () => {
+    expect(() => formatPeriod("2026-13")).toThrow(RangeError);
+    expect(() => formatPeriod("2026-00")).toThrow(RangeError);
+  });
+});

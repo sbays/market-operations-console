@@ -12,23 +12,25 @@ import type {
   Quarter,
   Status,
 } from "./schema";
+import { monthsOfQuarter, parsePeriod, quarterKey } from "./period";
 
 /** Attainment thresholds for status, judged over a quarter. */
 export const ON_TRACK_FROM = 0.98;
 export const AT_RISK_FROM = 0.92;
 
-const QUARTER = /^(\d{4})-Q([1-4])$/;
-
-/** The dataset months a period covers: a month is itself, a quarter is its three months. */
+/**
+ * The dataset months a period covers: a month is itself, a quarter is its three months.
+ * A period the data doesn't fully cover returns [], so a partial quarter is never summed
+ * as if it were complete.
+ */
 export function expandPeriod(dataset: Dataset, period: PeriodRef): Month[] {
-  const quarter = QUARTER.exec(period);
-  if (!quarter) return dataset.periods.includes(period) ? [period] : [];
-
-  const firstMonth = (Number(quarter[2]) - 1) * 3 + 1;
-  const months = [0, 1, 2].map(
-    (offset) => `${quarter[1]}-${String(firstMonth + offset).padStart(2, "0")}`,
-  );
-  return months.filter((month) => dataset.periods.includes(month));
+  const parsed = parsePeriod(period);
+  if (!parsed) return [];
+  const months =
+    parsed.kind === "month"
+      ? [period]
+      : monthsOfQuarter(parsed.year, parsed.quarter);
+  return months.every((m) => dataset.periods.includes(m)) ? months : [];
 }
 
 /** Every product-market series under an entity, or undefined if the entity isn't in the data. */
@@ -154,12 +156,12 @@ export function statusCounts(
 
 /** The most recent quarter whose three months are all in the data. */
 export function latestQuarter(dataset: Dataset): Quarter | undefined {
+  // Periods are consecutive months in order (the schema guarantees it).
   for (const month of [...dataset.periods].reverse()) {
-    const [year, monthNumber] = month.split("-").map(Number);
-    if (year === undefined || monthNumber === undefined) continue;
-    if (monthNumber % 3 !== 0) continue;
-    const quarter = `${year}-Q${monthNumber / 3}`;
-    if (expandPeriod(dataset, quarter).length === 3) return quarter;
+    const parsed = parsePeriod(month);
+    if (parsed?.kind !== "month" || parsed.month % 3 !== 0) continue;
+    const quarter = quarterKey(parsed.year, parsed.month / 3);
+    if (expandPeriod(dataset, quarter).length > 0) return quarter;
   }
   return undefined;
 }
@@ -199,9 +201,12 @@ export function topMovers(
     if (growth !== undefined) movers.push({ ref, growth });
   }
   const ranked = movers.sort((a, b) => b.growth - a.growth);
+  const up = ranked.slice(0, Math.max(0, count));
+  // `down` comes from what's left, so no market is listed both ways.
+  const rest = ranked.slice(up.length);
   return {
-    up: ranked.slice(0, count),
-    down: ranked.slice(-count).reverse(),
+    up,
+    down: rest.slice(Math.max(0, rest.length - count)).reverse(),
   };
 }
 
