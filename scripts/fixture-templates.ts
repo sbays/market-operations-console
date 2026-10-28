@@ -42,7 +42,12 @@ function renderAnswer(dataset: Dataset, template: AnswerTemplate): Fixture {
   const text = template.text.replace(/\{\{(\d+)\}\}/g, (_match, n: string) => {
     const citation = citations[Number(n) - 1];
     if (!citation) throw new Error(`${template.id}: no citation ${n}`);
-    const value = valueAt(dataset, citation.ref, citation.period, citation.metric);
+    const value = valueAt(
+      dataset,
+      citation.ref,
+      citation.period,
+      citation.metric,
+    );
     if (value === undefined) {
       throw new Error(`${template.id}: citation ${n} is not in the data`);
     }
@@ -231,7 +236,8 @@ export function renderFixtures(dataset: Dataset): Fixture[] {
       response: {
         kind: "error",
         text: "Germany's five products have followed different paths since October 2024. Atlas has grown steadily, while Beacon",
-        message: "The assistant stopped responding before the answer was complete.",
+        message:
+          "The assistant stopped responding before the answer was complete.",
       },
     },
   ];
