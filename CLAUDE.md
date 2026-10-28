@@ -45,6 +45,7 @@ Package manager: pnpm. Fonts come from the `geist` package (self-hosted; builds 
 - `pnpm test`: Vitest (unit + component, jsdom)
 - `pnpm test:e2e`: Playwright on Chromium and WebKit, including axe scans (builds and serves on port 3100)
 - `pnpm build`
+- `pnpm data:generate`: rewrite `src/pack/data.json` and `fixtures.json` (deterministic; never hand-edit them)
 
 CI (`.github/workflows/ci.yml`) runs all of the above on every PR as the `ci` check.
 
@@ -56,10 +57,12 @@ Before saying a task is done, run typecheck, lint and the tests for the code you
 src/
   app/            routes; api/chat (mock SSE), api/alerts (mock store)
   features/       dashboard/ assistant/ alerts/ navigation/
-  data/           server-state layer: query keys, fetchers, TanStack Query hooks
+  data/           server-state layer: pack.ts (loadDataset, loadFixtures), query keys, TanStack Query hooks
   domain/         schema.ts (Zod), selectors.ts (pure derivations), format.ts (Intl)
   state/url.ts    nuqs parsers: path, period, compare, mode
   ui/             shadcn primitives, chart shell, tokens
+  pack/           generated data.json + fixtures.json, CONTRACT.md (read only through data/pack.ts)
+scripts/          generate-data.ts (seeded; plants the brief's stories), fixture-templates.ts
 ```
 
 Feature code imports from `data/`, `domain/`, `state/` and `ui/`. Features never import from each other;
@@ -69,7 +72,8 @@ shared logic moves down into `data/`, `domain/` or `ui/`. Only `data/` talks to 
 
 - **No `any`.** Also no `as` casts to escape the type system. Use `unknown` and narrow it.
 - **Zod at every boundary.** Types come from `z.infer`. Validate `data.json`, every stream event and every API body. Nothing downstream re-checks shape.
-- **One `EntityRef` type** (`{ level, id }`) for the URL, charts and citations. Don't create parallel id formats.
+- **One `EntityRef` type** for the URL, charts and citations: a union on `level`; the product variant also carries
+  `marketId` (`{ level: 'product', marketId, id }`). Don't create parallel id formats.
 - **State has one home.** If someone opening the link should see it, it goes in the URL. Data from the server goes in TanStack Query. Derived values are computed with selectors, never stored. Zustand is only for hover, panel open and the stream buffer.
 - **Views don't talk to each other.** They read and write URL state; everything else is derived.
 - **Design tokens only.** No hex values or arbitrary Tailwind values in components. Chart colours come from tokens too.
