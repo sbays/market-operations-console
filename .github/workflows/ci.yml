@@ -30,6 +30,16 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # The generator is deterministic, so the committed pack must equal a fresh run.
+      - name: Data pack is up to date
+        run: |
+          pnpm data:generate
+          git diff --exit-code src/pack || {
+            echo "::error::src/pack is stale. Run 'pnpm data:generate' and commit the result."
+            exit 1
+          }
+
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
