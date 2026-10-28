@@ -277,3 +277,21 @@ describe("confidenceBand", () => {
     expect(confidenceBand(0.4999)).toBe("low");
   });
 });
+
+describe("selectors: review fixes", () => {
+  it("treats a quarter the data only partly covers as outside the data", () => {
+    const toMay = { ...dataset, periods: months.slice(0, 5) };
+    expect(expandPeriod(toMay, "2026-Q2")).toEqual([]);
+    expect(valueAt(toMay, germany, "2026-Q2", "revenue")).toBeUndefined();
+  });
+
+  it("returns no movers for a count of zero and never lists a market both ways", () => {
+    expect(topMovers(dataset, "2026-01", 0)).toEqual({ up: [], down: [] });
+    const movers = topMovers(dataset, "2026-01", 5);
+    expect(movers.up.map((m) => m.ref)).toEqual([
+      germany,
+      { level: "market", id: "US" },
+    ]);
+    expect(movers.down).toEqual([]);
+  });
+});

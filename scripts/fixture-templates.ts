@@ -3,7 +3,7 @@
  * formatted the way the dashboard formats it, followed by the marker `[n]`. The numbers in
  * fixtures.json therefore always match the dataset; src/data/pack.test.ts re-checks it.
  */
-import { formatMetric } from "@/domain/format";
+import { formatMetric, formatPercent } from "@/domain/format";
 import type {
   Citation,
   Dataset,
@@ -12,7 +12,10 @@ import type {
   Metric,
   PeriodRef,
 } from "@/domain/schema";
-import { valueAt } from "@/domain/selectors";
+import { ON_TRACK_FROM, valueAt } from "@/domain/selectors";
+
+/** Quoted from the status rule, not typed by hand, so the text follows the threshold. */
+const onTrackLine = formatPercent(ON_TRACK_FROM);
 
 const portfolio: EntityRef = { level: "portfolio" };
 const region = (id: string): EntityRef => ({ level: "region", id });
@@ -79,7 +82,7 @@ const answers: AnswerTemplate[] = [
       [market("DE"), "2026-Q3", "attainment"],
     ],
     text: [
-      "In Q3 2026, four of the twelve markets are below the 98% on-track line.",
+      `In Q3 2026, four of the twelve markets are below the ${onTrackLine} on-track line.`,
       "",
       "- **Brazil** is off-track with attainment of {{1}}. Demand softened after the April devaluation and hasn't recovered.",
       "- **Japan** ({{2}}) and **India** ({{3}}) are at risk. Both are growing, but their forecasts have assumed even faster growth since the FY26 plan.",
@@ -139,7 +142,7 @@ const answers: AnswerTemplate[] = [
       [market("DE"), "2026-Q3", "attainment"],
     ],
     text: [
-      "The portfolio delivered {{1}} of forecast in Q3 2026, its second quarter in a row below the 98% on-track line.",
+      `The portfolio delivered {{1}} of forecast in Q3 2026, its second quarter in a row below the ${onTrackLine} on-track line.`,
       "",
       "The biggest single driver is **Cirrus**. The April plan moved growth expectations onto its relaunch, and uptake hasn't followed: in the United States, its largest market, Cirrus reached {{2}} of forecast.",
       "",

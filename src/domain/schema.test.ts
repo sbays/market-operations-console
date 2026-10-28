@@ -268,3 +268,28 @@ describe("FixturesSchema", () => {
     ).toBe(false);
   });
 });
+
+describe("DatasetSchema: review fixes", () => {
+  it("rejects a series for a product that is not in the dataset", () => {
+    expect(
+      issuesOf({
+        ...validDataset,
+        markets: [
+          {
+            ...germany,
+            series: { ...germany.series, zeta: germany.series.atlas },
+          },
+        ],
+      }),
+    ).toContain("Market DE has a series for unknown product zeta");
+  });
+
+  it("rejects periods that are not consecutive months", () => {
+    expect(
+      issuesOf({ ...validDataset, periods: ["2026-02", "2026-01"] }),
+    ).toContain("Periods must be consecutive months in order");
+    expect(
+      issuesOf({ ...validDataset, periods: ["2026-01", "2026-01"] }),
+    ).toContain("Periods must be consecutive months in order");
+  });
+});

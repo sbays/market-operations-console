@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { nextMonth, parsePeriod } from "./period";
 
 // Identifiers --------------------------------------------------------------
 
@@ -28,9 +29,19 @@ export type EntityRef = z.infer<typeof EntityRefSchema>;
 // Periods ------------------------------------------------------------------
 
 /** "2026-03" */
-export const MonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+export const MonthSchema = z
+  .string()
+  .refine(
+    (s) => parsePeriod(s)?.kind === "month",
+    "Expected a month like 2026-03",
+  );
 /** "2026-Q3" */
-export const QuarterSchema = z.string().regex(/^\d{4}-Q[1-4]$/);
+export const QuarterSchema = z
+  .string()
+  .refine(
+    (s) => parsePeriod(s)?.kind === "quarter",
+    "Expected a quarter like 2026-Q3",
+  );
 /** What a citation or selection can refer to: one month or one quarter. */
 export const PeriodRefSchema = z.union([MonthSchema, QuarterSchema]);
 
@@ -123,9 +134,26 @@ export const DatasetSchema = z
 
     const fail = (message: string) => ctx.addIssue({ code: "custom", message });
 
+    const consecutive = dataset.periods.every((period, i) => {
+      const previous = parsePeriod(dataset.periods[i - 1] ?? "");
+      return (
+        i === 0 ||
+        (previous?.kind === "month" &&
+          nextMonth(previous.year, previous.month) === period)
+      );
+    });
+    if (!consecutive) fail("Periods must be consecutive months in order");
+
     for (const market of dataset.markets) {
       if (!regionIds.has(market.regionId)) {
         fail(`Market ${market.id} is in unknown region "${market.regionId}"`);
+      }
+      for (const productId of Object.keys(market.series)) {
+        if (!productIds.has(productId)) {
+          fail(
+            `Market ${market.id} has a series for unknown product ${productId}`,
+          );
+        }
       }
       for (const product of dataset.products) {
         const series = market.series[product.id];

@@ -5,7 +5,7 @@
     "suggested": true,
     "response": {
       "kind": "answer",
-      "text": "In Q3 2026, four of the twelve markets are below the 98% on-track line.\n\n- **Brazil** is off-track with attainment of 85.5% [1]. Demand softened after the April devaluation and hasn't recovered.\n- **Japan** (93.8% [2]) and **India** (94.3% [3]) are at risk. Both are growing, but their forecasts have assumed even faster growth since the FY26 plan.\n- **Germany** (95.4% [4]) is at risk because the Q3 forecast assumed it would win back the Beacon sales lost in March, and that hasn't happened.\n\nThe other eight markets are on track.",
+      "text": "In Q3 2026, four of the twelve markets are below the 98.0% on-track line.\n\n- **Brazil** is off-track with attainment of 85.5% [1]. Demand softened after the April devaluation and hasn't recovered.\n- **Japan** (93.8% [2]) and **India** (94.3% [3]) are at risk. Both are growing, but their forecasts have assumed even faster growth since the FY26 plan.\n- **Germany** (95.4% [4]) is at risk because the Q3 forecast assumed it would win back the Beacon sales lost in March, and that hasn't happened.\n\nThe other eight markets are on track.",
       "confidence": 0.86,
       "citations": [
         {
@@ -160,7 +160,7 @@
     "suggested": true,
     "response": {
       "kind": "answer",
-      "text": "The portfolio delivered 97.1% [1] of forecast in Q3 2026, its second quarter in a row below the 98% on-track line.\n\nThe biggest single driver is **Cirrus**. The April plan moved growth expectations onto its relaunch, and uptake hasn't followed: in the United States, its largest market, Cirrus reached 66.4% [2] of forecast.\n\nMarket-level misses add to it: Brazil at 85.5% [3], Japan at 93.8% [4] and Germany at 95.4% [5].",
+      "text": "The portfolio delivered 97.1% [1] of forecast in Q3 2026, its second quarter in a row below the 98.0% on-track line.\n\nThe biggest single driver is **Cirrus**. The April plan moved growth expectations onto its relaunch, and uptake hasn't followed: in the United States, its largest market, Cirrus reached 66.4% [2] of forecast.\n\nMarket-level misses add to it: Brazil at 85.5% [3], Japan at 93.8% [4] and Germany at 95.4% [5].",
       "confidence": 0.78,
       "citations": [
         {
