@@ -65,6 +65,13 @@ describe("story: why did Germany's revenue dip in March 2026?", () => {
     }
   });
 
+  it("the stock-out cost Beacon market share: the category didn't shrink", () => {
+    const beacon = product("DE", "beacon");
+    const february = valueAt(dataset, beacon, "2026-02", "share") ?? 0;
+    const march = valueAt(dataset, beacon, "2026-03", "share") ?? 0;
+    expect(march).toBeLessThan(february * 0.6);
+  });
+
   it("Germany is back on forecast by May", () => {
     expect(
       valueAt(dataset, market("DE"), "2026-05", "attainment"),

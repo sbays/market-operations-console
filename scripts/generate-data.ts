@@ -200,7 +200,9 @@ function generate(): Dataset {
             actual,
             forecast,
             units: actual / product.price,
-            marketSize: actual / (product.share * jitter(0.04)),
+            // From the pre-adjustment value: a story changes our sales, not the category's size,
+            // so a stock-out shows up as lost share.
+            marketSize: expected / (product.share * jitter(0.04)),
           });
         }
 
