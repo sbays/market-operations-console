@@ -137,6 +137,32 @@ Assisted-by: Claude Code
 - **Trailer:** every commit Claude writes ends with `Assisted-by: Claude Code`, so AI-assisted work is visible
   in the history.
 
+## Pull request descriptions
+
+Write every PR body with the `mattpocock-skills:pr` skill, save it as a Markdown file in the scratchpad, and hand
+Simon `gh pr create … --body-file <path>` (or `gh pr edit <n> --body-file <path>`). Never put the body inline in
+`--body "…"`. Structure:
+
+```markdown
+## Why
+<one or two sentences: the reason for the PR>
+
+## Summary
+<the smallest visual that makes the change clear: file tree, call tree, diff sketch or Mermaid diagram>
+
+## Decisions
+- <a choice made in this branch, or a deviation from docs/PLAN.md, with its reason>
+
+## Evidence
+- **Before:** <failing test, output or screenshot>
+  **After:** <passing test, output or screenshot>
+
+## Merge danger
+**Door:** <one-way or two-way>. **Blast radius:** <one word>, plus what could break if it is wrong.
+```
+
+Leave out `Decisions` when there were none. Keep prose short; let the visuals carry the detail.
+
 ## Browser checks
 
 When the browser connection is available, use it to verify UI work against the running app:
