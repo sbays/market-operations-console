@@ -96,6 +96,13 @@ Zod schemas are the single source of types: we write the schema, infer the TypeS
 
 The starter pack is not in hand, so we author our own `data.json` and fixtures following the brief's described contract (decided 28 Oct; the README says so). All data is read through a single `loadDataset()` seam, so a real pack would replace one module. Revenue is stored in one reporting currency, USD, so rollups are plain sums (decided 28 Oct).
 
+Pack decisions (28 Oct, `feat/data-pack`):
+
+- The pack lives in `src/pack/` (`data.json`, `fixtures.json`, `CONTRACT.md`) and is read only through `src/data/pack.ts` (`loadDataset`, `loadFixtures`); a lint rule enforces it.
+- The dataset stores facts only (`actual`, `units`, `forecast`, `priorYear`, `marketSize` per product, market and month). Growth, attainment, share and status are selectors, so rollups are exact. Status uses quarterly attainment: on-track from 98%, at-risk from 92%, off-track below. Anomalies are stored because they carry a reason.
+- 24 months, Oct 2024 to Sep 2026; "this quarter" is Q3 2026. Citations may refer to a month or a quarter.
+- `scripts/generate-data.ts` (seeded, deterministic) plants the stories as named adjustments. Fixtures are templates whose `{{n}}` placeholders are filled from the data, so quoted numbers match by construction; pack tests re-check it.
+
 ## Assistant surface
 
 The assistant is where we win or lose on trust, so every answer renders as a structured card, never a bare text bubble.
