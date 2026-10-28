@@ -101,6 +101,7 @@ replace one module. Fixture text must quote numbers that match the dataset; a te
 
 - Start non-trivial tasks in plan mode. Wait for the plan to be approved before writing code.
 - Keep diffs small and focused on one task. Use conventional commits (`feat:`, `fix:`, `test:`, `chore:`).
+- Never commit to `main`. One branch and PR per schedule block (`feat/…`, `fix/…`, `docs/…`), rebase-merged after CI passes and Simon approves. Run `/code-review` on the branch before opening the PR.
 - Don't add dependencies without saying why. Prefer what's already in the stack.
 - If the plan and the code disagree, or a decision isn't covered here, ask. Don't guess.
 - **Do not write README prose.** The README must be in the author's own words. You may add command snippets, file paths or the architecture diagram source when asked.
