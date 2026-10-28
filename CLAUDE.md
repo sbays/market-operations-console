@@ -57,7 +57,7 @@ Before saying a task is done, run typecheck, lint and the tests for the code you
 src/
   app/            routes; api/chat (mock SSE), api/alerts (mock store)
   features/       dashboard/ assistant/ alerts/ navigation/
-  data/           server-state layer: pack.ts (loadDataset, loadFixtures), query keys, TanStack Query hooks
+  data/           server-state layer: pack.ts (server-only: loadDataset, loadFixtures), query keys, TanStack Query hooks
   domain/         schema.ts (Zod), selectors.ts (pure derivations), format.ts (Intl)
   state/url.ts    nuqs parsers: path, period, compare, mode
   ui/             shadcn primitives, chart shell, tokens

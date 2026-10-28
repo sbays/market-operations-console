@@ -98,8 +98,8 @@ The starter pack is not in hand, so we author our own `data.json` and fixtures f
 
 Pack decisions (28 Oct, `feat/data-pack`):
 
-- The pack lives in `src/pack/` (`data.json`, `fixtures.json`, `CONTRACT.md`) and is read only through `src/data/pack.ts` (`loadDataset`, `loadFixtures`); a lint rule enforces it.
-- The dataset stores facts only (`actual`, `units`, `forecast`, `priorYear`, `marketSize` per product, market and month). Growth, attainment, share and status are selectors, so rollups are exact. Status uses quarterly attainment: on-track from 98%, at-risk from 92%, off-track below. Anomalies are stored because they carry a reason.
+- The pack lives in `src/pack/` (`data.json`, `fixtures.json`, `CONTRACT.md`) and is read only through `src/data/pack.ts` (`loadDataset`, `loadFixtures`); a lint rule enforces it. `pack.ts` is `server-only`: the dataset reaches the client through TanStack Query and the fixtures never leave the server.
+- The dataset stores facts only (`actual`, `units`, `forecast`, `priorYear`, `marketSize` per product, market and month). Growth, attainment, share and status are selectors, so rollups are exact. Status uses quarterly attainment: on-track from 98%, at-risk from 92%, off-track below, compared on the value as displayed (one decimal), so a badge never contradicts its number (decided 28 Oct, PR #4 review). Anomalies are stored because they carry a reason.
 - 24 months, Oct 2024 to Sep 2026; "this quarter" is Q3 2026. Citations may refer to a month or a quarter.
 - `scripts/generate-data.ts` (seeded, deterministic) plants the stories as named adjustments. Fixtures are templates whose `{{n}}` placeholders are filled from the data, so quoted numbers match by construction; pack tests re-check it.
 
