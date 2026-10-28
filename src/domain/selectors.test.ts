@@ -29,7 +29,7 @@ const months = [
   "2026-04",
   "2026-05",
   "2026-06",
-];
+] as const;
 
 function series(
   values: Omit<Point, "period">,
@@ -302,5 +302,12 @@ describe("selectors: review fixes", () => {
       { level: "market", id: "US" },
     ]);
     expect(movers.down).toEqual([]);
+  });
+});
+
+describe("period types", () => {
+  it("won't compile a month where a quarter is required", () => {
+    // @ts-expect-error a month is not a quarter
+    expect(statusOf(dataset, germany, "2026-03")).toBeDefined();
   });
 });

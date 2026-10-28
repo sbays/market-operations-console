@@ -13,7 +13,7 @@ import type {
   Status,
 } from "./schema";
 import { PERCENT_DECIMALS } from "./format";
-import { monthsOfQuarter, parsePeriod, quarterKey } from "./period";
+import { monthKey, monthsOfQuarter, parsePeriod, quarterKey } from "./period";
 
 /** Attainment thresholds for status, judged over a quarter. */
 export const ON_TRACK_FROM = 0.98;
@@ -29,7 +29,7 @@ export function expandPeriod(dataset: Dataset, period: PeriodRef): Month[] {
   if (!parsed) return [];
   const months =
     parsed.kind === "month"
-      ? [period]
+      ? [monthKey(parsed.year, parsed.month)]
       : monthsOfQuarter(parsed.year, parsed.quarter);
   return months.every((m) => dataset.periods.includes(m)) ? months : [];
 }
