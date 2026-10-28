@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { nextMonth, parsePeriod } from "./period";
+import { MonthSchema, nextMonth, parsePeriod, PeriodRefSchema } from "./period";
+
+export { MonthSchema, PeriodRefSchema, QuarterSchema } from "./period";
+export type { Month, PeriodRef, Quarter } from "./period";
 
 // Identifiers --------------------------------------------------------------
 
@@ -25,29 +28,6 @@ export const EntityRefSchema = z.discriminatedUnion("level", [
   }),
 ]);
 export type EntityRef = z.infer<typeof EntityRefSchema>;
-
-// Periods ------------------------------------------------------------------
-
-/** "2026-03" */
-export const MonthSchema = z
-  .string()
-  .refine(
-    (s) => parsePeriod(s)?.kind === "month",
-    "Expected a month like 2026-03",
-  );
-/** "2026-Q3" */
-export const QuarterSchema = z
-  .string()
-  .refine(
-    (s) => parsePeriod(s)?.kind === "quarter",
-    "Expected a quarter like 2026-Q3",
-  );
-/** What a citation or selection can refer to: one month or one quarter. */
-export const PeriodRefSchema = z.union([MonthSchema, QuarterSchema]);
-
-export type Month = z.infer<typeof MonthSchema>;
-export type Quarter = z.infer<typeof QuarterSchema>;
-export type PeriodRef = z.infer<typeof PeriodRefSchema>;
 
 // Dataset ------------------------------------------------------------------
 

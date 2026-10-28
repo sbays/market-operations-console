@@ -65,7 +65,17 @@ describe("formatMetric", () => {
 
 describe("formatPeriod: review fixes", () => {
   it("refuses impossible months instead of rolling them over", () => {
+    // Values that skipped the schema: the types already reject them at compile time.
+    // @ts-expect-error month 13 is not a Month
     expect(() => formatPeriod("2026-13")).toThrow(RangeError);
+    // @ts-expect-error month 00 is not a Month
     expect(() => formatPeriod("2026-00")).toThrow(RangeError);
+  });
+});
+
+describe("formatPeriod: types", () => {
+  it("won't compile a string that isn't a period", () => {
+    // @ts-expect-error "banana" is not a PeriodRef
+    expect(() => formatPeriod("banana")).toThrow(RangeError);
   });
 });
