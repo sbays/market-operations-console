@@ -17,7 +17,10 @@ export default defineConfig({
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
   ],
   webServer: {
-    command: `pnpm build && pnpm start --port ${port}`,
+    // CI has already run `pnpm build`; locally, build first so E2E always tests a production bundle.
+    command: process.env.CI
+      ? `pnpm start --port ${port}`
+      : `pnpm build && pnpm start --port ${port}`,
     url: `http://127.0.0.1:${port}/console`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
