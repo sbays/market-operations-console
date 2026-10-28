@@ -105,11 +105,37 @@ replace one module. Fixture text must quote numbers that match the dataset; a te
 ## Working style
 
 - Start non-trivial tasks in plan mode. Wait for the plan to be approved before writing code.
-- Keep diffs small and focused on one task. Use conventional commits (`feat:`, `fix:`, `test:`, `chore:`).
+- Keep diffs small and focused on one task. Commit messages follow "Commit messages" below.
 - Never commit to `main`. One branch and PR per schedule block (`feat/…`, `fix/…`, `docs/…`), rebase-merged after CI passes and Simon approves. Run `/code-review` on the branch before opening the PR.
 - Don't add dependencies without saying why. Prefer what's already in the stack.
 - If the plan and the code disagree, or a decision isn't covered here, ask. Don't guess.
 - **Do not write README prose.** The README must be in the author's own words. You may add command snippets, file paths or the architecture diagram source when asked.
+
+## Commit messages
+
+```
+<type>(<scope>): <summary>
+
+Why: <the reason for the change, one or two sentences>
+
+What:
+- <change>
+- <change>
+
+Tested: <how it was verified, e.g. "selectors.test.ts (15 tests)", or "n/a: docs only">
+
+Assisted-by: Claude Code
+```
+
+- **Type:** `feat`, `fix`, `test`, `refactor`, `docs`, `chore`, `ci`.
+- **Scope:** the area touched, from the layout: `app`, `assistant`, `dashboard`, `alerts`, `navigation`, `data`,
+  `domain`, `state`, `ui`, `pack`, `scripts`, `deps`. Use the main one if a commit spans two. Leave the scope out when
+  it would only repeat the type (`docs: …`, `ci: …`).
+- **Summary:** imperative, lower case, no full stop, at most 72 characters including type and scope.
+- **Body:** wrap at 72 characters. `Why` and `Tested` are always present; `What` may be dropped when the
+  subject already says it all. Explain why, not how: the diff shows how.
+- **Trailer:** every commit Claude writes ends with `Assisted-by: Claude Code`, so AI-assisted work is visible
+  in the history.
 
 ## Browser checks
 
