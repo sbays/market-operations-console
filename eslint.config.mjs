@@ -44,6 +44,18 @@ const eslintConfig = defineConfig([
               message: "Lower layers never import from features or routes.",
             },
             {
+              target: [
+                "./src/app",
+                "./src/features",
+                "./src/domain",
+                "./src/state",
+                "./src/ui",
+              ],
+              from: "./src/pack",
+              message:
+                "Read the data pack through data/pack.ts (loadDataset, loadFixtures), which validates it.",
+            },
+            {
               target: "./src/domain",
               from: ["./src/data", "./src/state", "./src/ui"],
               message:
