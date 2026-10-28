@@ -20,16 +20,19 @@ export function formatCurrency(value: number): string {
   return currency.format(value);
 }
 
+/** Decimal places shown for percentages; status decisions round to the same precision. */
+export const PERCENT_DECIMALS = 1;
+
 const percent = new Intl.NumberFormat(LOCALE, {
   style: "percent",
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
+  minimumFractionDigits: PERCENT_DECIMALS,
+  maximumFractionDigits: PERCENT_DECIMALS,
 });
 
 const signedPercent = new Intl.NumberFormat(LOCALE, {
   style: "percent",
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
+  minimumFractionDigits: PERCENT_DECIMALS,
+  maximumFractionDigits: PERCENT_DECIMALS,
   signDisplay: "exceptZero",
 });
 

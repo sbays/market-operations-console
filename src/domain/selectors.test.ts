@@ -205,9 +205,18 @@ describe("status", () => {
   it("is on-track from 98% attainment, at-risk from 92%, off-track below", () => {
     expect(statusForAttainment(1.05)).toBe("on-track");
     expect(statusForAttainment(0.98)).toBe("on-track");
-    expect(statusForAttainment(0.9799)).toBe("at-risk");
+    expect(statusForAttainment(0.9794)).toBe("at-risk");
     expect(statusForAttainment(0.92)).toBe("at-risk");
-    expect(statusForAttainment(0.9199)).toBe("off-track");
+    expect(statusForAttainment(0.9194)).toBe("off-track");
+  });
+
+  it("decides on the value as displayed, so a badge never contradicts its number", () => {
+    // 97.996% is shown as "98.0%", so it must be on-track
+    expect(statusForAttainment(0.97996)).toBe("on-track");
+    // 97.949% is shown as "97.9%"
+    expect(statusForAttainment(0.97949)).toBe("at-risk");
+    expect(statusForAttainment(0.91996)).toBe("at-risk");
+    expect(statusForAttainment(0.91949)).toBe("off-track");
   });
 
   it("judges an entity on its attainment over a quarter", () => {
