@@ -22,6 +22,9 @@ A small, working, well-engineered build beats a large, broken one. Do not add fe
 ## Stack (decided; don't swap without asking)
 
 - Next.js 16 App Router, React 19, TypeScript strict (use current stable releases)
+- Pinned on purpose, don't upgrade: TypeScript 6.0 (`typescript-eslint` needs `<6.1`), ESLint 9 (`eslint-plugin-jsx-a11y`
+  peers on `≤9`). Node 24 (`.nvmrc`); pnpm version comes from `packageManager` in `package.json`.
+- `cacheComponents` is on (Next 16 default): dynamic reads such as nuqs/`useSearchParams` need a Suspense boundary.
 - Every dependency must declare React 19 support. Don't force installs with overrides or `--legacy-peer-deps`; flag the library instead.
 - Tailwind v4 with CSS-variable tokens, shadcn/ui on Radix
 - visx for charts; react-simple-maps + d3-geo for the choropleth
@@ -31,17 +34,19 @@ A small, working, well-engineered build beats a large, broken one. Do not add fe
 - Vitest + Testing Library + MSW; Playwright + axe-core
 - `web-vitals` (console reporting). Sentry is described in the README, not wired.
 
-Package manager: pnpm.
+Package manager: pnpm. Fonts come from the `geist` package (self-hosted; builds make no network calls).
 
 ## Commands
 
-<!-- Confirm these once the project is scaffolded -->
 - `pnpm dev`: start dev server
-- `pnpm typecheck`: `tsc --noEmit`
-- `pnpm lint`
-- `pnpm test`: Vitest (unit + component)
-- `pnpm test:e2e`: Playwright, including axe scans
+- `pnpm typecheck`: `next typegen && tsc --noEmit` (typegen creates route types such as `LayoutProps`)
+- `pnpm lint`: ESLint, including the layer-boundary rules (`import/no-restricted-paths`)
+- `pnpm format` / `pnpm format:check`: Prettier with Tailwind class sorting
+- `pnpm test`: Vitest (unit + component, jsdom)
+- `pnpm test:e2e`: Playwright on Chromium and WebKit, including axe scans (builds and serves on port 3100)
 - `pnpm build`
+
+CI (`.github/workflows/ci.yml`) runs all of the above on every PR as the `ci` check.
 
 Before saying a task is done, run typecheck, lint and the tests for the code you touched.
 
