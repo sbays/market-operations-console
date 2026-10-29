@@ -152,7 +152,7 @@ describe("threshold range by metric", () => {
 
   it("reports the range on the threshold field, naming it in the message", () => {
     expect(issuesOf({ ...valid, metric: "growth", threshold: 1001 })).toEqual([
-      "threshold: Growth thresholds run from -100% to 1000%.",
+      "threshold: Growth thresholds run from -100% to 1,000%.",
     ]);
     expect(
       issuesOf({ ...valid, metric: "attainment", threshold: 201 }),

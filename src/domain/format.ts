@@ -44,6 +44,16 @@ export function formatPercent(
   return (options.signed ? signedPercent : percent).format(value);
 }
 
+const wholePercent = new Intl.NumberFormat(LOCALE, {
+  style: "percent",
+  maximumFractionDigits: 0,
+});
+
+/** A percentage as the user typed it, not a ratio: 95 → "95%", 1000 → "1,000%". */
+export function formatTypedPercent(value: number): string {
+  return wholePercent.format(value / 100);
+}
+
 const points = new Intl.NumberFormat(LOCALE, {
   minimumFractionDigits: PERCENT_DECIMALS,
   maximumFractionDigits: PERCENT_DECIMALS,

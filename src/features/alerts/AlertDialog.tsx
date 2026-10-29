@@ -9,7 +9,7 @@ import {
   AlertMetricSchema,
   AlertOperatorSchema,
   AlertRuleInputSchema,
-  THRESHOLD_RANGE,
+  thresholdRangeText,
   type AlertOperator,
   type AlertRuleInput,
 } from "@/domain/alert";
@@ -208,7 +208,6 @@ function AlertForm({ onSaved }: { onSaved: () => void }) {
   const { errors } = form.formState;
   // useWatch rather than watch(): watch() is the one RHF API the React Compiler will not memoize.
   const metric = useWatch({ control: form.control, name: "metric" });
-  const range = THRESHOLD_RANGE[metric];
 
   const issues = FIELD_ORDER.flatMap((field) => {
     const message = messageOf(errors[field]);
@@ -364,7 +363,7 @@ function AlertForm({ onSaved }: { onSaved: () => void }) {
             className="text-xs text-muted-foreground"
           >
             Valid range for {formatMetricName(metric).toLowerCase()}:{" "}
-            {range.min}% to {range.max}%.
+            {thresholdRangeText(metric)}.
           </p>
           <FieldError
             id={errorId("threshold")}
