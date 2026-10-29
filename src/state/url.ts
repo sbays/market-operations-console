@@ -4,7 +4,13 @@
  * The shareable selection: everything a colleague opening the link should see.
  * Views read and write these params; nothing else stores the selection.
  */
-import { createParser, parseAsString, useQueryStates } from "nuqs";
+import {
+  createParser,
+  parseAsArrayOf,
+  parseAsString,
+  useQueryState,
+  useQueryStates,
+} from "nuqs";
 import { useDataset } from "@/data/useDataset";
 import {
   PeriodRefSchema,
@@ -63,5 +69,43 @@ export function useSetPeriod(): (period: PeriodRef) => void {
   });
   return (period) => {
     void setSelection({ period });
+  };
+}
+
+/** The most entities the radar compares at once. */
+export const MAX_COMPARE = 4;
+
+/** Entities to compare, as drill paths: "eu.DE,eu.FR". Same format as `path`. */
+const compareParser = parseAsArrayOf(parseAsString, ",").withDefault([]);
+
+/** The compared entities that the data contains, at most MAX_COMPARE. */
+export function useCompare(): EntityRef[] {
+  const dataset = useDataset();
+  const [paths] = useQueryState("compare", compareParser);
+  return paths
+    .map((path) => refFromPath(dataset, path))
+    .filter((ref) => ref !== undefined)
+    .slice(0, MAX_COMPARE);
+}
+
+/**
+ * Adds an entity to the comparison, or removes it if it's there. Ignores additions past
+ * MAX_COMPARE. Replaces history: picking what to compare isn't a navigation.
+ */
+export function useToggleCompare(): (ref: EntityRef) => void {
+  const dataset = useDataset();
+  const [paths, setPaths] = useQueryState(
+    "compare",
+    compareParser.withOptions({ history: "replace" }),
+  );
+  return (ref) => {
+    const path = pathOf(dataset, ref);
+    if (path === undefined) return;
+    if (paths.includes(path)) {
+      const rest = paths.filter((p) => p !== path);
+      void setPaths(rest.length > 0 ? rest : null);
+    } else if (paths.length < MAX_COMPARE) {
+      void setPaths([...paths, path]);
+    }
   };
 }
