@@ -19,3 +19,49 @@ test("console has no axe violations", async ({ page }) => {
 
   expect(results.violations).toEqual([]);
 });
+
+test("a cited answer drills the dashboard, and Back undoes it", async ({
+  page,
+}) => {
+  await page.goto("/console");
+  const assistant = page.getByRole("complementary", { name: "Assistant" });
+
+  await assistant
+    .getByRole("button", {
+      name: "Why did Germany's revenue dip in March 2026?",
+    })
+    .click();
+  await expect(assistant.getByText("High confidence")).toBeVisible();
+
+  const chip = assistant.getByRole("button", {
+    name: "DE · Mar 2026 · Revenue",
+  });
+  await chip.focus();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "Source data: Germany, Mar 2026, Revenue: $4M",
+  );
+
+  await chip.click();
+  await expect(page).toHaveURL(/path=eu\.DE&period=2026-03/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/console$/);
+});
+
+test("console with an answer on screen has no axe violations", async ({
+  page,
+}) => {
+  await page.goto("/console");
+  const assistant = page.getByRole("complementary", { name: "Assistant" });
+  await assistant
+    .getByRole("button", {
+      name: "Why did Germany's revenue dip in March 2026?",
+    })
+    .click();
+  await expect(assistant.getByText("High confidence")).toBeVisible();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+});
