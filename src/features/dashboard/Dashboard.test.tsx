@@ -46,6 +46,8 @@ function lastUrl(onUrlUpdate: ReturnType<typeof vi.fn<OnUrlUpdateFunction>>) {
 
 const breadcrumb = () => screen.getByRole("navigation", { name: "Breadcrumb" });
 const keyFigures = () => screen.getByRole("region", { name: "Key figures" });
+const trendFigure = () =>
+  screen.getByRole("figure", { name: "Germany revenue" });
 
 describe("Dashboard", () => {
   it("shows the portfolio for the latest full quarter when the URL is empty", () => {
@@ -136,7 +138,9 @@ describe("Dashboard", () => {
       }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "View as table" }));
+    await user.click(
+      within(trendFigure()).getByRole("button", { name: "View as table" }),
+    );
 
     const table = screen.getByRole("table", {
       name: /Germany revenue by month/,
@@ -193,13 +197,15 @@ describe("Dashboard", () => {
   it("names each line in a legend, and reads the summary once", async () => {
     const { user } = renderDashboard("?path=eu.DE");
 
-    const legend = screen.getByRole("list", { name: "Legend" });
+    const legend = within(trendFigure()).getByRole("list", { name: "Legend" });
     expect(legend).toHaveTextContent(/Actual.*Forecast.*Prior year/);
     // Chart mode: the svg carries the summary, so the visible copy is hidden from AT.
     const summary = /^Germany revenue, Oct 2024 to Sep 2026: /;
     expect(screen.getByText(summary)).toHaveAttribute("aria-hidden", "true");
 
-    await user.click(screen.getByRole("button", { name: "View as table" }));
+    await user.click(
+      within(trendFigure()).getByRole("button", { name: "View as table" }),
+    );
     expect(screen.getByText(summary)).not.toHaveAttribute("aria-hidden");
   });
 
@@ -233,5 +239,50 @@ describe("Dashboard", () => {
       "?path=eu&compare=eu.FR,eu.GB,eu.IT",
     );
     expect(spain).toBeEnabled();
+  });
+
+  it("compares the rows ticked in the breakdown", async () => {
+    const { user } = renderDashboard("?path=eu");
+    const table = screen.getByRole("table", { name: /Europe by market/ });
+
+    await user.click(
+      within(table).getByRole("checkbox", { name: "Compare Germany" }),
+    );
+    await user.click(
+      within(table).getByRole("checkbox", { name: "Compare Spain" }),
+    );
+
+    const compare = screen.getByRole("figure", { name: "Compare" });
+    const legend = within(compare).getByRole("list", { name: "Legend" });
+    expect(within(legend).getAllByRole("listitem")).toHaveLength(2);
+    expect(legend).toHaveTextContent(/Germany.*Spain/);
+  });
+
+  it("focuses a month from the heat map, and the key figures follow", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+
+    await user.click(
+      screen.getByRole("button", { name: /^Beacon in Germany, Mar 2026: / }),
+    );
+
+    expect(lastUrl(onUrlUpdate)).toEqual({
+      query: "?path=eu.DE&period=2026-03",
+      history: "replace",
+    });
+    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$4M/);
+  });
+
+  it("drills to a market from the map", async () => {
+    const { user, onUrlUpdate } = renderDashboard();
+
+    await user.click(
+      await screen.findByRole("button", { name: /^Germany: attainment / }),
+    );
+
+    expect(lastUrl(onUrlUpdate)).toEqual({
+      query: "?path=eu.DE",
+      history: "push",
+    });
+    expect(breadcrumb()).toHaveTextContent(/Portfolio.*Europe.*Germany/);
   });
 });
