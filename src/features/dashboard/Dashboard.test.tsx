@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadDataset } from "@/data/pack";
 import { datasetQuery } from "@/data/queries";
-import { resetHighlight } from "@/state/highlight";
+import { clearHighlight } from "@/state/highlight";
 import { Toaster } from "@/ui/Toaster";
 import { Dashboard } from "./Dashboard";
 
@@ -482,21 +482,27 @@ describe("Dashboard", () => {
 
 describe("Dashboard: linked highlighting", () => {
   // The highlight store is module-level, so each test starts with nothing highlighted.
-  afterEach(() => act(() => resetHighlight()));
+  afterEach(() => act(() => clearHighlight()));
 
   const linked = (element: HTMLElement | undefined) =>
     element?.getAttribute("data-linked") === "true";
   const marker = (name: string) =>
     screen.getByRole("button", { name: new RegExp(`^${name}: attainment`) });
-  const tableRow = (name: string) =>
-    within(screen.getByRole("table", { name: /by (market|region)/ }))
+  // getByRole throws if the row is missing, so a renamed row fails here, not in an assertion.
+  const tableRow = (name: string) => {
+    const row = within(
+      screen.getByRole("table", { name: /by (market|region)/ }),
+    )
       .getByRole("button", { name })
-      .closest("tr") ?? undefined;
+      .closest("tr");
+    if (row === null) throw new Error(`No table row for ${name}`);
+    return row;
+  };
 
   it("emphasises a hovered table row's market on the map, heat map and radar", async () => {
     const { user } = renderDashboard("?path=eu");
 
-    await user.hover(tableRow("Germany") ?? document.body);
+    await user.hover(tableRow("Germany"));
 
     expect(linked(marker("Germany"))).toBe(true);
     expect(linked(marker("France"))).toBe(false);
@@ -508,7 +514,7 @@ describe("Dashboard: linked highlighting", () => {
     ).toBe(true);
     expect(linked(tableRow("France"))).toBe(false);
 
-    await user.unhover(tableRow("Germany") ?? document.body);
+    await user.unhover(tableRow("Germany"));
     expect(linked(marker("Germany"))).toBe(false);
   });
 
@@ -524,9 +530,36 @@ describe("Dashboard: linked highlighting", () => {
   it("links a region's row to its markets on the map at the portfolio", async () => {
     const { user } = renderDashboard();
 
-    await user.hover(tableRow("Europe") ?? document.body);
+    await user.hover(tableRow("Europe"));
 
     expect(linked(marker("Germany"))).toBe(true);
     expect(linked(marker("United States"))).toBe(false);
+  });
+
+  it("clears the highlight when a hovered row is drilled into", async () => {
+    const { user } = renderDashboard("?path=eu");
+
+    await user.hover(tableRow("Germany"));
+    await user.click(
+      within(tableRow("Germany")).getByRole("button", { name: "Germany" }),
+    );
+
+    // Without clearing, "eu.DE" would link every one of Germany's products.
+    expect(
+      screen.getByRole("table", { name: /Germany by product/ }),
+    ).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-linked="true"]')).toHaveLength(0);
+  });
+
+  it("emphasises a hovered market among the top risks", async () => {
+    const { user } = renderDashboard("?path=latam&period=2026-Q2");
+    const risks = screen.getByRole("region", { name: "Top risks" });
+
+    await user.hover(tableRow("Brazil"));
+
+    const brazil = within(risks)
+      .getByRole("button", { name: "Brazil" })
+      .closest("li");
+    expect(brazil?.getAttribute("data-linked")).toBe("true");
   });
 });

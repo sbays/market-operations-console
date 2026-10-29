@@ -12,18 +12,42 @@
 import { create } from "zustand";
 import { isLinked } from "@/domain/highlight";
 
-type HighlightState = { path: string | null };
+/**
+ * Pointer and focus are tracked apart, so a mouse passing over one item can't wipe the
+ * highlight a keyboard user has on another. The pointer wins while it's over an item.
+ */
+type HighlightState = { pointer: string | null; focus: string | null };
 
-const useHighlightStore = create<HighlightState>(() => ({ path: null }));
+const useHighlightStore = create<HighlightState>(() => ({
+  pointer: null,
+  focus: null,
+}));
+
+const shown = (state: HighlightState) => state.pointer ?? state.focus;
 
 /** The drill path being hovered or focused, or null. */
 export function useHighlightedPath(): string | null {
-  return useHighlightStore((state) => state.path);
+  return useHighlightStore(shown);
 }
 
-/** Clears the highlight. For tests, which share the module-level store. */
-export function resetHighlight(): void {
-  useHighlightStore.setState({ path: null });
+/**
+ * Whether one item is linked to the highlight. The selector returns a boolean, so a
+ * component using it re-renders only when its own emphasis turns on or off, not on every
+ * hover elsewhere.
+ */
+export function useIsLinked(path: string | undefined): boolean {
+  return useHighlightStore(
+    (state) => path !== undefined && isLinked(path, shown(state)),
+  );
+}
+
+/**
+ * Clears the highlight. The dashboard calls it when the selection changes: the hovered or
+ * focused item usually unmounts in a drill without firing its leave or blur, and a stale
+ * "eu.DE" would otherwise link every product of Germany at the next level.
+ */
+export function clearHighlight(): void {
+  useHighlightStore.setState({ pointer: null, focus: null });
 }
 
 export type HighlightHandlers = {
@@ -36,21 +60,19 @@ export type HighlightHandlers = {
 /**
  * Handlers that highlight `path` while the item is hovered or focused. Not a hook (it only
  * writes to the store), so views can call it per item inside loops and chart render props.
- * Pointer and focus events both drive it, so keyboard users get the same emphasis. Leaving
- * only clears the highlight if it is still this item's: moving quickly can fire the next
- * item's enter before this one's leave.
+ * Leaving or blurring only clears its own slot, and only if it still holds this item:
+ * moving quickly can fire the next item's enter before this one's leave.
  */
 export function highlightHandlers(path: string): HighlightHandlers {
-  const show = () => useHighlightStore.setState({ path });
-  const hide = () =>
+  const release = (slot: keyof HighlightState) => () =>
     useHighlightStore.setState((state) =>
-      state.path === path ? { path: null } : state,
+      state[slot] === path ? { [slot]: null } : state,
     );
   return {
-    onMouseEnter: show,
-    onMouseLeave: hide,
-    onFocus: show,
-    onBlur: hide,
+    onMouseEnter: () => useHighlightStore.setState({ pointer: path }),
+    onMouseLeave: release("pointer"),
+    onFocus: () => useHighlightStore.setState({ focus: path }),
+    onBlur: release("focus"),
   };
 }
 
@@ -60,12 +82,12 @@ export type LinkedProps = Partial<HighlightHandlers> & {
 
 /**
  * Everything an item needs to take part in linked highlighting: the handlers, plus
- * `data-linked` while it's emphasised. `own` keeps an item's existing focus handler (a chart
+ * `data-linked` while `linked`. `own` keeps an item's existing focus handler (a chart
  * point's roving tabindex) working alongside the highlight. Items with no path don't link.
  */
 export function linkedProps(
   path: string | undefined,
-  highlighted: string | null,
+  linked: boolean,
   own: { onFocus?: () => void } = {},
 ): LinkedProps {
   if (path === undefined) return own;
@@ -76,6 +98,6 @@ export function linkedProps(
       own.onFocus?.();
       handlers.onFocus();
     },
-    "data-linked": isLinked(path, highlighted) ? "true" : undefined,
+    "data-linked": linked ? "true" : undefined,
   };
 }

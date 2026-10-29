@@ -1,12 +1,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  resetHighlight,
-  useHighlightedPath,
+  clearHighlight,
   highlightHandlers,
+  useHighlightedPath,
+  useIsLinked,
 } from "./highlight";
 
-afterEach(() => act(() => resetHighlight()));
+afterEach(() => act(() => clearHighlight()));
 
 function setup() {
   const highlighted = renderHook(() => useHighlightedPath());
@@ -47,5 +48,36 @@ describe("highlight state", () => {
     act(() => france.current.onMouseEnter());
     act(() => germany.current.onMouseLeave());
     expect(highlighted.current).toBe("eu.FR");
+  });
+
+  it("keeps a keyboard user's focus highlight when the mouse passes over something else", () => {
+    const { germany, france, highlighted } = setup();
+
+    act(() => france.current.onFocus());
+    act(() => germany.current.onMouseEnter());
+    // The pointer wins while it's over an item.
+    expect(highlighted.current).toBe("eu.DE");
+
+    act(() => germany.current.onMouseLeave());
+    expect(highlighted.current).toBe("eu.FR");
+  });
+
+  it("clears both pointer and focus highlights", () => {
+    const { germany, france, highlighted } = setup();
+    act(() => france.current.onFocus());
+    act(() => germany.current.onMouseEnter());
+
+    act(() => clearHighlight());
+    expect(highlighted.current).toBeNull();
+  });
+
+  it("answers per item whether it is linked, including parent and child", () => {
+    const { germany } = setup();
+    const europe = renderHook(() => useIsLinked("eu"));
+    const france = renderHook(() => useIsLinked("eu.FR"));
+
+    act(() => germany.current.onMouseEnter());
+    expect(europe.result.current).toBe(true);
+    expect(france.result.current).toBe(false);
   });
 });
