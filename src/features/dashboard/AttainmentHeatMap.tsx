@@ -146,7 +146,7 @@ export function AttainmentHeatMap({ dataset, selected, period }: Props) {
                 key={`${rowKey(dataset, row, r)}-${cell.period}`}
                 type="button"
                 {...item}
-                {...linkedProps(pathOf(dataset, row.ref), highlighted, item)}
+                {...linkedProps(pathOf(dataset, row.ref), linkedRow(row), item)}
                 aria-label={
                   cell.attainment === undefined
                     ? `${label}: no data`

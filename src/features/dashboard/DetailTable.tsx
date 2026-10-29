@@ -16,10 +16,9 @@ import {
   valueAt,
 } from "@/domain/selectors";
 import { type SortDirection, type SortValue, sortRows } from "@/domain/table";
-import { linkedProps, useHighlightedPath } from "@/state/highlight";
 import { useCompare, useDrill, useToggleCompare } from "@/state/url";
-import { cn } from "@/ui/cn";
 import { StatusBadge } from "@/ui/StatusBadge";
+import { LinkedRow } from "./Linked";
 
 /** The figure columns, in the order they show. Names and status are handled separately. */
 const FIGURE_COLUMNS = [
@@ -42,7 +41,6 @@ type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
  */
 export function DetailTable({ dataset, selected, period }: Props) {
   const drill = useDrill();
-  const highlighted = useHighlightedPath();
   const compared = useCompare(selected);
   const toggleCompare = useToggleCompare(selected);
   const limitId = useId();
@@ -126,13 +124,11 @@ export function DetailTable({ dataset, selected, period }: Props) {
               const status = statusAt(dataset, ref, period);
               const isCompared = comparedPaths.has(pathOf(dataset, ref));
               const blocked = full && !isCompared;
-              // Focus bubbles up from the row's button and checkbox, so keyboard users link too.
-              const link = linkedProps(pathOf(dataset, ref), highlighted);
               return (
-                <tr
+                <LinkedRow
                   key={pathOf(dataset, ref) ?? name(ref)}
-                  {...link}
-                  className={cn("border-b", link["data-linked"] && "bg-accent")}
+                  path={pathOf(dataset, ref)}
+                  className="border-b"
                 >
                   <th scope="row" className="py-2 text-left font-medium">
                     <button
@@ -172,7 +168,7 @@ export function DetailTable({ dataset, selected, period }: Props) {
                       className="size-4 accent-primary"
                     />
                   </td>
-                </tr>
+                </LinkedRow>
               );
             })}
           </tbody>
