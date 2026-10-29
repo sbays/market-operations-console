@@ -3,8 +3,12 @@
 import { useId, useState, type ReactNode } from "react";
 import { ParentSize } from "@visx/responsive";
 import { Button } from "@/ui/button";
+import { cn } from "@/ui/cn";
 
-/** Width used before the chart is measured (first paint, jsdom), so points still render. */
+/**
+ * Width drawn at before the chart is measured. Real browsers keep it invisible until the
+ * measurement lands (one frame); jsdom never measures, so tests still get points.
+ */
 const FALLBACK_WIDTH = 600;
 const DEFAULT_HEIGHT = 240;
 
@@ -25,6 +29,8 @@ export type ChartFrameProps = {
    * events, so each point opts back in with its own pointer-events class.
    */
   points?: (size: Size) => ReactNode;
+  /** A key to the marks, shown under the chart in both views. */
+  legend?: ReactNode;
 };
 
 export function ChartFrame({
@@ -34,6 +40,7 @@ export function ChartFrame({
   height = DEFAULT_HEIGHT,
   drawing,
   points,
+  legend,
 }: ChartFrameProps) {
   const [showTable, setShowTable] = useState(false);
   const titleId = useId();
@@ -45,7 +52,13 @@ export function ChartFrame({
           <figcaption id={titleId} className="text-base font-semibold">
             {title}
           </figcaption>
-          <p className="text-sm text-muted-foreground">{summary}</p>
+          {/* In chart mode the svg carries the summary as its name; don't read it twice. */}
+          <p
+            aria-hidden={showTable ? undefined : true}
+            className="text-sm text-muted-foreground"
+          >
+            {summary}
+          </p>
         </div>
         <Button
           type="button"
@@ -65,7 +78,7 @@ export function ChartFrame({
               const width = measured > 0 ? measured : FALLBACK_WIDTH;
               const size = { width, height };
               return (
-                <>
+                <div className={cn("contents", measured === 0 && "invisible")}>
                   <svg
                     role="img"
                     aria-label={summary}
@@ -80,12 +93,13 @@ export function ChartFrame({
                       {points(size)}
                     </div>
                   ) : null}
-                </>
+                </div>
               );
             }}
           </ParentSize>
         </div>
       )}
+      {legend}
     </figure>
   );
 }

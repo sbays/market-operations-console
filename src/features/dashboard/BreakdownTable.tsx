@@ -1,9 +1,9 @@
-import { formatMetric, formatPeriod } from "@/domain/format";
+import { formatMetricOrMissing, formatPeriod } from "@/domain/format";
 import type { Dataset, EntityRef, PeriodRef } from "@/domain/schema";
 import {
+  childLevelOf,
   childrenOf,
-  entityCode,
-  entityName,
+  entityLabel,
   pathOf,
   statusAt,
   valueAt,
@@ -13,26 +13,16 @@ import { StatusBadge } from "@/ui/StatusBadge";
 
 type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
 
-const CHILD_LEVEL: Record<EntityRef["level"], string | undefined> = {
-  portfolio: "region",
-  region: "market",
-  market: "product",
-  product: undefined,
-};
-
 /** The level below the selection, one row per child; a row's name drills into it. */
 export function BreakdownTable({ dataset, selected, period }: Props) {
   const drill = useDrill();
-  const childLevel = CHILD_LEVEL[selected.level];
+  const childLevel = childLevelOf(selected);
   const rows = childrenOf(dataset, selected);
   if (!childLevel || rows.length === 0) return null;
 
-  const name = (ref: EntityRef) =>
-    entityName(dataset, ref) ?? entityCode(dataset, ref);
-  const figure = (ref: EntityRef, metric: "revenue" | "attainment") => {
-    const value = valueAt(dataset, ref, period, metric);
-    return value === undefined ? "No data" : formatMetric(metric, value);
-  };
+  const name = (ref: EntityRef) => entityLabel(dataset, ref);
+  const figure = (ref: EntityRef, metric: "revenue" | "attainment") =>
+    formatMetricOrMissing(metric, valueAt(dataset, ref, period, metric));
 
   return (
     <table className="w-full text-sm">

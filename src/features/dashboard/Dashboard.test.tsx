@@ -168,4 +168,38 @@ describe("Dashboard", () => {
     });
     expect(keyFigures()).toHaveTextContent("Aug 2026");
   });
+
+  it("enters the chart on the selected month, marked as current", () => {
+    renderDashboard("?path=eu.DE&period=2026-03");
+
+    const march = screen.getByRole("button", { name: /^Mar 2026: revenue / });
+    expect(march).toHaveAttribute("tabindex", "0");
+    expect(march).toHaveAttribute("aria-current", "date");
+    expect(
+      screen.getByRole("button", { name: /^Sep 2026: revenue / }),
+    ).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("gives each point the same figures as the table, prior year included", () => {
+    renderDashboard("?path=eu.DE");
+
+    expect(
+      screen.getByRole("button", { name: /^Mar 2026: revenue / }),
+    ).toHaveAccessibleName(
+      /^Mar 2026: revenue \$4M, forecast \$[\d.]+M, prior year \$[\d.]+M$/,
+    );
+  });
+
+  it("names each line in a legend, and reads the summary once", async () => {
+    const { user } = renderDashboard("?path=eu.DE");
+
+    const legend = screen.getByRole("list", { name: "Legend" });
+    expect(legend).toHaveTextContent(/Actual.*Forecast.*Prior year/);
+    // Chart mode: the svg carries the summary, so the visible copy is hidden from AT.
+    const summary = /^Germany revenue, Oct 2024 to Sep 2026: /;
+    expect(screen.getByText(summary)).toHaveAttribute("aria-hidden", "true");
+
+    await user.click(screen.getByRole("button", { name: "View as table" }));
+    expect(screen.getByText(summary)).not.toHaveAttribute("aria-hidden");
+  });
 });
