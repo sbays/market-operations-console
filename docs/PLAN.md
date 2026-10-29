@@ -192,6 +192,13 @@ Midday decisions (29 Oct, `feat/modes-and-alerts`):
 - Review fixes (29 Oct): the alert dialog scrolls within the viewport (it clipped Save on phones); a refused save removes only its own pending row; `?fail=1` is read in `state/url.ts` (`useFailSaves`) and passed to the mutation; a saved rule is announced with a toast; the detail table takes a full-width row in a focusable scroll region; attainment rounding has one helper.
 - Built by two parallel agents in worktrees (alerts; risks, movers and detail table), each test-first, mutation-checked by the agents and spot-checked again before integration.
 
+Afternoon decisions (29 Oct, `feat/afternoon`):
+
+- Escape goes up a level (Simon asked for it back from the cut list): a window keydown listener acts only when focus is inside the dashboard and nothing else handled the key, so the chat and dialogs keep their own Escape.
+- An unknown `path` shows the portfolio with one toast and is removed from the URL (replace), so a shared link doesn't carry it on.
+- The favicon (`app/icon.svg`) repeats the primary token colours as literals, because an icon can't read CSS variables. It's an asset, not a component, so the token rule doesn't apply.
+- README screenshots come from `pnpm screenshots` (`e2e/screenshots/`, excluded from CI). The manual keyboard and VoiceOver pass is `docs/a11y-checklist.md`; the architecture diagram source is `docs/architecture.mmd`.
+
 ## Coordinated views and URL state
 
 The URL is the selection store. Views never talk to each other; they read from and write to the URL, and everything else is derived. This keeps wiring linear: N views, one store, not N² handlers.
@@ -220,7 +227,7 @@ A rule builder that flags markets crossing thresholds, saved optimistically and 
 
 Target WCAG 2.1 AA, verified by axe in CI and a manual keyboard and VoiceOver pass before submission.
 
-- **Keyboard** — skip link; logical tab order; roving tabindex inside charts (arrow keys between points, Enter to drill, Escape to go up); cmd-K reachable; visible focus ring from tokens.
+- **Keyboard** — skip link; logical tab order; roving tabindex inside charts (arrow keys between points, Enter to drill); Escape anywhere in the dashboard goes up a level (built 29 Oct); cmd-K was not built; visible focus ring from tokens.
 - **Charts** — every chart has a "View as table" toggle with the same data; SVGs get `role="img"` plus a generated text summary ("Germany revenue fell 12% in March, below forecast").
 - **Colour** — token palette checked at 4.5:1 for text, 3:1 for UI; status always paired with icon and label; colour-blind-safe diverging scale.
 - **Screen readers** — chat uses polite live regions for start and finish; confidence and AI labels are real text, not icons alone.
@@ -248,8 +255,8 @@ The brief asks us to discuss productionising in README (c) and point to what we 
 Wired:
 
 - **CI** — GitHub Actions: typecheck, lint, unit and component tests, build, Playwright + axe against `next start` in CI. Vercel preview per PR for manual review.
-- **Loading** — charts and the map lazy-loaded with `next/dynamic`; TopoJSON trimmed to needed countries.
-- **RUM** — `web-vitals` reporting LCP, INP and CLS to the console.
+- **Loading** — the map is lazy-loaded with `next/dynamic`, so the world TopoJSON (110m, about 108 KB) stays out of the first bundle. It isn't trimmed: the base map draws every country, with the 12 markets coloured on top.
+- **RUM** — Core Web Vitals (LCP, INP, CLS and others) logged to the console by `app/WebVitals.tsx`, through Next's `useReportWebVitals`, which wraps the `web-vitals` library.
 - **Errors** — per-panel error boundary, so one broken chart doesn't take the dashboard down.
 - **Safe output** — react-markdown with HTML disabled and an empty link allow-list (model links render as plain text); stream events validated before render.
 
@@ -268,7 +275,7 @@ Two days (decided 28 Oct). Claude Code implements and Simon steers and reviews e
 | Day 2, midday | Exec/analyst modes, top risks and movers, detail table. Citation chip drills the dashboard. Alert form with optimistic save and `?fail=1` rollback | Coordinated views work across panels; the form rolls back |
 | Day 2, afternoon | Component and integration tests, E2E happy path, axe scans, keyboard and VoiceOver pass, screenshots. Simon writes the README | CI green, axe clean, checklist below ticked |
 
-Cut order if we fall behind (none of these are required by the brief): KPI sparklines, anomaly markers, Escape to go up a level, generated chart text summaries beyond one sentence, the video. Never cut: the gate, any required chart, its table alternative, or the E2E happy path.
+Cut order if we fall behind (none of these are required by the brief): KPI sparklines, anomaly markers, generated chart text summaries beyond one sentence, the video. Never cut: the gate, any required chart, its table alternative, or the E2E happy path.
 
 Commit small and often; the git history is part of what they'll read.
 

@@ -1,0 +1,35 @@
+%% Market Operations console: layers, state homes and the two server round trips.
+%% Source for the README diagram (render with any Mermaid viewer, or GitHub's ```mermaid blocks).
+flowchart LR
+  subgraph Browser
+    URL[("URL (nuqs)\npath · period · compare · mode")]
+    subgraph app["app/ (routes compose features)"]
+      Page["/console\npartial prerender"]
+    end
+    subgraph features["features/ (never import each other)"]
+      Dash["dashboard/\nKPIs · risks · map · trend\nheat map · radar · detail table"]
+      Asst["assistant/\nstream · answer card · citation chips"]
+      Alerts["alerts/\nrule dialog · rule list"]
+    end
+    subgraph lower["shared layers"]
+      Data["data/\nTanStack Query · useDataset\nchatStream · alerts"]
+      Domain["domain/\nZod schemas · selectors · format"]
+      State["state/url.ts\nnuqs parsers"]
+      UI["ui/\nChartFrame · tokens · shadcn"]
+    end
+  end
+
+  subgraph Server["Next.js server (mocks by design)"]
+    Pack[("pack/data.json\nfixtures.json")]
+    Chat["POST /api/chat\nfixture → SSE"]
+    AlertsApi["GET / POST /api/alerts\nin-memory · ?fail=1 → 500"]
+  end
+
+  Page --> Dash & Asst & Alerts
+  Dash & Asst & Alerts --> Data & Domain & State & UI
+  State <-->|read / write selection| URL
+  Asst -->|citation chip drills| State
+  Pack -->|"loadDataset() · 'use cache' · hydrated"| Data
+  Data -->|"fetch + ReadableStream\nown SSE parser, Zod per event"| Chat
+  Data -->|"optimistic save · rollback"| AlertsApi
+  Chat --> Pack
