@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { formatMetricOrMissing, formatPeriod } from "@/domain/format";
 import type { Dataset, EntityRef, Metric, PeriodRef } from "@/domain/schema";
 import { childStatusCounts, statusAt, valueAt } from "@/domain/selectors";
+import { DASHBOARD_FOCUS_ID } from "@/ui/dashboardFocus";
 import { StatusBadge } from "@/ui/StatusBadge";
 
 type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
@@ -16,7 +17,13 @@ export function KpiStrip({ dataset, selected, period }: Props) {
   const judged = flagged + counts["on-track"];
 
   return (
-    <section aria-label="Key figures" className="flex flex-col gap-2">
+    // A citation drill focuses this, so the figures that check the answer are read first.
+    <section
+      id={DASHBOARD_FOCUS_ID}
+      tabIndex={-1}
+      aria-label="Key figures"
+      className="flex flex-col gap-2 rounded-lg focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+    >
       <p className="text-xs font-medium text-muted-foreground">
         Source data · {formatPeriod(period)}
       </p>

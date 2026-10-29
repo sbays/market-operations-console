@@ -13,6 +13,7 @@ import { datasetQuery } from "@/data/queries";
 import type { StreamEvent } from "@/domain/schema";
 import { encodeSseEvent } from "@/domain/sse";
 import { server, sseResponse, type TestFrame } from "@/test/msw";
+import { DASHBOARD_FOCUS_ID } from "@/ui/dashboardFocus";
 import { AssistantPanel } from "./AssistantPanel";
 
 const GERMANY_DIP = "Why did Germany's revenue dip in March 2026?";
@@ -98,9 +99,14 @@ describe("AssistantPanel", () => {
     );
   });
 
-  it("drills the dashboard to the cited entity and period", async () => {
+  it("drills the dashboard to the cited entity and period, and moves focus there", async () => {
     respondWith([token("Germany fell [1]."), final()]);
     const { user, onUrlUpdate } = renderPanel();
+    // Stands in for the dashboard's key figures, which the console renders beside the panel.
+    const figures = document.createElement("section");
+    figures.id = DASHBOARD_FOCUS_ID;
+    figures.tabIndex = -1;
+    document.body.append(figures);
 
     await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
     await user.click(
@@ -113,6 +119,8 @@ describe("AssistantPanel", () => {
         options: expect.objectContaining({ history: "push" }),
       }),
     );
+    expect(figures).toHaveFocus();
+    figures.remove();
   });
 
   it("shows markers as pending until the answer's evidence arrives", async () => {
