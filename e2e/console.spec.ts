@@ -26,6 +26,17 @@ test("a cited answer drills the dashboard, and Back undoes it", async ({
   await page.goto("/console");
   const assistant = page.getByRole("complementary", { name: "Assistant" });
 
+  // Drill Europe › Germany first, as an analyst would before asking.
+  await page
+    .getByRole("table", { name: /Portfolio by region/ })
+    .getByRole("button", { name: "Europe" })
+    .click();
+  await page
+    .getByRole("table", { name: /Europe by market/ })
+    .getByRole("button", { name: "Germany" })
+    .click();
+  await expect(page).toHaveURL(/path=eu\.DE$/);
+
   await assistant
     .getByRole("button", {
       name: "Why did Germany's revenue dip in March 2026?",
@@ -43,8 +54,27 @@ test("a cited answer drills the dashboard, and Back undoes it", async ({
 
   await chip.click();
   await expect(page).toHaveURL(/path=eu\.DE&period=2026-03/);
+  // Focus lands on the figures that check the answer.
+  const keyFigures = page.getByRole("region", { name: "Key figures" });
+  await expect(keyFigures).toBeFocused();
+  await expect(keyFigures).toContainText("Mar 2026");
+
   await page.goBack();
-  await expect(page).toHaveURL(/\/console$/);
+  await expect(page).toHaveURL(/path=eu\.DE$/);
+  await expect(keyFigures).toContainText("Q3 2026");
+});
+
+test("exec mode has no axe violations", async ({ page }) => {
+  await page.goto("/console?path=eu&mode=exec");
+  await expect(
+    page.getByRole("button", { name: "Exec", pressed: true }),
+  ).toBeVisible();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
 });
 
 test("console with an answer on screen has no axe violations", async ({
