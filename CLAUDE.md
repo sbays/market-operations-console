@@ -30,7 +30,7 @@ A small, working, well-engineered build beats a large, broken one. Do not add fe
 - `cacheComponents` is on (Next 16 default): dynamic reads such as nuqs/`useSearchParams` need a Suspense boundary.
 - Every dependency must declare React 19 support. Don't force installs with overrides or `--legacy-peer-deps`; flag the library instead.
 - Tailwind v4 with CSS-variable tokens, shadcn/ui on Radix
-- visx for charts; react-simple-maps + d3-geo for the choropleth
+- visx for charts; d3-geo + topojson-client for the choropleth (react-simple-maps dropped 29 Oct, see `docs/PLAN.md`)
 - TanStack Query (server state), nuqs (URL state), Zustand (ephemeral UI state only)
 - React Hook Form + Zod
 - Streaming: `fetch` + `ReadableStream` with our own SSE parser. No Vercel AI SDK, no `EventSource`.
