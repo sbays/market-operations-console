@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DatasetSchema, type Point } from "./schema";
 import {
+  ancestorsOf,
   childrenOf,
   confidenceBand,
   coverageOf,
@@ -8,8 +9,11 @@ import {
   entityName,
   expandPeriod,
   latestQuarter,
+  monthlySeries,
   pathOf,
   refFromPath,
+  selectionPeriod,
+  statusAt,
   statusCounts,
   statusForAttainment,
   statusOf,
@@ -394,5 +398,110 @@ describe("entityCode", () => {
     expect(
       entityCode(dataset, { level: "product", marketId: "DE", id: "zephyr" }),
     ).toBe("DE zephyr");
+  });
+});
+
+describe("ancestorsOf", () => {
+  it("lists a market under its region and the portfolio", () => {
+    expect(ancestorsOf(dataset, germany)).toEqual([
+      { level: "portfolio" },
+      { level: "region", id: "eu" },
+      germany,
+    ]);
+  });
+
+  it("extends a product's chain by the product", () => {
+    expect(
+      ancestorsOf(dataset, { level: "product", marketId: "DE", id: "beacon" }),
+    ).toEqual([
+      { level: "portfolio" },
+      { level: "region", id: "eu" },
+      germany,
+      { level: "product", marketId: "DE", id: "beacon" },
+    ]);
+  });
+
+  it("is just the portfolio for the portfolio and the portfolio plus a region", () => {
+    expect(ancestorsOf(dataset, { level: "portfolio" })).toEqual([
+      { level: "portfolio" },
+    ]);
+    expect(ancestorsOf(dataset, { level: "region", id: "na" })).toEqual([
+      { level: "portfolio" },
+      { level: "region", id: "na" },
+    ]);
+  });
+
+  it("stops at the portfolio when the market isn't in the data", () => {
+    expect(ancestorsOf(dataset, { level: "market", id: "JP" })).toEqual([
+      { level: "portfolio" },
+      { level: "market", id: "JP" },
+    ]);
+  });
+});
+
+describe("statusAt", () => {
+  it("judges a product's month by its attainment that month", () => {
+    // DE/beacon March: 20 / 100 = 20%
+    expect(
+      statusAt(
+        dataset,
+        { level: "product", marketId: "DE", id: "beacon" },
+        "2026-03",
+      ),
+    ).toBe("off-track");
+  });
+
+  it("judges a market's month, and is undefined outside the data", () => {
+    // US in January: 300 / 300 = 100%
+    expect(statusAt(dataset, { level: "market", id: "US" }, "2026-01")).toBe(
+      "on-track",
+    );
+    expect(
+      statusAt(dataset, { level: "market", id: "JP" }, "2026-01"),
+    ).toBeUndefined();
+  });
+
+  it("works for a quarter", () => {
+    // US Q2: 900 / 900 = 100%
+    expect(statusAt(dataset, { level: "market", id: "US" }, "2026-Q2")).toBe(
+      "on-track",
+    );
+  });
+});
+
+describe("monthlySeries", () => {
+  it("gives one point per month with actual, forecast and prior year", () => {
+    const points = monthlySeries(dataset, germany);
+    expect(points).toHaveLength(6);
+    // DE March: actual 120 (100 + 20), forecast 200, prior year 130 (80 + 50)
+    expect(points[2]).toEqual({
+      period: "2026-03",
+      actual: 120,
+      forecast: 200,
+      priorYear: 130,
+    });
+  });
+
+  it("is empty for an entity the data doesn't contain", () => {
+    expect(monthlySeries(dataset, { level: "market", id: "JP" })).toEqual([]);
+  });
+});
+
+describe("selectionPeriod", () => {
+  it("defaults to the latest complete quarter when nothing is selected", () => {
+    expect(selectionPeriod(dataset, null)).toBe("2026-Q2");
+  });
+
+  it("keeps a selected period the data covers", () => {
+    expect(selectionPeriod(dataset, "2026-03")).toBe("2026-03");
+  });
+
+  it("falls back to the default for a period outside the data", () => {
+    expect(selectionPeriod(dataset, "2027-01")).toBe("2026-Q2");
+  });
+
+  it("falls back to the last month when no quarter is complete", () => {
+    const twoMonths = { ...dataset, periods: months.slice(0, 2) };
+    expect(selectionPeriod(twoMonths, null)).toBe("2026-02");
   });
 });
