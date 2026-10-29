@@ -152,3 +152,30 @@ test("a comparison survives a reload, because it lives in the URL", async ({
   await expect(legend).toContainText("Germany");
   await expect(legend).toContainText("Spain");
 });
+
+test("the alert dialog has no axe violations", async ({ page }) => {
+  await page.goto("/console?path=eu.DE");
+  await page.getByRole("button", { name: "New alert" }).click();
+  const dialog = page.getByRole("dialog", { name: "New alert rule" });
+  await expect(dialog.getByRole("checkbox", { name: "Germany" })).toBeChecked();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+});
+
+test("a refused save rolls the alert rule back", async ({ page }) => {
+  await page.goto("/console?path=eu.DE&fail=1");
+  await page.getByRole("button", { name: "New alert" }).click();
+  const dialog = page.getByRole("dialog", { name: "New alert rule" });
+  await dialog.getByRole("textbox", { name: "Rule name" }).fill("Doomed");
+  await dialog.getByRole("spinbutton", { name: "Threshold" }).fill("5");
+  await dialog.getByRole("button", { name: "Save rule" }).click();
+
+  const rules = page.getByRole("list", { name: "Alert rules" });
+  await expect(rules).toContainText("Saving");
+  await expect(page.getByText("Couldn't save the alert rule.")).toBeVisible();
+  await expect(page.getByText("Doomed")).toHaveCount(0);
+});
