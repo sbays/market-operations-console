@@ -134,12 +134,19 @@ describe("radarAxes", () => {
     expect(us?.values.growth.scaled).toBe(0.5);
   });
 
-  it("scores an entity the data doesn't contain as no data at zero", () => {
+  it("gives an entity the data doesn't contain no position, rather than the centre", () => {
     const unknown = { level: "market", id: "XX" } as const;
     const [de, missing] = radarAxes(dataset, [germany, unknown], "2026-Q1");
 
-    expect(missing?.values.revenue).toEqual({ raw: undefined, scaled: 0 });
-    expect(missing?.values.growth).toEqual({ raw: undefined, scaled: 0 });
+    // The centre means "lowest" (for growth, the steepest decline), so no data stays off the chart.
+    expect(missing?.values.revenue).toEqual({
+      raw: undefined,
+      scaled: undefined,
+    });
+    expect(missing?.values.growth).toEqual({
+      raw: undefined,
+      scaled: undefined,
+    });
     // The largest known entity still sets the scale.
     expect(de?.values.revenue.scaled).toBeCloseTo(420 / 420);
   });
@@ -166,7 +173,10 @@ describe("radarAxes", () => {
   it("returns undefined raw values for a period outside the data", () => {
     const [de] = radarAxes(dataset, [germany], "2025-Q4");
 
-    expect(de?.values.revenue).toEqual({ raw: undefined, scaled: 0 });
+    expect(de?.values.revenue).toEqual({
+      raw: undefined,
+      scaled: undefined,
+    });
   });
 });
 

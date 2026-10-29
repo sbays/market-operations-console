@@ -15,7 +15,9 @@ export const RADAR_METRICS = [
 ] as const;
 export type RadarMetric = (typeof RADAR_METRICS)[number];
 
-export type RadarValue = { raw: number | undefined; scaled: number };
+/** A raw value and its distance from the centre (0..1). No data has no position. */
+export type RadarValue =
+  { raw: number; scaled: number } | { raw: undefined; scaled: undefined };
 type PerMetric<T> = Record<RadarMetric, T>;
 
 export type RadarSeries = {
@@ -26,7 +28,8 @@ export type RadarSeries = {
 /**
  * One series per entity, with every axis scaled to 0..1 across the entities given.
  * Growth is centred: the largest move in either direction reaches the rim, and zero growth
- * sits at 0.5. An axis with no non-zero value scales to 0 for everyone.
+ * sits at 0.5. An axis with no non-zero value scales to 0 for everyone. A missing value gets
+ * no position: the centre would read as the lowest value.
  */
 export function radarAxes(
   dataset: Dataset,
@@ -89,7 +92,8 @@ function scaled(
   raw: number | undefined,
   largest: number,
 ): RadarValue {
-  if (raw === undefined || largest === 0) return { raw, scaled: 0 };
+  if (raw === undefined) return { raw, scaled: undefined };
+  if (largest === 0) return { raw, scaled: 0 };
   const position =
     metric === "growth" ? (raw / largest + 1) / 2 : raw / largest;
   return { raw, scaled: position };
