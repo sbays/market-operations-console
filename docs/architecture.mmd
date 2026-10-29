@@ -16,6 +16,7 @@ flowchart LR
       Domain["domain/\nZod schemas · selectors · format"]
       State["state/url.ts\nnuqs parsers"]
       UI["ui/\nChartFrame · tokens · shadcn"]
+      Hover[("Zustand\nhover highlight")]
     end
   end
 
@@ -29,6 +30,7 @@ flowchart LR
   Dash & Asst & Alerts --> Data & Domain & State & UI
   State <-->|read / write selection| URL
   Asst -->|citation chip drills| State
+  Dash <-->|"hover / focus · selector per view"| Hover
   Pack -->|"loadDataset() · 'use cache' · hydrated"| Data
   Data -->|"fetch + ReadableStream\nown SSE parser, Zod per event"| Chat
   Data -->|"optimistic save · rollback"| AlertsApi
