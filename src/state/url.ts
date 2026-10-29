@@ -12,6 +12,7 @@ import {
   useQueryStates,
 } from "nuqs";
 import { useDataset } from "@/data/useDataset";
+import { comparedRefs, toggleCompared } from "@/domain/compare";
 import {
   PeriodRefSchema,
   type EntityRef,
@@ -72,40 +73,31 @@ export function useSetPeriod(): (period: PeriodRef) => void {
   };
 }
 
-/** The most entities the radar compares at once. */
-export const MAX_COMPARE = 4;
-
 /** Entities to compare, as drill paths: "eu.DE,eu.FR". Same format as `path`. */
 const compareParser = parseAsArrayOf(parseAsString, ",").withDefault([]);
 
-/** The compared entities that the data contains, at most MAX_COMPARE. */
-export function useCompare(): EntityRef[] {
+/** The entities the radar compares under a selection (see comparedRefs). */
+export function useCompare(selected: EntityRef): EntityRef[] {
   const dataset = useDataset();
   const [paths] = useQueryState("compare", compareParser);
-  return paths
-    .map((path) => refFromPath(dataset, path))
-    .filter((ref) => ref !== undefined)
-    .slice(0, MAX_COMPARE);
+  return comparedRefs(dataset, selected, paths);
 }
 
 /**
- * Adds an entity to the comparison, or removes it if it's there. Ignores additions past
- * MAX_COMPARE. Replaces history: picking what to compare isn't a navigation.
+ * Ticks or unticks an entity, writing the whole comparison so the defaults survive the first
+ * tick. Replaces history: picking what to compare isn't a navigation.
  */
-export function useToggleCompare(): (ref: EntityRef) => void {
+export function useToggleCompare(
+  selected: EntityRef,
+): (ref: EntityRef) => void {
   const dataset = useDataset();
-  const [paths, setPaths] = useQueryState(
+  const compared = useCompare(selected);
+  const [, setPaths] = useQueryState(
     "compare",
     compareParser.withOptions({ history: "replace" }),
   );
   return (ref) => {
-    const path = pathOf(dataset, ref);
-    if (path === undefined) return;
-    if (paths.includes(path)) {
-      const rest = paths.filter((p) => p !== path);
-      void setPaths(rest.length > 0 ? rest : null);
-    } else if (paths.length < MAX_COMPARE) {
-      void setPaths([...paths, path]);
-    }
+    const paths = toggleCompared(dataset, compared, ref);
+    void setPaths(paths.length > 0 ? paths : null);
   };
 }

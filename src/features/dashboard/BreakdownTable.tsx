@@ -9,12 +9,8 @@ import {
   valueAt,
 } from "@/domain/selectors";
 import { useId } from "react";
-import {
-  MAX_COMPARE,
-  useCompare,
-  useDrill,
-  useToggleCompare,
-} from "@/state/url";
+import { MAX_COMPARE } from "@/domain/compare";
+import { useCompare, useDrill, useToggleCompare } from "@/state/url";
 import { StatusBadge } from "@/ui/StatusBadge";
 
 type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
@@ -22,8 +18,8 @@ type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
 /** The level below the selection, one row per child; a row's name drills into it. */
 export function BreakdownTable({ dataset, selected, period }: Props) {
   const drill = useDrill();
-  const compared = useCompare();
-  const toggleCompare = useToggleCompare();
+  const compared = useCompare(selected);
+  const toggleCompare = useToggleCompare(selected);
   const limitId = useId();
   const comparedPaths = new Set(compared.map((ref) => pathOf(dataset, ref)));
   const full = compared.length >= MAX_COMPARE;
