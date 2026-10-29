@@ -1,11 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useDataset } from "@/data/useDataset";
-import { pathOf, selectionPeriod } from "@/domain/selectors";
-import { useMode, useSelection, useUnknownPath } from "@/state/url";
+import { ancestorsOf, pathOf, selectionPeriod } from "@/domain/selectors";
+import { useDrill, useMode, useSelection, useUnknownPath } from "@/state/url";
 import { ErrorBoundary } from "@/ui/ErrorBoundary";
 import { AttainmentHeatMap } from "./AttainmentHeatMap";
 import { Breadcrumb } from "./Breadcrumb";
@@ -47,11 +47,28 @@ export function Dashboard() {
     );
     unknownPath.clear();
   }, [unknownPath]);
+  // Escape goes up a level, from anywhere inside the dashboard. A window listener rather than
+  // a handler on the wrapper, which has no interactive role. Focus outside the dashboard (the
+  // chat, an open dialog in its portal) is left alone, and so is an Escape already handled.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const drill = useDrill();
+  const parent = ancestorsOf(dataset, ref).at(-2);
+  useEffect(() => {
+    if (parent === undefined) return;
+    const goUp = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (!(event.target instanceof Node)) return;
+      if (!rootRef.current?.contains(event.target)) return;
+      drill(parent);
+    };
+    window.addEventListener("keydown", goUp);
+    return () => window.removeEventListener("keydown", goUp);
+  }, [parent, drill]);
   // A failed chart is retried when the selection changes.
   const resetKey = `${pathOf(dataset, ref) ?? ""}@${shown}`;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div ref={rootRef} className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Breadcrumb dataset={dataset} selected={ref} />
         <ModeToggle />
