@@ -3,6 +3,7 @@ import { DatasetSchema, type Point } from "./schema";
 import {
   childrenOf,
   confidenceBand,
+  coverageOf,
   expandPeriod,
   latestQuarter,
   statusCounts,
@@ -309,5 +310,11 @@ describe("period types", () => {
   it("won't compile a month where a quarter is required", () => {
     // @ts-expect-error a month is not a quarter
     expect(statusOf(dataset, germany, "2026-03")).toBeDefined();
+  });
+});
+
+describe("coverageOf", () => {
+  it("is the first and last month in the data", () => {
+    expect(coverageOf(dataset)).toEqual({ from: "2026-01", to: "2026-06" });
   });
 });

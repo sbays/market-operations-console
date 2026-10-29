@@ -228,3 +228,12 @@ export function confidenceBand(confidence: number): ConfidenceBand {
   if (confidence >= MEDIUM_CONFIDENCE_FROM) return "medium";
   return "low";
 }
+
+/** The months the data covers, as quoted by an abstention. */
+export function coverageOf(dataset: Dataset): { from: Month; to: Month } {
+  const from = dataset.periods[0];
+  const to = dataset.periods.at(-1);
+  // The schema requires at least one period, so this only guards the index types.
+  if (!from || !to) throw new Error("Dataset has no periods");
+  return { from, to };
+}
