@@ -59,12 +59,11 @@ export function Dashboard() {
           <Panel label="Heat map" resetKey={resetKey}>
             <AttainmentHeatMap {...props} />
           </Panel>
-          <div className="grid items-start gap-6 xl:grid-cols-2">
-            <Panel label="Compare chart" resetKey={resetKey}>
-              <CompareRadar {...props} />
-            </Panel>
-            <DetailTable {...props} />
-          </div>
+          <Panel label="Compare chart" resetKey={resetKey}>
+            <CompareRadar {...props} />
+          </Panel>
+          {/* Full width: eight columns don't fit beside another panel. */}
+          <DetailTable {...props} />
         </>
       )}
     </div>

@@ -34,7 +34,8 @@ export function KpiStrip({ dataset, selected, period, mode }: Props) {
       <p className="text-xs font-medium text-muted-foreground">
         Source data · {formatPeriod(period)}
       </p>
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* Tiles wrap and stretch, so 3 to 7 of them (by mode and level) always fill each row. */}
+      <dl className="flex flex-wrap gap-3">
         <Tile label="Revenue">{figure("revenue")}</Tile>
         <Tile label="Forecast attainment">
           {figure("attainment")}
@@ -59,7 +60,7 @@ export function KpiStrip({ dataset, selected, period, mode }: Props) {
 
 function Tile({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg border bg-card p-3 text-card-foreground">
+    <div className="flex min-w-40 flex-1 flex-col gap-1 rounded-lg border bg-card p-3 text-card-foreground">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="flex flex-wrap items-baseline gap-2 text-xl font-semibold tabular-nums">
         {children}
