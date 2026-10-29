@@ -43,7 +43,8 @@ function contrast(x: Oklch, y: Oklch): number {
 }
 
 describe("status tokens", () => {
-  const surfaces = ["card", "background"];
+  // accent: a linked-highlight row puts status badges on it.
+  const surfaces = ["card", "background", "accent"];
   const statuses = ["status-on-track", "status-at-risk", "status-off-track"];
 
   it.each(statuses.flatMap((s) => surfaces.map((bg) => [s, bg])))(
@@ -54,6 +55,12 @@ describe("status tokens", () => {
       );
     },
   );
+
+  it("keeps muted text readable on a highlighted (accent) row", () => {
+    expect(
+      contrast(token("muted-foreground"), token("accent")),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
 
   it("agrees with axe on the colour it flagged", () => {
     // axe measured oklch(0.6 0.13 70) (#b17000) at 4.04:1 on white.
