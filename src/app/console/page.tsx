@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { DatasetHydration, dehydrateDataset } from "@/data/DatasetHydration";
 import { loadFixtures } from "@/data/pack";
 import { AssistantPanel } from "@/features/assistant/AssistantPanel";
+import { Dashboard } from "@/features/dashboard/Dashboard";
 
 export default async function ConsolePage() {
   const suggestedQuestions = loadFixtures()
@@ -14,8 +15,12 @@ export default async function ConsolePage() {
         Skip to main content
       </a>
       <div className="flex min-h-full flex-1 flex-col lg:flex-row">
-        <main id="main" className="flex-1 p-6">
+        <main id="main" className="flex min-w-0 flex-1 flex-col gap-6 p-6">
           <h1 className="text-xl font-semibold">Market Operations</h1>
+          {/* The dashboard reads the selection from the URL, known only at request time. */}
+          <Suspense fallback={<DashboardSkeleton />}>
+            <Dashboard />
+          </Suspense>
         </main>
         <div className="border-t lg:w-96 lg:shrink-0 lg:border-t-0 lg:border-l">
           {/* Citation chips read URL state (useDrill), which is only known at request time. */}
@@ -25,5 +30,19 @@ export default async function ConsolePage() {
         </div>
       </div>
     </DatasetHydration>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div aria-hidden className="flex flex-col gap-6">
+      <div className="h-4 w-48 rounded-sm bg-muted" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((tile) => (
+          <div key={tile} className="h-20 rounded-lg bg-muted" />
+        ))}
+      </div>
+      <div className="h-60 rounded-lg bg-muted" />
+    </div>
   );
 }
