@@ -26,26 +26,42 @@ Element.prototype.setPointerCapture ??= () => undefined;
 
 type Harness = {
   user: ReturnType<typeof userEvent.setup>;
+  /** Lets the pending save answer. */
   release: () => void;
+  /** Lets a held refetch of the list answer (only with holdRefetch). */
+  releaseRefetch: () => void;
 };
 
 /** The saves the mock has accepted, in order; a failed save is never added. */
 let saved: AlertRule[] = [];
 let postCount = 0;
+let listCount = 0;
 
-function serveAlerts(initial: AlertRule[]) {
+/**
+ * Serves the list and the save. With `holdRefetch`, every list request after the first waits
+ * for releaseRefetch, so a test can tell a rollback from the refetch that follows a save.
+ */
+function serveAlerts(initial: AlertRule[], holdRefetch: boolean) {
   saved = initial;
   postCount = 0;
-  let open!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    open = resolve;
+  listCount = 0;
+  const gates = { save: () => {}, refetch: () => {} };
+  const saveGate = new Promise<void>((resolve) => {
+    gates.save = resolve;
+  });
+  const refetchGate = new Promise<void>((resolve) => {
+    gates.refetch = resolve;
   });
   server.use(
-    http.get("*/api/alerts", () => HttpResponse.json({ rules: saved })),
+    http.get("*/api/alerts", async () => {
+      listCount += 1;
+      if (holdRefetch && listCount > 1) await refetchGate;
+      return HttpResponse.json({ rules: saved });
+    }),
     http.post("*/api/alerts", async ({ request }) => {
       postCount += 1;
       const body = AlertRuleInputSchema.parse(await request.json());
-      await gate;
+      await saveGate;
       if (new URL(request.url).searchParams.get("fail") === "1") {
         return HttpResponse.json({ error: "Saving failed" }, { status: 500 });
       }
@@ -54,11 +70,17 @@ function serveAlerts(initial: AlertRule[]) {
       return HttpResponse.json(rule, { status: 201 });
     }),
   );
-  return open;
+  return gates;
 }
 
-function renderAlerts(searchParams = "", initial: AlertRule[] = []): Harness {
-  const release = serveAlerts(initial);
+function renderAlerts(
+  searchParams = "",
+  {
+    initial = [],
+    holdRefetch = false,
+  }: { initial?: AlertRule[]; holdRefetch?: boolean } = {},
+): Harness {
+  const { save, refetch } = serveAlerts(initial, holdRefetch);
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -85,7 +107,7 @@ function renderAlerts(searchParams = "", initial: AlertRule[] = []): Harness {
     </>,
     { wrapper: Wrapper },
   );
-  return { user: userEvent.setup(), release };
+  return { user: userEvent.setup(), release: save, releaseRefetch: refetch };
 }
 
 /** The rules list only exists once there is at least one rule, so it is awaited. */
@@ -260,16 +282,18 @@ describe("AlertList", () => {
   });
 
   it("describes each rule in one line", async () => {
-    renderAlerts("", [
-      {
-        id: "r1",
-        name: "Watch Germany",
-        scope: ["eu.DE", "eu.FR"],
-        metric: "attainment",
-        operator: "below",
-        threshold: 95,
-      },
-    ]);
+    renderAlerts("", {
+      initial: [
+        {
+          id: "r1",
+          name: "Watch Germany",
+          scope: ["eu.DE", "eu.FR"],
+          metric: "attainment",
+          operator: "below",
+          threshold: 95,
+        },
+      ],
+    });
 
     const rules = await rulesList();
     expect(within(rules).getByText("Watch Germany")).toBeInTheDocument();
@@ -283,7 +307,10 @@ describe("AlertList", () => {
 
 describe("a save the server refuses", () => {
   it("removes the optimistic row, shows a toast with Retry, and retries the same rule", async () => {
-    const { user, release } = renderAlerts("?fail=1");
+    // The list refetch is held, so the row can only go by the rollback, not by invalidation.
+    const { user, release, releaseRefetch } = renderAlerts("?fail=1", {
+      holdRefetch: true,
+    });
     const dialog = await openDialog(user);
     await fillRule(user, {
       name: "Doomed",
@@ -297,11 +324,12 @@ describe("a save the server refuses", () => {
     expect(within(rules).getByText("Saving…")).toBeInTheDocument();
 
     release();
-    // Once the save is refused the list falls back to its empty state, so the row is gone.
+    // The refetch is still held, so the row going away here is the rollback's doing.
     await waitFor(() =>
       expect(screen.queryByText("Doomed")).not.toBeInTheDocument(),
     );
     expect(screen.getByText("No alert rules yet.")).toBeInTheDocument();
+    releaseRefetch();
     expect(
       await screen.findByText("Couldn't save the alert rule."),
     ).toBeInTheDocument();
