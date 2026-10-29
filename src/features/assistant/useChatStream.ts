@@ -144,7 +144,10 @@ export function useChatStream() {
         } catch (error) {
           // An abort is a stop or a newer question; both already updated the state.
           if (current.signal.aborted) return;
-          fail(error instanceof ChatRequestError ? error.message : UNREACHABLE);
+          if (error instanceof ChatRequestError) return fail(error.message);
+          // Anything else is a network failure or our own bug: say so in the console, not just the UI.
+          console.error("Assistant request failed:", error);
+          fail(UNREACHABLE);
         }
       })();
     },

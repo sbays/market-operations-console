@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { StreamEvent } from "@/domain/schema";
 import { server, sseResponse, type TestFrame } from "@/test/msw";
 import { useChatStream } from "./useChatStream";
@@ -187,6 +187,53 @@ describe("useChatStream", () => {
       text: "Recovered",
     });
     expect(calls).toBe(2);
+  });
+
+  it("drops the earlier answer when a new question is asked mid-stream", async () => {
+    server.use(
+      http.post("*/api/chat", async ({ request }) => {
+        const body: unknown = await request.json();
+        const first =
+          typeof body === "object" &&
+          body !== null &&
+          "question" in body &&
+          body.question === "first";
+        return first
+          ? sseResponse([token("old "), token("old "), token("old"), final], {
+              delayMs: 30,
+            })
+          : sseResponse([token("new"), final], { delayMs: 60 });
+      }),
+    );
+    const { result } = renderHook(() => useChatStream());
+
+    act(() => result.current.ask("first"));
+    await waitFor(() => expect(result.current.state.text).toContain("old"));
+    act(() => result.current.ask("second"));
+    await waitFor(() => expect(result.current.state.status).toBe("complete"));
+
+    expect(result.current.state).toMatchObject({
+      question: "second",
+      text: "new",
+    });
+  });
+
+  it("logs an unexpected failure instead of hiding it", async () => {
+    server.use(http.post("*/api/chat", () => HttpResponse.error()));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { result } = renderHook(() => useChatStream());
+
+    act(() => result.current.ask(QUESTION));
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+
+    expect(result.current.state.error?.message).toBe(
+      "Couldn't reach the assistant.",
+    );
+    expect(logged).toHaveBeenCalledWith(
+      "Assistant request failed:",
+      expect.any(TypeError),
+    );
+    logged.mockRestore();
   });
 
   it("re-renders per animation frame, not per token", async () => {
