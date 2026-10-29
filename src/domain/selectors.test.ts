@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import { DatasetSchema, type Point } from "./schema";
 import {
   ancestorsOf,
+  childLevelOf,
   childrenOf,
+  childStatusCounts,
   confidenceBand,
   coverageOf,
   entityCode,
+  entityLabel,
   entityName,
   expandPeriod,
   latestQuarter,
@@ -503,5 +506,57 @@ describe("selectionPeriod", () => {
   it("falls back to the last month when no quarter is complete", () => {
     const twoMonths = { ...dataset, periods: months.slice(0, 2) };
     expect(selectionPeriod(twoMonths, null)).toBe("2026-02");
+  });
+});
+
+describe("entityLabel", () => {
+  it("prefers the name and falls back to the short code", () => {
+    expect(entityLabel(dataset, germany)).toBe("Germany");
+    expect(
+      entityLabel(dataset, { level: "product", marketId: "DE", id: "beacon" }),
+    ).toBe("Beacon in Germany");
+    expect(entityLabel(dataset, { level: "market", id: "NZ" })).toBe("NZ");
+  });
+});
+
+describe("childLevelOf", () => {
+  it("names the level below, and none below a product", () => {
+    expect(childLevelOf({ level: "portfolio" })).toBe("region");
+    expect(childLevelOf({ level: "region", id: "eu" })).toBe("market");
+    expect(childLevelOf(germany)).toBe("product");
+    expect(
+      childLevelOf({ level: "product", marketId: "DE", id: "beacon" }),
+    ).toBeUndefined();
+  });
+});
+
+describe("childStatusCounts", () => {
+  it("counts the children's statuses over a period", () => {
+    // Jan 2026: Europe (DE) is 150 of 200 = 75%, North America (US) is 300 of 300.
+    expect(
+      childStatusCounts(dataset, { level: "portfolio" }, "2026-01"),
+    ).toEqual({ "on-track": 1, "at-risk": 0, "off-track": 1 });
+  });
+
+  it("leaves out a child with no status rather than counting it as flagged", () => {
+    const noUsForecast = {
+      ...dataset,
+      markets: dataset.markets.map((market) =>
+        market.id !== "US"
+          ? market
+          : {
+              ...market,
+              series: Object.fromEntries(
+                Object.entries(market.series).map(([id, points]) => [
+                  id,
+                  points.map((point) => ({ ...point, forecast: 0 })),
+                ]),
+              ),
+            },
+      ),
+    };
+    expect(
+      childStatusCounts(noUsForecast, { level: "portfolio" }, "2026-01"),
+    ).toEqual({ "on-track": 0, "at-risk": 0, "off-track": 1 });
   });
 });
