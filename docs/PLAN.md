@@ -199,6 +199,13 @@ Afternoon decisions (29 Oct, `feat/afternoon`):
 - The favicon (`app/icon.svg`) repeats the primary token colours as literals, because an icon can't read CSS variables. It's an asset, not a component, so the token rule doesn't apply.
 - README screenshots come from `pnpm screenshots` (`e2e/screenshots/`, excluded from CI). The manual keyboard and VoiceOver pass is `docs/a11y-checklist.md`; the architecture diagram source is `docs/architecture.mmd`.
 
+Stretch goal (29 Oct, `feat/linked-highlight`):
+
+- Linked highlighting: hovering or focusing an entity in the map, heat map, radar, detail table or top risks emphasises the same entity in the others. It's the one state CLAUDE.md reserves for Zustand (`state/highlight.ts`), chosen by elimination: hover is ephemeral and high-frequency, so not the URL (a shared link shouldn't carry it, and writes would flood history), and React context would re-render the whole dashboard on every hover. Each entity view subscribes once through a selector (`useHighlightedPath`), so the dashboard, key figures, trend and assistant don't re-render.
+- Items link by drill path, and a parent links to its children both ways (`isLinked`), because views can show different levels at once: at the portfolio the map shows markets while the others show regions. The portfolio never links.
+- Focus drives the same highlight as hover, so keyboard users get it too. The highlight is emphasis only (outline, weight, background, fading the rest), not status, and adds nothing screen readers need: each view's labels already name the entity.
+- The store is module-level: it only changes in the browser after an interaction and starts empty on the server, so no request sees another's state under PPR. The stream buffer stays a ref plus `useReducer`; moving it to Zustand would gain nothing.
+
 ## Coordinated views and URL state
 
 The URL is the selection store. Views never talk to each other; they read from and write to the URL, and everything else is derived. This keeps wiring linear: N views, one store, not N² handlers.

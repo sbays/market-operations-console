@@ -77,7 +77,7 @@ shared logic moves down into `data/`, `domain/` or `ui/`. Only `data/` talks to 
 - **Zod at every boundary.** Types come from `z.infer`. Validate `data.json`, every stream event and every API body. Nothing downstream re-checks shape.
 - **One `EntityRef` type** for the URL, charts and citations: a union on `level`; the product variant also carries
   `marketId` (`{ level: 'product', marketId, id }`). Don't create parallel id formats.
-- **State has one home.** If someone opening the link should see it, it goes in the URL. Data from the server goes in TanStack Query. Derived values are computed with selectors, never stored. Zustand is only for ephemeral cross-view UI state such as hover (not yet added). The stream buffer is a ref plus `useReducer` in `useChatStream`, batched per animation frame.
+- **State has one home.** If someone opening the link should see it, it goes in the URL. Data from the server goes in TanStack Query. Derived values are computed with selectors, never stored. Zustand is only for ephemeral cross-view UI state: the hover highlight (`state/highlight.ts`). The stream buffer is a ref plus `useReducer` in `useChatStream`, batched per animation frame.
 - **Views don't talk to each other.** They read and write URL state; everything else is derived.
 - **Design tokens only.** No hex values or arbitrary Tailwind values in components. Chart colours come from tokens too.
   Exception: shadcn primitives vendored into `ui/` keep their upstream classes, so updates stay a re-run of the CLI rather than a hand edit.
