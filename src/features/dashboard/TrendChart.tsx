@@ -12,6 +12,7 @@ import {
 import { trendSummary } from "@/domain/summaries";
 import { useSetPeriod } from "@/state/url";
 import { ChartFrame } from "@/ui/ChartFrame";
+import { ChartLegend } from "@/ui/ChartLegend";
 import { cn } from "@/ui/cn";
 import { useRovingIndex } from "@/ui/useRovingIndex";
 
@@ -136,17 +137,12 @@ function TrendLegend() {
     { label: "Prior year", line: "border-dashed border-chart-5" },
   ];
   return (
-    <ul
-      aria-label="Legend"
-      className="flex flex-wrap gap-4 text-xs text-muted-foreground"
-    >
-      {items.map(({ label, line }) => (
-        <li key={label} className="flex items-center gap-1.5">
-          <span aria-hidden className={cn("w-5 border-t-2", line)} />
-          {label}
-        </li>
-      ))}
-    </ul>
+    <ChartLegend
+      items={items.map(({ label, line }) => ({
+        label,
+        swatch: <span className={cn("w-5 border-t-2", line)} />,
+      }))}
+    />
   );
 }
 
