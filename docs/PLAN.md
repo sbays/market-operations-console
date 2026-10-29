@@ -172,6 +172,14 @@ Gate decisions (29 Oct, `feat/dashboard-gate`):
 - Breadcrumb and breakdown drills push history and keep the period; focusing a month from a chart replaces history (`useSetPeriod`).
 - `/console` is a partial prerender: the shell and the assistant are static, and the dashboard's Suspense hole reads the request's `searchParams`, so it is server-rendered for each URL and streamed in the same response rather than waiting for client JavaScript. Charts still draw after hydration, because they measure their container.
 
+Charts decisions (29 Oct, `feat/dashboard-charts`):
+
+- `compare` holds drill paths (`eu.DE,eu.FR`), the same format as `path`, so one `EntityRef` format runs through the URL. Breakdown checkboxes toggle it (replace history), at most 4; with none ticked the radar compares the selection's first 4 children.
+- The map draws countries with d3-geo and topojson-client inside the chart shell's `<svg role="img">`, with one focusable marker per market at its projected centroid in the HTML overlay, the same pattern as the trend points. Off-track markets also get a hatch pattern. It loads with `next/dynamic` (ssr off), so the world TopoJSON stays out of the first bundle. react-simple-maps was dropped: its `ComposableMap` renders its own `<svg>` (nested inside the accessible one) and makes every country a tab stop.
+- The heat map shows the selection's children by month. Cells are filled with `color-mix(in oklch, var(--diverging-*) N%, var(--diverging-midpoint))`, so the diverging scale uses tokens only; arrow keys move in two dimensions (`useRovingIndex` with `columns`).
+- Each chart sits in its own `ErrorBoundary`, so one failing chart leaves the dashboard working.
+- Built by three parallel agents in worktrees (map, radar, heat map), each test-first on its own files; every agent's tests were mutation-checked before integration.
+
 ## Coordinated views and URL state
 
 The URL is the selection store. Views never talk to each other; they read from and write to the URL, and everything else is derived. This keeps wiring linear: N views, one store, not N² handlers.
@@ -180,7 +188,7 @@ The URL is the selection store. Views never talk to each other; they read from a
 | --- | --- | --- | --- |
 | `path` | `eu.DE.beacon` | Map click, table row, breadcrumb, citation chip, cmd-K | Every panel |
 | `period` | `2026-03` | Heat map cell, time-series click | Radar, time-series (highlighted point), KPI strip, map |
-| `compare` | `de,fr,jp` | Table checkboxes | Radar |
+| `compare` | `eu.DE,eu.FR` | Table checkboxes | Radar |
 | `mode` | `exec` or `analyst` | Mode toggle | Layout |
 
 - Drill changes push history (back button goes up a level). Hover-like changes such as period replace history, so back isn't flooded.
