@@ -262,7 +262,10 @@ export function monthlySeries(dataset: Dataset, ref: EntityRef): TrendPoint[] {
 
 export type Mover = { ref: EntityRef; growth: number };
 
-/** The entities in `refs` with the highest and lowest growth against the prior year over a period. */
+/**
+ * The entities in `refs` that grew most and declined most against the prior year over a period.
+ * Only growth goes under `up` and only decline under `down`, so a list can be empty.
+ */
 export function topMovers(
   dataset: Dataset,
   refs: EntityRef[],
@@ -274,13 +277,16 @@ export function topMovers(
     const growth = valueAt(dataset, ref, period, "growth");
     if (growth !== undefined) movers.push({ ref, growth });
   }
-  const ranked = movers.sort((a, b) => b.growth - a.growth);
-  const up = ranked.slice(0, Math.max(0, count));
-  // `down` comes from what's left, so no market is listed both ways.
-  const rest = ranked.slice(up.length);
+  const limit = Math.max(0, count);
   return {
-    up,
-    down: rest.slice(Math.max(0, rest.length - count)).reverse(),
+    up: movers
+      .filter((m) => m.growth > 0)
+      .sort((a, b) => b.growth - a.growth)
+      .slice(0, limit),
+    down: movers
+      .filter((m) => m.growth < 0)
+      .sort((a, b) => a.growth - b.growth)
+      .slice(0, limit),
   };
 }
 

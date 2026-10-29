@@ -281,17 +281,23 @@ describe("childrenOf", () => {
 });
 
 describe("topMovers", () => {
-  it("ranks the given entities by growth against the prior year, both ways", () => {
-    // Jan: DE +15.4%, US 0%
-    const movers = topMovers(dataset, [germany, unitedStates], "2026-01", 1);
-    expect(movers.up.map((m) => m.ref)).toEqual([germany]);
-    expect(movers.up[0]?.growth).toBeCloseTo(0.153846, 5);
-    expect(movers.down.map((m) => m.ref)).toEqual([unitedStates]);
+  it("lists growth under up and decline under down", () => {
+    // Jan: DE +15.4%, US flat. Mar: DE -7.7% (beacon 20 against 50), US flat.
+    const january = topMovers(dataset, [germany, unitedStates], "2026-01", 1);
+    expect(january.up.map((m) => m.ref)).toEqual([germany]);
+    expect(january.up[0]?.growth).toBeCloseTo(0.153846, 5);
+    expect(january.down).toEqual([]);
+
+    const march = topMovers(dataset, [germany, unitedStates], "2026-03", 1);
+    expect(march.up).toEqual([]);
+    expect(march.down.map((m) => m.ref)).toEqual([germany]);
+    expect(march.down[0]?.growth).toBeCloseTo(-10 / 130, 5);
   });
 
-  it("only ranks the entities it is given", () => {
-    expect(topMovers(dataset, [unitedStates], "2026-01", 5)).toEqual({
-      up: [{ ref: unitedStates, growth: 0 }],
+  it("never lists a flat or growing entity as a decline", () => {
+    // With every entity at or above last year, "down" is empty rather than the slowest growers.
+    expect(topMovers(dataset, [germany, unitedStates], "2026-01", 5)).toEqual({
+      up: [{ ref: germany, growth: expect.closeTo(0.153846, 5) }],
       down: [],
     });
   });
@@ -484,10 +490,7 @@ describe("selectors: review fixes", () => {
       down: [],
     });
     const movers = topMovers(dataset, markets, "2026-01", 5);
-    expect(movers.up.map((m) => m.ref)).toEqual([
-      germany,
-      { level: "market", id: "US" },
-    ]);
+    expect(movers.up.map((m) => m.ref)).toEqual([germany]);
     expect(movers.down).toEqual([]);
   });
 });
