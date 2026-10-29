@@ -124,9 +124,14 @@ export function valueAt(
  * Compares the attainment as it is displayed (rounded to PERCENT_DECIMALS), so a status
  * badge can never disagree with the percentage shown beside it.
  */
-export function statusForAttainment(attainment: number): Status {
+/** An attainment ratio rounded as it is displayed (to PERCENT_DECIMALS of a percent). */
+function displayedAttainment(attainment: number): number {
   const scale = 10 ** (PERCENT_DECIMALS + 2);
-  const displayed = Math.round(attainment * scale) / scale;
+  return Math.round(attainment * scale) / scale;
+}
+
+export function statusForAttainment(attainment: number): Status {
+  const displayed = displayedAttainment(attainment);
   if (displayed >= ON_TRACK_FROM) return "on-track";
   if (displayed >= AT_RISK_FROM) return "at-risk";
   return "off-track";
@@ -437,12 +442,6 @@ export type Risk = {
   reason: string;
 };
 
-/** The attainment as it is displayed, rounded the same way statusForAttainment rounds it. */
-function displayedAttainment(attainment: number): number {
-  const scale = 10 ** (PERCENT_DECIMALS + 2);
-  return Math.round(attainment * scale) / scale;
-}
-
 /**
  * The reason a risk is shown: the note of an anomaly recorded against that child in the period
  * shown, or else a sentence about the shortfall. The note is only used when the child's path
@@ -485,15 +484,11 @@ export function topRisks(
     attainment: number;
   }[] = [];
   for (const ref of childrenOf(dataset, selected)) {
-    const status = statusAt(dataset, ref, period);
     const attainment = valueAt(dataset, ref, period, "attainment");
-    if (
-      status === undefined ||
-      status === "on-track" ||
-      attainment === undefined
-    ) {
-      continue;
-    }
+    if (attainment === undefined) continue;
+    // The same status statusAt would give, without reading the attainment twice.
+    const status = statusForAttainment(attainment);
+    if (status === "on-track") continue;
     flagged.push({ ref, status, attainment });
   }
   return flagged

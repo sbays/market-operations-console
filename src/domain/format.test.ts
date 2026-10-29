@@ -10,6 +10,7 @@ import {
   formatPeriod,
   formatPoints,
   formatStatus,
+  formatTypedPercent,
 } from "./format";
 
 describe("formatCurrency", () => {
@@ -123,5 +124,13 @@ describe("formatMetricOrMissing", () => {
   it("formats a value, and says so plainly when there is none", () => {
     expect(formatMetricOrMissing("revenue", 4_100_000)).toBe("$4.1M");
     expect(formatMetricOrMissing("attainment", undefined)).toBe("No data");
+  });
+});
+
+describe("formatTypedPercent", () => {
+  it("shows a percentage the user typed as a whole number", () => {
+    expect(formatTypedPercent(95)).toBe("95%");
+    expect(formatTypedPercent(-100)).toBe("-100%");
+    expect(formatTypedPercent(1000)).toBe("1,000%");
   });
 });

@@ -3,7 +3,7 @@
  * Pure: the schema cannot see the dataset, so scope paths are checked by the form's options.
  */
 import { z } from "zod";
-import { formatMetric, formatMetricName } from "./format";
+import { formatMetric, formatMetricName, formatTypedPercent } from "./format";
 import type { Dataset } from "./schema";
 import { entityLabel, refFromPath } from "./selectors";
 
@@ -44,6 +44,12 @@ const RuleFieldsSchema = z.object({
   threshold: z.number({ error: "Enter the threshold as a number." }),
 });
 
+/** "-100% to 1,000%": the valid thresholds for a metric, as the form's hint and errors say them. */
+export function thresholdRangeText(metric: AlertMetric): string {
+  const { min, max } = THRESHOLD_RANGE[metric];
+  return `${formatTypedPercent(min)} to ${formatTypedPercent(max)}`;
+}
+
 /** The cross-field rule: the threshold's range depends on the metric. */
 function checkThresholdRange(
   rule: { metric: AlertMetric; threshold: number },
@@ -54,7 +60,7 @@ function checkThresholdRange(
     ctx.addIssue({
       code: "custom",
       path: ["threshold"],
-      message: `${METRIC_LABEL[rule.metric]} thresholds run from ${min}% to ${max}%.`,
+      message: `${METRIC_LABEL[rule.metric]} thresholds run from ${thresholdRangeText(rule.metric)}.`,
     });
   }
 }
