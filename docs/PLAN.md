@@ -223,7 +223,7 @@ Wired:
 - **Loading** — charts and the map lazy-loaded with `next/dynamic`; TopoJSON trimmed to needed countries.
 - **RUM** — `web-vitals` reporting LCP, INP and CLS to the console.
 - **Errors** — per-panel error boundary, so one broken chart doesn't take the dashboard down.
-- **Safe output** — react-markdown with HTML disabled and a link allow-list; stream events validated before render.
+- **Safe output** — react-markdown with HTML disabled and an empty link allow-list (model links render as plain text); stream events validated before render.
 
 Documented in the README only: Sentry error tracking, `size-limit` bundle budgets in CI, CSP and security headers (static `headers()` in `next.config.ts`), CDN caching strategy for the static dataset, feature flags, real SSO, alert storage, synthetic monitoring.
 
