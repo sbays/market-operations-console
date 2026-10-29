@@ -8,6 +8,7 @@ import {
   formatNumber,
   formatPercent,
   formatPeriod,
+  formatPoints,
   formatStatus,
 } from "./format";
 
@@ -33,6 +34,13 @@ describe("formatPercent", () => {
     expect(formatPercent(0.042, { signed: true })).toBe("+4.2%");
     expect(formatPercent(-0.18, { signed: true })).toBe("-18.0%");
     expect(formatPercent(0, { signed: true })).toBe("0.0%");
+  });
+});
+
+describe("formatPoints", () => {
+  it("reads a gap in percentage points with one decimal", () => {
+    expect(formatPoints(14.5)).toBe("14.5 points");
+    expect(formatPoints(5)).toBe("5.0 points");
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DatasetSchema, type Point } from "./schema";
+import { DatasetSchema, type Dataset, type Point } from "./schema";
 import {
   ancestorsOf,
   childLevelOf,
@@ -21,6 +21,7 @@ import {
   statusForAttainment,
   statusOf,
   topMovers,
+  topRisks,
   valueAt,
 } from "./selectors";
 
@@ -116,6 +117,8 @@ const dataset = DatasetSchema.parse({
 });
 
 const germany = { level: "market", id: "DE" } as const;
+const unitedStates = { level: "market", id: "US" } as const;
+const europe = { level: "region", id: "eu" } as const;
 
 describe("expandPeriod", () => {
   it("expands a quarter to its months", () => {
@@ -278,14 +281,182 @@ describe("childrenOf", () => {
 });
 
 describe("topMovers", () => {
-  it("ranks markets by growth against the prior year, both ways", () => {
+  it("ranks the given entities by growth against the prior year, both ways", () => {
     // Jan: DE +15.4%, US 0%
-    const movers = topMovers(dataset, "2026-01", 1);
+    const movers = topMovers(dataset, [germany, unitedStates], "2026-01", 1);
     expect(movers.up.map((m) => m.ref)).toEqual([germany]);
     expect(movers.up[0]?.growth).toBeCloseTo(0.153846, 5);
-    expect(movers.down.map((m) => m.ref)).toEqual([
-      { level: "market", id: "US" },
+    expect(movers.down.map((m) => m.ref)).toEqual([unitedStates]);
+  });
+
+  it("only ranks the entities it is given", () => {
+    expect(topMovers(dataset, [unitedStates], "2026-01", 5)).toEqual({
+      up: [{ ref: unitedStates, growth: 0 }],
+      down: [],
+    });
+  });
+
+  it("leaves out an entity the data doesn't contain", () => {
+    const movers = topMovers(
+      dataset,
+      [{ level: "market", id: "JP" }, germany],
+      "2026-01",
+      5,
+    );
+    expect(movers.up.map((m) => m.ref)).toEqual([germany]);
+  });
+});
+
+describe("topRisks", () => {
+  // Europe in Q2: DE is 75% (off track), FR 95% (at risk), ES 100% (on track).
+  // FR comes before DE in the dataset, so the list has to sort, not just filter.
+  const europeWithFrance = {
+    ...dataset,
+    markets: [
+      {
+        id: "FR",
+        name: "France",
+        regionId: "eu",
+        series: {
+          atlas: series({
+            actual: 95,
+            forecast: 100,
+            priorYear: 95,
+            marketSize: 1000,
+            units: 9,
+          }),
+        },
+      },
+      ...dataset.markets,
+      {
+        id: "ES",
+        name: "Spain",
+        regionId: "eu",
+        series: {
+          atlas: series({
+            actual: 100,
+            forecast: 100,
+            priorYear: 100,
+            marketSize: 1000,
+            units: 10,
+          }),
+        },
+      },
+    ],
+  };
+
+  it("lists the children at risk or off track, lowest attainment first", () => {
+    expect(topRisks(europeWithFrance, europe, "2026-Q2", 3)).toEqual([
+      {
+        ref: germany,
+        status: "off-track",
+        attainment: 0.75,
+        reason: "Attainment 75.0%, 25.0 points under forecast.",
+      },
+      {
+        ref: { level: "market", id: "FR" },
+        status: "at-risk",
+        attainment: 0.95,
+        reason: "Attainment 95.0%, 5.0 points under forecast.",
+      },
     ]);
+  });
+
+  it("keeps at most the count asked for", () => {
+    expect(
+      topRisks(europeWithFrance, europe, "2026-Q2", 1).map((r) => r.ref),
+    ).toEqual([germany]);
+    expect(topRisks(europeWithFrance, europe, "2026-Q2", 0)).toEqual([]);
+  });
+
+  it("is empty when no child is at risk or off track", () => {
+    expect(topRisks(dataset, unitedStates, "2026-Q2", 3)).toEqual([]);
+  });
+
+  it("is empty below a product, where there are no children", () => {
+    expect(
+      topRisks(
+        dataset,
+        { level: "product", marketId: "DE", id: "beacon" },
+        "2026-Q2",
+        3,
+      ),
+    ).toEqual([]);
+  });
+
+  it("uses the anomaly note when its period is inside the period shown", () => {
+    const withStockOut: Dataset = {
+      ...dataset,
+      anomalies: [
+        {
+          ref: { level: "product", marketId: "DE", id: "beacon" },
+          period: "2026-03",
+          metric: "revenue",
+          note: "A distributor stock-out held back Beacon shipments.",
+        },
+      ],
+    };
+    // Q1 holds March; beacon is 120 of 300 = 40%.
+    expect(topRisks(withStockOut, germany, "2026-Q1", 3)).toEqual([
+      {
+        ref: { level: "product", marketId: "DE", id: "beacon" },
+        status: "off-track",
+        attainment: 0.4,
+        reason: "A distributor stock-out held back Beacon shipments.",
+      },
+    ]);
+    // A month is itself a period: March is inside it, February isn't.
+    expect(
+      topRisks(withStockOut, germany, "2026-03", 3).map((r) => r.reason),
+    ).toEqual(["A distributor stock-out held back Beacon shipments."]);
+    expect(
+      topRisks(withStockOut, germany, "2026-02", 3).map((r) => r.reason),
+    ).toEqual(["Attainment 50.0%, 50.0 points under forecast."]);
+  });
+
+  it("falls back to a sentence when the anomaly is outside the period shown", () => {
+    const withStockOut: Dataset = {
+      ...dataset,
+      anomalies: [
+        {
+          ref: { level: "product", marketId: "DE", id: "beacon" },
+          period: "2026-03",
+          metric: "revenue",
+          note: "A distributor stock-out held back Beacon shipments.",
+        },
+      ],
+    };
+    // Q2 doesn't hold March: beacon is 150 of 300 = 50%.
+    expect(topRisks(withStockOut, germany, "2026-Q2", 3)).toEqual([
+      {
+        ref: { level: "product", marketId: "DE", id: "beacon" },
+        status: "off-track",
+        attainment: 0.5,
+        reason: "Attainment 50.0%, 50.0 points under forecast.",
+      },
+    ]);
+  });
+
+  it("only uses an anomaly recorded against that child", () => {
+    const marketNote: Dataset = {
+      ...dataset,
+      anomalies: [
+        {
+          ref: germany,
+          period: "2026-03",
+          metric: "revenue",
+          note: "Germany-wide note.",
+        },
+      ],
+    };
+    // The note is about Germany, not about its Beacon product.
+    expect(
+      topRisks(marketNote, germany, "2026-Q1", 3).map((r) => r.reason),
+    ).toEqual(["Attainment 40.0%, 60.0 points under forecast."]);
+    // Seen from Europe, the note is about one of the children, so it applies.
+    expect(
+      topRisks(marketNote, europe, "2026-Q1", 3).map((r) => r.reason),
+    ).toEqual(["Germany-wide note."]);
   });
 });
 
@@ -307,8 +478,12 @@ describe("selectors: review fixes", () => {
   });
 
   it("returns no movers for a count of zero and never lists a market both ways", () => {
-    expect(topMovers(dataset, "2026-01", 0)).toEqual({ up: [], down: [] });
-    const movers = topMovers(dataset, "2026-01", 5);
+    const markets = [germany, unitedStates];
+    expect(topMovers(dataset, markets, "2026-01", 0)).toEqual({
+      up: [],
+      down: [],
+    });
+    const movers = topMovers(dataset, markets, "2026-01", 5);
     expect(movers.up.map((m) => m.ref)).toEqual([
       germany,
       { level: "market", id: "US" },

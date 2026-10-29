@@ -44,6 +44,16 @@ export function formatPercent(
   return (options.signed ? signedPercent : percent).format(value);
 }
 
+const points = new Intl.NumberFormat(LOCALE, {
+  minimumFractionDigits: PERCENT_DECIMALS,
+  maximumFractionDigits: PERCENT_DECIMALS,
+});
+
+/** A gap in percentage points, as in "14.5 points under forecast". Not a ratio: 14.5 is 14.5. */
+export function formatPoints(value: number): string {
+  return `${points.format(value)} points`;
+}
+
 const compactNumber = new Intl.NumberFormat(LOCALE, {
   notation: "compact",
   maximumFractionDigits: 1,
