@@ -118,3 +118,11 @@ const STATUS_NAMES: Record<Status, string> = {
 export function formatStatus(status: Status): string {
   return STATUS_NAMES[status];
 }
+
+/** A metric value, or "No data" when the data doesn't cover it. */
+export function formatMetricOrMissing(
+  metric: Metric,
+  value: number | undefined,
+): string {
+  return value === undefined ? "No data" : formatMetric(metric, value);
+}

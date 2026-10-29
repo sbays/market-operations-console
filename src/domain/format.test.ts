@@ -4,6 +4,7 @@ import {
   formatCurrency,
   formatMetric,
   formatMetricName,
+  formatMetricOrMissing,
   formatNumber,
   formatPercent,
   formatPeriod,
@@ -107,5 +108,12 @@ describe("formatStatus", () => {
     expect(formatStatus("on-track")).toBe("On track");
     expect(formatStatus("at-risk")).toBe("At risk");
     expect(formatStatus("off-track")).toBe("Off track");
+  });
+});
+
+describe("formatMetricOrMissing", () => {
+  it("formats a value, and says so plainly when there is none", () => {
+    expect(formatMetricOrMissing("revenue", 4_100_000)).toBe("$4.1M");
+    expect(formatMetricOrMissing("attainment", undefined)).toBe("No data");
   });
 });

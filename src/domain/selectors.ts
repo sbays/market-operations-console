@@ -387,3 +387,39 @@ export function entityCode(dataset: Dataset, ref: EntityRef): string {
       return "Portfolio";
   }
 }
+
+/** The label a view shows for an entity: its name, or the short code when it has none. */
+export function entityLabel(dataset: Dataset, ref: EntityRef): string {
+  return entityName(dataset, ref) ?? entityCode(dataset, ref);
+}
+
+const CHILD_LEVEL: Record<EntityRef["level"], EntityRef["level"] | undefined> =
+  {
+    portfolio: "region",
+    region: "market",
+    market: "product",
+    product: undefined,
+  };
+
+/** The level one below `ref` (what childrenOf returns), or undefined below a product. */
+export function childLevelOf(ref: EntityRef): EntityRef["level"] | undefined {
+  return CHILD_LEVEL[ref.level];
+}
+
+/** How many of `ref`'s children are in each status over a period; children with no status are left out. */
+export function childStatusCounts(
+  dataset: Dataset,
+  ref: EntityRef,
+  period: PeriodRef,
+): Record<Status, number> {
+  const counts: Record<Status, number> = {
+    "on-track": 0,
+    "at-risk": 0,
+    "off-track": 0,
+  };
+  for (const child of childrenOf(dataset, ref)) {
+    const status = statusAt(dataset, child, period);
+    if (status) counts[status] += 1;
+  }
+  return counts;
+}
