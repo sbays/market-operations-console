@@ -9,6 +9,8 @@ export type SseFrame = { event?: string; data: string };
 export type SseParser = {
   /** Feed the next decoded chunk; returns every frame it completed. */
   push(chunk: string): SseFrame[];
+  /** Call once the stream has ended; returns any frame its last line completed. */
+  end(): SseFrame[];
 };
 
 export function createSseParser(): SseParser {
@@ -44,14 +46,26 @@ export function createSseParser(): SseParser {
     push(chunk) {
       buffer += chunk;
       const frames: SseFrame[] = [];
-      for (;;) {
-        const match = /\r\n|\r|\n/.exec(buffer);
-        if (!match) break;
+      const lineEnd = /\r\n|\r|\n/g;
+      let start = 0;
+      for (
+        let match = lineEnd.exec(buffer);
+        match;
+        match = lineEnd.exec(buffer)
+      ) {
         // A trailing "\r" may be the first half of "\r\n": wait for the next chunk.
         if (match[0] === "\r" && match.index === buffer.length - 1) break;
-        processLine(buffer.slice(0, match.index), frames);
-        buffer = buffer.slice(match.index + match[0].length);
+        processLine(buffer.slice(start, match.index), frames);
+        start = lineEnd.lastIndex;
       }
+      buffer = buffer.slice(start);
+      return frames;
+    },
+    end() {
+      // Nothing more is coming, so a held "\r" can't become "\r\n": it ends its line.
+      const frames: SseFrame[] = [];
+      if (buffer.endsWith("\r")) processLine(buffer.slice(0, -1), frames);
+      buffer = "";
       return frames;
     },
   };

@@ -40,6 +40,12 @@ describe("createSseParser", () => {
     expect(parseAll(["data: a\r", "\n\r", "\n"])).toEqual([{ data: "a" }]);
   });
 
+  it("dispatches a frame ended by a lone CR once the stream ends", () => {
+    const parser = createSseParser();
+    expect(parser.push("event: final\rdata: x\r\r")).toEqual([]);
+    expect(parser.end()).toEqual([{ event: "final", data: "x" }]);
+  });
+
   it("joins multi-line data and strips one space after the colon", () => {
     expect(parseAll(["data: one\ndata:two\ndata:  three\n\n"])).toEqual([
       { data: "one\ntwo\n three" },
