@@ -4,8 +4,11 @@ import {
   childrenOf,
   confidenceBand,
   coverageOf,
+  entityName,
   expandPeriod,
   latestQuarter,
+  pathOf,
+  refFromPath,
   statusCounts,
   statusForAttainment,
   statusOf,
@@ -316,5 +319,60 @@ describe("period types", () => {
 describe("coverageOf", () => {
   it("is the first and last month in the data", () => {
     expect(coverageOf(dataset)).toEqual({ from: "2026-01", to: "2026-06" });
+  });
+});
+
+describe("refFromPath", () => {
+  it("reads region, market and product from a dotted path", () => {
+    expect(refFromPath(dataset, "")).toEqual({ level: "portfolio" });
+    expect(refFromPath(dataset, "eu")).toEqual({ level: "region", id: "eu" });
+    expect(refFromPath(dataset, "eu.DE")).toEqual(germany);
+    expect(refFromPath(dataset, "eu.DE.beacon")).toEqual({
+      level: "product",
+      marketId: "DE",
+      id: "beacon",
+    });
+  });
+
+  it("rejects a path the data doesn't contain", () => {
+    expect(refFromPath(dataset, "apac")).toBeUndefined();
+    expect(refFromPath(dataset, "eu.JP")).toBeUndefined();
+    expect(refFromPath(dataset, "na.DE")).toBeUndefined(); // Germany is in Europe
+    expect(refFromPath(dataset, "eu.DE.zephyr")).toBeUndefined();
+    expect(refFromPath(dataset, "eu.DE.beacon.extra")).toBeUndefined();
+    expect(refFromPath(dataset, "eu..beacon")).toBeUndefined();
+  });
+});
+
+describe("pathOf", () => {
+  it("writes the drill path, finding a market's region in the data", () => {
+    expect(pathOf(dataset, { level: "portfolio" })).toBe("");
+    expect(pathOf(dataset, { level: "region", id: "na" })).toBe("na");
+    expect(pathOf(dataset, germany)).toBe("eu.DE");
+    expect(
+      pathOf(dataset, { level: "product", marketId: "US", id: "atlas" }),
+    ).toBe("na.US.atlas");
+  });
+
+  it("has no path for a market the data doesn't contain", () => {
+    expect(pathOf(dataset, { level: "market", id: "JP" })).toBeUndefined();
+  });
+});
+
+describe("entityName", () => {
+  it("names each level as a reader would say it", () => {
+    expect(entityName(dataset, { level: "portfolio" })).toBe("Portfolio");
+    expect(entityName(dataset, { level: "region", id: "eu" })).toBe("Europe");
+    expect(entityName(dataset, germany)).toBe("Germany");
+    expect(
+      entityName(dataset, { level: "product", marketId: "DE", id: "beacon" }),
+    ).toBe("Beacon in Germany");
+  });
+
+  it("has no name for an entity the data doesn't contain", () => {
+    expect(entityName(dataset, { level: "market", id: "JP" })).toBeUndefined();
+    expect(
+      entityName(dataset, { level: "product", marketId: "DE", id: "zephyr" }),
+    ).toBeUndefined();
   });
 });

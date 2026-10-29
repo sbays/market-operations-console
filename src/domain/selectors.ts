@@ -237,3 +237,67 @@ export function coverageOf(dataset: Dataset): { from: Month; to: Month } {
   if (!from || !to) throw new Error("Dataset has no periods");
   return { from, to };
 }
+
+/** The URL form of a drill path: "eu.DE.beacon" is region, market, product; "" is the portfolio. */
+export function refFromPath(
+  dataset: Dataset,
+  path: string,
+): EntityRef | undefined {
+  if (path === "") return { level: "portfolio" };
+  const [regionId, marketId, productId, ...rest] = path.split(".");
+  if (rest.length > 0) return undefined;
+
+  const region = dataset.regions.find((r) => r.id === regionId);
+  if (!region) return undefined;
+  if (marketId === undefined) return { level: "region", id: region.id };
+
+  const market = dataset.markets.find(
+    (m) => m.id === marketId && m.regionId === region.id,
+  );
+  if (!market) return undefined;
+  if (productId === undefined) return { level: "market", id: market.id };
+
+  const product = dataset.products.find((p) => p.id === productId);
+  if (!product) return undefined;
+  return { level: "product", marketId: market.id, id: product.id };
+}
+
+/** The inverse of refFromPath; undefined when the ref's market isn't in the data. */
+export function pathOf(dataset: Dataset, ref: EntityRef): string | undefined {
+  switch (ref.level) {
+    case "portfolio":
+      return "";
+    case "region":
+      return ref.id;
+    case "market":
+    case "product": {
+      const marketId = ref.level === "market" ? ref.id : ref.marketId;
+      const market = dataset.markets.find((m) => m.id === marketId);
+      if (!market) return undefined;
+      const marketPath = `${market.regionId}.${market.id}`;
+      return ref.level === "market" ? marketPath : `${marketPath}.${ref.id}`;
+    }
+  }
+}
+
+/** A display name for any entity: "Germany", "Beacon in Germany". */
+export function entityName(
+  dataset: Dataset,
+  ref: EntityRef,
+): string | undefined {
+  switch (ref.level) {
+    case "portfolio":
+      return "Portfolio";
+    case "region":
+      return dataset.regions.find((r) => r.id === ref.id)?.name;
+    case "market":
+      return dataset.markets.find((m) => m.id === ref.id)?.name;
+    case "product": {
+      const market = dataset.markets.find((m) => m.id === ref.marketId);
+      const product = dataset.products.find((p) => p.id === ref.id);
+      return market && product
+        ? `${product.name} in ${market.name}`
+        : undefined;
+    }
+  }
+}

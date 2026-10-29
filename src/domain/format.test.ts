@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatCoverage,
   formatCurrency,
   formatMetric,
+  formatMetricName,
   formatNumber,
   formatPercent,
   formatPeriod,
@@ -77,5 +79,24 @@ describe("formatPeriod: types", () => {
   it("won't compile a string that isn't a period", () => {
     // @ts-expect-error "banana" is not a PeriodRef
     expect(() => formatPeriod("banana")).toThrow(RangeError);
+  });
+});
+
+describe("formatMetricName", () => {
+  it("names every metric for labels and chips", () => {
+    expect(formatMetricName("revenue")).toBe("Revenue");
+    expect(formatMetricName("units")).toBe("Units");
+    expect(formatMetricName("forecast")).toBe("Forecast");
+    expect(formatMetricName("growth")).toBe("Growth vs prior year");
+    expect(formatMetricName("attainment")).toBe("Forecast attainment");
+    expect(formatMetricName("share")).toBe("Market share");
+  });
+});
+
+describe("formatCoverage", () => {
+  it("reads as a range of months", () => {
+    expect(formatCoverage({ from: "2024-10", to: "2026-09" })).toBe(
+      "Oct 2024 to Sep 2026",
+    );
   });
 });
