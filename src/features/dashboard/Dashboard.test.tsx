@@ -6,9 +6,10 @@ import {
   type OnUrlUpdateFunction,
 } from "nuqs/adapters/testing";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadDataset } from "@/data/pack";
 import { datasetQuery } from "@/data/queries";
+import { resetHighlight } from "@/state/highlight";
 import { Toaster } from "@/ui/Toaster";
 import { Dashboard } from "./Dashboard";
 
@@ -476,5 +477,56 @@ describe("Dashboard", () => {
 
     await user.keyboard("{Escape}");
     expect(lastUrl(onUrlUpdate).query).toBe("?path=eu");
+  });
+});
+
+describe("Dashboard: linked highlighting", () => {
+  // The highlight store is module-level, so each test starts with nothing highlighted.
+  afterEach(() => act(() => resetHighlight()));
+
+  const linked = (element: HTMLElement | undefined) =>
+    element?.getAttribute("data-linked") === "true";
+  const marker = (name: string) =>
+    screen.getByRole("button", { name: new RegExp(`^${name}: attainment`) });
+  const tableRow = (name: string) =>
+    within(screen.getByRole("table", { name: /by (market|region)/ }))
+      .getByRole("button", { name })
+      .closest("tr") ?? undefined;
+
+  it("emphasises a hovered table row's market on the map, heat map and radar", async () => {
+    const { user } = renderDashboard("?path=eu");
+
+    await user.hover(tableRow("Germany") ?? document.body);
+
+    expect(linked(marker("Germany"))).toBe(true);
+    expect(linked(marker("France"))).toBe(false);
+    expect(
+      linked(screen.getByRole("button", { name: /^Germany, Mar 2026: / })),
+    ).toBe(true);
+    expect(
+      linked(screen.getByRole("button", { name: /^Germany, Revenue: / })),
+    ).toBe(true);
+    expect(linked(tableRow("France"))).toBe(false);
+
+    await user.unhover(tableRow("Germany") ?? document.body);
+    expect(linked(marker("Germany"))).toBe(false);
+  });
+
+  it("emphasises a focused map marker's row in the table, for keyboard users", () => {
+    renderDashboard("?path=eu");
+
+    act(() => marker("France").focus());
+
+    expect(linked(tableRow("France"))).toBe(true);
+    expect(linked(tableRow("Germany"))).toBe(false);
+  });
+
+  it("links a region's row to its markets on the map at the portfolio", async () => {
+    const { user } = renderDashboard();
+
+    await user.hover(tableRow("Europe") ?? document.body);
+
+    expect(linked(marker("Germany"))).toBe(true);
+    expect(linked(marker("United States"))).toBe(false);
   });
 });

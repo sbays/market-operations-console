@@ -10,6 +10,7 @@
  * interaction, and starts empty on the server, so no request sees another's state.
  */
 import { create } from "zustand";
+import { isLinked } from "@/domain/highlight";
 
 type HighlightState = { path: string | null };
 
@@ -50,5 +51,31 @@ export function highlightHandlers(path: string): HighlightHandlers {
     onMouseLeave: hide,
     onFocus: show,
     onBlur: hide,
+  };
+}
+
+export type LinkedProps = Partial<HighlightHandlers> & {
+  "data-linked"?: "true";
+};
+
+/**
+ * Everything an item needs to take part in linked highlighting: the handlers, plus
+ * `data-linked` while it's emphasised. `own` keeps an item's existing focus handler (a chart
+ * point's roving tabindex) working alongside the highlight. Items with no path don't link.
+ */
+export function linkedProps(
+  path: string | undefined,
+  highlighted: string | null,
+  own: { onFocus?: () => void } = {},
+): LinkedProps {
+  if (path === undefined) return own;
+  const handlers = highlightHandlers(path);
+  return {
+    ...handlers,
+    onFocus: () => {
+      own.onFocus?.();
+      handlers.onFocus();
+    },
+    "data-linked": isLinked(path, highlighted) ? "true" : undefined,
   };
 }

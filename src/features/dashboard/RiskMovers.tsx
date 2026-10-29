@@ -9,7 +9,9 @@ import {
   topMovers,
   topRisks,
 } from "@/domain/selectors";
+import { linkedProps, useHighlightedPath } from "@/state/highlight";
 import { type Mode, useDrill } from "@/state/url";
+import { cn } from "@/ui/cn";
 import { StatusBadge } from "@/ui/StatusBadge";
 
 type Props = {
@@ -28,6 +30,7 @@ const LIST_LENGTH = 3;
  */
 export function RiskMovers({ dataset, selected, period, mode }: Props) {
   const drill = useDrill();
+  const highlighted = useHighlightedPath();
   const riskHeadingId = useId();
   const moversHeadingId = useId();
   const children = childrenOf(dataset, selected);
@@ -54,26 +57,33 @@ export function RiskMovers({ dataset, selected, period, mode }: Props) {
           </p>
         ) : (
           <ol className="flex flex-col gap-3">
-            {risks.map((risk) => (
-              <li
-                key={
-                  pathOf(dataset, risk.ref) ?? entityLabel(dataset, risk.ref)
-                }
-                className="flex flex-col gap-1"
-              >
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <DrillButton
-                    name={entityLabel(dataset, risk.ref)}
-                    onDrill={() => drill(risk.ref)}
-                  />
-                  <StatusBadge status={risk.status} />
-                  <span className="text-sm font-semibold tabular-nums">
-                    {formatMetric("attainment", risk.attainment)}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground">{risk.reason}</p>
-              </li>
-            ))}
+            {risks.map((risk) => {
+              const link = linkedProps(pathOf(dataset, risk.ref), highlighted);
+              return (
+                <li
+                  key={
+                    pathOf(dataset, risk.ref) ?? entityLabel(dataset, risk.ref)
+                  }
+                  {...link}
+                  className={cn(
+                    "-mx-2 flex flex-col gap-1 rounded-md px-2 py-1",
+                    link["data-linked"] && "bg-accent",
+                  )}
+                >
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <DrillButton
+                      name={entityLabel(dataset, risk.ref)}
+                      onDrill={() => drill(risk.ref)}
+                    />
+                    <StatusBadge status={risk.status} />
+                    <span className="text-sm font-semibold tabular-nums">
+                      {formatMetric("attainment", risk.attainment)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{risk.reason}</p>
+                </li>
+              );
+            })}
           </ol>
         )}
       </section>
@@ -122,6 +132,7 @@ function MoverList({
   onDrill: (ref: EntityRef) => void;
 }) {
   const labelId = useId();
+  const highlighted = useHighlightedPath();
   return (
     <div className="flex flex-col gap-2">
       <h3 id={labelId} className="text-sm font-medium text-muted-foreground">
@@ -133,22 +144,29 @@ function MoverList({
         </p>
       ) : (
         <ul aria-labelledby={labelId} className="flex flex-col gap-2">
-          {movers.map((mover) => (
-            <li
-              key={
-                pathOf(dataset, mover.ref) ?? entityLabel(dataset, mover.ref)
-              }
-              className="flex items-baseline justify-between gap-3 text-sm"
-            >
-              <DrillButton
-                name={entityLabel(dataset, mover.ref)}
-                onDrill={() => onDrill(mover.ref)}
-              />
-              <span className="font-semibold tabular-nums">
-                {formatMetric("growth", mover.growth)}
-              </span>
-            </li>
-          ))}
+          {movers.map((mover) => {
+            const link = linkedProps(pathOf(dataset, mover.ref), highlighted);
+            return (
+              <li
+                key={
+                  pathOf(dataset, mover.ref) ?? entityLabel(dataset, mover.ref)
+                }
+                {...link}
+                className={cn(
+                  "-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 text-sm",
+                  link["data-linked"] && "bg-accent",
+                )}
+              >
+                <DrillButton
+                  name={entityLabel(dataset, mover.ref)}
+                  onDrill={() => onDrill(mover.ref)}
+                />
+                <span className="font-semibold tabular-nums">
+                  {formatMetric("growth", mover.growth)}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

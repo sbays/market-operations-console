@@ -15,6 +15,8 @@ import { isMonth } from "@/domain/period";
 import type { Dataset, EntityRef, PeriodRef } from "@/domain/schema";
 import { childLevelOf, entityLabel, pathOf } from "@/domain/selectors";
 import { useSetPeriod } from "@/state/url";
+import { isLinked } from "@/domain/highlight";
+import { linkedProps, useHighlightedPath } from "@/state/highlight";
 import { ChartFrame } from "@/ui/ChartFrame";
 import { ChartLegend } from "@/ui/ChartLegend";
 import { useRovingIndex } from "@/ui/useRovingIndex";
@@ -41,7 +43,10 @@ const SCALE_STOPS = [
  */
 export function AttainmentHeatMap({ dataset, selected, period }: Props) {
   const setPeriod = useSetPeriod();
+  const highlighted = useHighlightedPath();
   const rows = heatmapRows(dataset, selected);
+  const linkedRow = (row: (typeof rows)[number]) =>
+    isLinked(pathOf(dataset, row.ref) ?? "", highlighted);
   const months = dataset.periods;
   const selectedColumn = isMonth(period) ? months.indexOf(period) : -1;
   // Keyboard users enter on the selected month, or the latest when a quarter is shown.
@@ -74,6 +79,7 @@ export function AttainmentHeatMap({ dataset, selected, period }: Props) {
                 dominantBaseline="central"
                 fill={LABEL_COLOUR}
                 fontSize={11}
+                fontWeight={linkedRow(row) ? 700 : undefined}
               >
                 {entityLabel(dataset, row.ref)}
               </text>
@@ -89,6 +95,18 @@ export function AttainmentHeatMap({ dataset, selected, period }: Props) {
                   style={{ fill: heatColour(cell.attainment) }}
                 />
               )),
+            )}
+            {rows.map((row, r) =>
+              linkedRow(row) ? (
+                <rect
+                  key={`linked-${rowKey(dataset, row, r)}`}
+                  x={grid.columnX(0)}
+                  y={grid.rowY(r)}
+                  width={grid.cellWidth * months.length}
+                  height={grid.cellHeight}
+                  className="fill-none stroke-foreground stroke-2"
+                />
+              ) : null,
             )}
             {selectedColumn === -1 ? null : (
               <rect
@@ -122,11 +140,13 @@ export function AttainmentHeatMap({ dataset, selected, period }: Props) {
           row.cells.map((cell, c) => {
             const index = r * months.length + c;
             const label = `${entityLabel(dataset, row.ref)}, ${formatPeriod(cell.period)}`;
+            const item = roving.itemProps(index);
             return (
               <button
                 key={`${rowKey(dataset, row, r)}-${cell.period}`}
                 type="button"
-                {...roving.itemProps(index)}
+                {...item}
+                {...linkedProps(pathOf(dataset, row.ref), highlighted, item)}
                 aria-label={
                   cell.attainment === undefined
                     ? `${label}: no data`
