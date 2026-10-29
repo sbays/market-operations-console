@@ -10,7 +10,6 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { parseAsInteger, useQueryState } from "nuqs";
 import { toast } from "sonner";
 import { z } from "zod";
 import {
@@ -58,32 +57,34 @@ async function postAlert(
 }
 
 /**
- * Saves a rule. The page's `?fail=1` is forwarded so the mock refuses the save, which is how
- * the rollback is reached on purpose.
+ * Saves a rule. With `fail`, the request asks the mock to refuse the save, which is how the
+ * rollback is reached on purpose (the page's `?fail=1`, read in state/url).
  */
-export function useCreateAlert() {
+export function useCreateAlert({ fail }: { fail: boolean }) {
   const queryClient = useQueryClient();
-  const [fail] = useQueryState("fail", parseAsInteger);
 
   const mutation = useMutation({
-    mutationFn: (input: AlertRuleInput) => postAlert(input, fail === 1),
+    mutationFn: (input: AlertRuleInput) => postAlert(input, fail),
     onMutate: async (input) => {
       // An in-flight refetch would otherwise overwrite the optimistic row.
       await queryClient.cancelQueries({ queryKey: alertsQuery.queryKey });
-      const previous = queryClient.getQueryData(alertsQuery.queryKey);
       const pending: AlertListItem = {
         ...input,
         id: `pending-${crypto.randomUUID()}`,
         pending: true,
       };
-      queryClient.setQueryData(alertsQuery.queryKey, [
-        ...(previous ?? []),
+      queryClient.setQueryData(alertsQuery.queryKey, (rules) => [
+        ...(rules ?? []),
         pending,
       ]);
-      return { previous };
+      return { pendingId: pending.id };
     },
     onError: (_error, input, context) => {
-      queryClient.setQueryData(alertsQuery.queryKey, context?.previous);
+      // Only this save's row goes: restoring a snapshot would also drop rows that other saves
+      // added after it and that are still in progress.
+      queryClient.setQueryData(alertsQuery.queryKey, (rules) =>
+        rules?.filter((rule) => rule.id !== context?.pendingId),
+      );
       toast.error("Couldn't save the alert rule.", {
         action: {
           label: "Retry",

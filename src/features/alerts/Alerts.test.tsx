@@ -338,4 +338,52 @@ describe("a save the server refuses", () => {
     await user.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(postCount).toBe(2));
   });
+
+  it("rolls back only its own row, leaving a later save still in progress", async () => {
+    const { user } = renderAlerts("");
+    // "Doomed" is saved first and refused once "Kept" is also pending. Restoring Doomed's
+    // snapshot (taken before Kept existed) would wrongly drop Kept. The list never refetches,
+    // so only the rollback can change the rows.
+    let refuse = () => {};
+    const refusal = new Promise<void>((resolve) => (refuse = resolve));
+    let keepSaving = () => {};
+    const kept = new Promise<void>((resolve) => (keepSaving = resolve));
+    let refused = false;
+    server.use(
+      http.get("*/api/alerts", async () => {
+        await kept;
+        return HttpResponse.json({ rules: [] });
+      }),
+      http.post("*/api/alerts", async ({ request }) => {
+        const body = AlertRuleInputSchema.parse(await request.json());
+        if (body.name === "Doomed") {
+          await refusal;
+          refused = true;
+          return HttpResponse.json({ error: "Saving failed" }, { status: 500 });
+        }
+        await kept;
+        return HttpResponse.json({ ...body, id: "kept" }, { status: 201 });
+      }),
+    );
+
+    let dialog = await openDialog(user);
+    await fillRule(user, { name: "Doomed", threshold: "5" });
+    await user.click(within(dialog).getByRole("button", { name: "Save rule" }));
+    const rules = await rulesList();
+    expect(await within(rules).findByText("Doomed")).toBeInTheDocument();
+
+    dialog = await openDialog(user);
+    await fillRule(user, { name: "Kept", threshold: "5" });
+    await user.click(within(dialog).getByRole("button", { name: "Save rule" }));
+    expect(await within(rules).findByText("Kept")).toBeInTheDocument();
+
+    refuse();
+    await waitFor(() => expect(refused).toBe(true));
+    await waitFor(() =>
+      expect(screen.queryByText("Doomed")).not.toBeInTheDocument(),
+    );
+    expect(within(rules).getByText("Kept")).toBeInTheDocument();
+    expect(within(rules).getByText("Saving…")).toBeInTheDocument();
+    keepSaving();
+  });
 });
