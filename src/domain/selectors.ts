@@ -12,7 +12,7 @@ import type {
   Quarter,
   Status,
 } from "./schema";
-import { PERCENT_DECIMALS } from "./format";
+import { formatPercent, formatPoints, PERCENT_DECIMALS } from "./format";
 import { monthKey, monthsOfQuarter, parsePeriod, quarterKey } from "./period";
 
 /** Attainment thresholds for status, judged over a quarter. */
@@ -262,15 +262,15 @@ export function monthlySeries(dataset: Dataset, ref: EntityRef): TrendPoint[] {
 
 export type Mover = { ref: EntityRef; growth: number };
 
-/** Markets with the highest and lowest growth against the prior year over a period. */
+/** The entities in `refs` with the highest and lowest growth against the prior year over a period. */
 export function topMovers(
   dataset: Dataset,
+  refs: EntityRef[],
   period: PeriodRef,
   count: number,
 ): { up: Mover[]; down: Mover[] } {
   const movers: Mover[] = [];
-  for (const market of dataset.markets) {
-    const ref: EntityRef = { level: "market", id: market.id };
+  for (const ref of refs) {
     const growth = valueAt(dataset, ref, period, "growth");
     if (growth !== undefined) movers.push({ ref, growth });
   }
@@ -422,4 +422,81 @@ export function childStatusCounts(
     if (status) counts[status] += 1;
   }
   return counts;
+}
+
+export type Risk = {
+  ref: EntityRef;
+  status: Extract<Status, "at-risk" | "off-track">;
+  attainment: number;
+  reason: string;
+};
+
+/** The attainment as it is displayed, rounded the same way statusForAttainment rounds it. */
+function displayedAttainment(attainment: number): number {
+  const scale = 10 ** (PERCENT_DECIMALS + 2);
+  return Math.round(attainment * scale) / scale;
+}
+
+/**
+ * The reason a risk is shown: the note of an anomaly recorded against that child in the period
+ * shown, or else a sentence about the shortfall. The note is only used when the child's path
+ * matches the anomaly's, so one entity never borrows another's explanation.
+ */
+function riskReason(
+  dataset: Dataset,
+  ref: EntityRef,
+  period: PeriodRef,
+  attainment: number,
+): string {
+  const path = pathOf(dataset, ref);
+  const months = expandPeriod(dataset, period);
+  const note =
+    path === undefined
+      ? undefined
+      : dataset.anomalies.find(
+          (anomaly) =>
+            pathOf(dataset, anomaly.ref) === path &&
+            months.includes(anomaly.period),
+        )?.note;
+  if (note !== undefined) return note;
+  const displayed = displayedAttainment(attainment);
+  return `Attainment ${formatPercent(displayed)}, ${formatPoints((1 - displayed) * 100)} under forecast.`;
+}
+
+/**
+ * The children of `selected` that are at risk or off track over a period, lowest attainment
+ * first, at most `count`. Children with no status (outside the data) are left out.
+ */
+export function topRisks(
+  dataset: Dataset,
+  selected: EntityRef,
+  period: PeriodRef,
+  count: number,
+): Risk[] {
+  const flagged: {
+    ref: EntityRef;
+    status: Risk["status"];
+    attainment: number;
+  }[] = [];
+  for (const ref of childrenOf(dataset, selected)) {
+    const status = statusAt(dataset, ref, period);
+    const attainment = valueAt(dataset, ref, period, "attainment");
+    if (
+      status === undefined ||
+      status === "on-track" ||
+      attainment === undefined
+    ) {
+      continue;
+    }
+    flagged.push({ ref, status, attainment });
+  }
+  return flagged
+    .sort((a, b) => a.attainment - b.attainment)
+    .slice(0, Math.max(0, count))
+    .map(({ ref, status, attainment }) => ({
+      ref,
+      status,
+      attainment,
+      reason: riskReason(dataset, ref, period, attainment),
+    }));
 }
