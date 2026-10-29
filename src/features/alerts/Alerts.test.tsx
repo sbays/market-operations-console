@@ -179,6 +179,9 @@ describe("AlertDialog", () => {
     expect(scope).toHaveAccessibleDescription(
       "Pick at least one region or market.",
     );
+    expect(
+      within(scope).getByRole("checkbox", { name: "Europe" }),
+    ).toBeInvalid();
 
     const threshold = within(dialog).getByRole("spinbutton", {
       name: "Threshold",

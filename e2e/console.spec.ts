@@ -179,3 +179,16 @@ test("a refused save rolls the alert rule back", async ({ page }) => {
   await expect(page.getByText("Couldn't save the alert rule.")).toBeVisible();
   await expect(page.getByText("Doomed")).toHaveCount(0);
 });
+
+test("the alert dialog scrolls to Save on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto("/console");
+  await page.getByRole("button", { name: "New alert" }).click();
+  const dialog = page.getByRole("dialog", { name: "New alert rule" });
+
+  // Playwright scrolls the button into view before clicking; a clipped dialog can't be.
+  await dialog.getByRole("button", { name: "Save rule" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Fix these before saving",
+  );
+});

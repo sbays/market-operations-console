@@ -97,12 +97,15 @@ function ScopeCheckbox({
   label,
   checked,
   onToggle,
+  invalid,
   inputRef,
 }: {
   path: string;
   label: string;
   checked: boolean;
   onToggle: (path: string, checked: boolean) => void;
+  /** Set while the scope has an error; the fieldset carries the message. */
+  invalid: boolean;
   inputRef?: Ref<HTMLInputElement>;
 }) {
   const id = useId();
@@ -114,6 +117,7 @@ function ScopeCheckbox({
         type="checkbox"
         className="size-4 accent-primary"
         checked={checked}
+        aria-invalid={invalid || undefined}
         onChange={(event) => onToggle(path, event.target.checked)}
       />
       <label htmlFor={id}>{label}</label>
@@ -148,7 +152,6 @@ function ScopePicker({
     <fieldset
       className="flex flex-col gap-2"
       aria-describedby={error ? errorId : undefined}
-      aria-invalid={error ? true : undefined}
     >
       <legend className="text-sm font-medium">Scope</legend>
       <ul className="flex flex-col gap-2">
@@ -159,6 +162,7 @@ function ScopePicker({
               label={region.name}
               checked={selected.includes(region.id)}
               onToggle={toggle}
+              invalid={Boolean(error)}
               inputRef={index === 0 ? firstRef : undefined}
             />
             <ul className="flex flex-col gap-1.5 pl-6">
@@ -173,6 +177,7 @@ function ScopePicker({
                         label={market.name}
                         checked={selected.includes(path)}
                         onToggle={toggle}
+                        invalid={Boolean(error)}
                       />
                     </li>
                   );
@@ -393,7 +398,8 @@ export function AlertDialog() {
       <DialogTrigger asChild>
         <Button type="button">New alert</Button>
       </DialogTrigger>
-      <DialogContent>
+      {/* The form is taller than a phone screen, so the dialog scrolls rather than clip Save. */}
+      <DialogContent className="max-h-dvh overflow-y-auto">
         <DialogHeader>
           <DialogTitle>New alert rule</DialogTitle>
           <DialogDescription>
