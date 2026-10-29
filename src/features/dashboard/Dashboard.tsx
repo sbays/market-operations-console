@@ -8,8 +8,8 @@ import { useMode, useSelection } from "@/state/url";
 import { ErrorBoundary } from "@/ui/ErrorBoundary";
 import { AttainmentHeatMap } from "./AttainmentHeatMap";
 import { Breadcrumb } from "./Breadcrumb";
-import { BreakdownTable } from "./BreakdownTable";
 import { CompareRadar } from "./CompareRadar";
+import { DetailTable } from "./DetailTable";
 import { KpiStrip } from "./KpiStrip";
 import { ModeToggle } from "./ModeToggle";
 import { TrendChart } from "./TrendChart";
@@ -61,7 +61,7 @@ export function Dashboard() {
             <Panel label="Compare chart" resetKey={resetKey}>
               <CompareRadar {...props} />
             </Panel>
-            <BreakdownTable {...props} />
+            <DetailTable {...props} />
           </div>
         </>
       )}
