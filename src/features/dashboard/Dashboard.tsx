@@ -1,28 +1,69 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import type { ReactNode } from "react";
 import { useDataset } from "@/data/useDataset";
 import { selectionPeriod } from "@/domain/selectors";
 import { useSelection } from "@/state/url";
+import { ErrorBoundary } from "@/ui/ErrorBoundary";
+import { AttainmentHeatMap } from "./AttainmentHeatMap";
 import { Breadcrumb } from "./Breadcrumb";
 import { BreakdownTable } from "./BreakdownTable";
+import { CompareRadar } from "./CompareRadar";
 import { KpiStrip } from "./KpiStrip";
 import { TrendChart } from "./TrendChart";
+
+// The world TopoJSON is the largest asset on the page: load it after the rest of the
+// dashboard. The map measures its container anyway, so it can't draw on the server.
+const MarketMap = dynamic(
+  () => import("./MarketMap").then((module) => module.MarketMap),
+  { ssr: false, loading: () => <PanelSkeleton /> },
+);
 
 /**
  * The dashboard for the selection in the URL. Every panel derives from the same entity and
  * period, and writes back only through URL state, so the panels never talk to each other.
+ * Each chart has its own error boundary, so one failing chart leaves the rest working.
  */
 export function Dashboard() {
   const dataset = useDataset();
   const { ref, period } = useSelection();
   const shown = selectionPeriod(dataset, period);
+  const props = { dataset, selected: ref, period: shown };
 
   return (
     <div className="flex flex-col gap-6">
       <Breadcrumb dataset={dataset} selected={ref} />
-      <KpiStrip dataset={dataset} selected={ref} period={shown} />
-      <TrendChart dataset={dataset} selected={ref} period={shown} />
-      <BreakdownTable dataset={dataset} selected={ref} period={shown} />
+      <KpiStrip {...props} />
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Panel label="Market map">
+          <MarketMap {...props} />
+        </Panel>
+        <Panel label="Trend chart">
+          <TrendChart {...props} />
+        </Panel>
+      </div>
+      <Panel label="Heat map">
+        <AttainmentHeatMap {...props} />
+      </Panel>
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        <Panel label="Compare chart">
+          <CompareRadar {...props} />
+        </Panel>
+        <BreakdownTable {...props} />
+      </div>
     </div>
   );
+}
+
+function Panel({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <ErrorBoundary label={label}>
+      <div className="min-w-0">{children}</div>
+    </ErrorBoundary>
+  );
+}
+
+function PanelSkeleton() {
+  return <div aria-hidden className="h-80 rounded-lg bg-muted" />;
 }
