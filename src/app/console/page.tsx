@@ -1,8 +1,11 @@
 import { Suspense, use } from "react";
 import { DatasetHydration, dehydrateDataset } from "@/data/DatasetHydration";
 import { loadFixtures } from "@/data/pack";
+import { AlertDialog } from "@/features/alerts/AlertDialog";
+import { AlertList } from "@/features/alerts/AlertList";
 import { AssistantPanel } from "@/features/assistant/AssistantPanel";
 import { Dashboard } from "@/features/dashboard/Dashboard";
+import { Toaster } from "@/ui/Toaster";
 
 export default async function ConsolePage({
   searchParams,
@@ -18,9 +21,18 @@ export default async function ConsolePage({
       </a>
       <div className="flex min-h-full flex-1 flex-col lg:flex-row">
         <main id="main" className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-          <h1 className="text-xl font-semibold">Market Operations</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-xl font-semibold">Market Operations</h1>
+            {/* The form prefills its scope from the URL selection, known only at request time. */}
+            <Suspense>
+              <AlertDialog />
+            </Suspense>
+          </div>
           <Suspense fallback={<DashboardSkeleton />}>
             <RequestDashboard searchParams={searchParams} />
+          </Suspense>
+          <Suspense>
+            <AlertList />
           </Suspense>
         </main>
         <div className="border-t lg:w-96 lg:shrink-0 lg:border-t-0 lg:border-l">
@@ -30,6 +42,7 @@ export default async function ConsolePage({
           </Suspense>
         </div>
       </div>
+      <Toaster />
     </DatasetHydration>
   );
 }
