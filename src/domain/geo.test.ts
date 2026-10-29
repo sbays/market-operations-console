@@ -1,4 +1,4 @@
-import { geoCentroid } from "d3-geo";
+import { geoContains } from "d3-geo";
 import { describe, expect, it } from "vitest";
 import worldTopology from "world-atlas/countries-110m.json";
 import type { Dataset, EntityRef } from "./schema";
@@ -7,6 +7,7 @@ import {
   WorldTopologySchema,
   countryOf,
   marketAnchor,
+  marketLocation,
   marketsInSelection,
   worldProjection,
 } from "./geo";
@@ -92,12 +93,28 @@ describe("marketAnchor", () => {
     }
   });
 
-  it("is the projected centroid of the country", () => {
+  it("is the projected location of the market", () => {
     const project = worldProjection({ width: 800, height: 400 });
-    const country = countryOf("DE");
-    expect(country).toBeDefined();
-    expect(marketAnchor("DE", project)).toEqual(
-      country && project(geoCentroid(country)),
-    );
+    const location = marketLocation("DE");
+    expect(marketAnchor("DE", project)).toEqual(location && project(location));
+  });
+});
+
+describe("marketLocation", () => {
+  // A whole-country centroid lands at sea for countries in several parts (France with
+  // French Guiana, Japan's islands), so the marker would sit off the country it names.
+  it("falls inside its own country for every mapped market", () => {
+    for (const marketId of Object.keys(MARKET_GEO_IDS)) {
+      const country = countryOf(marketId);
+      const location = marketLocation(marketId);
+      expect(
+        country && location && geoContains(country, location),
+        marketId,
+      ).toBe(true);
+    }
+  });
+
+  it("is undefined for a market with no country", () => {
+    expect(marketLocation("XX")).toBeUndefined();
   });
 });

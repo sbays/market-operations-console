@@ -2,7 +2,13 @@
  * Geography for the market map: which country each market is, and where it sits on a
  * projected world. Pure, so the map component only draws what these functions return.
  */
-import { geoCentroid, geoEqualEarth, type GeoProjection } from "d3-geo";
+import {
+  geoArea,
+  geoCentroid,
+  geoEqualEarth,
+  type GeoPermissibleObjects,
+  type GeoProjection,
+} from "d3-geo";
 import { feature } from "topojson-client";
 import { z } from "zod";
 import worldTopology from "world-atlas/countries-110m.json";
@@ -58,6 +64,8 @@ export const WorldTopologySchema = z.object({
     .optional(),
 });
 
+// Importing this module loads and parses the ~108 KB world topology. Only the lazily loaded
+// MarketMap should import it, so the topology stays out of the main bundle.
 const topology = WorldTopologySchema.parse(worldTopology);
 
 /**
@@ -111,12 +119,43 @@ export function worldProjection({
   return geoEqualEarth().fitSize([width, height], countries);
 }
 
-/** Where a market's marker sits: the projected centroid of its country. */
+/**
+ * The centre of a country's largest landmass. A whole-country centroid lands at sea for
+ * countries in several parts (France with French Guiana, Japan's islands).
+ */
+function mainlandCentroid(
+  country: NonNullable<ReturnType<typeof countryOf>>,
+): [number, number] {
+  const { geometry } = country;
+  if (geometry.type !== "MultiPolygon") return geoCentroid(country);
+  const parts: GeoPermissibleObjects[] = geometry.coordinates.map(
+    (coordinates) => ({ type: "Polygon", coordinates }),
+  );
+  const largest = parts.reduce((a, b) => (geoArea(b) > geoArea(a) ? b : a));
+  return geoCentroid(largest);
+}
+
+// Computed once: the countries never change, and the map reads these on every render.
+const marketLocations = new Map(
+  Object.keys(MARKET_GEO_IDS).flatMap((marketId) => {
+    const country = countryOf(marketId);
+    return country === undefined
+      ? []
+      : [[marketId, mainlandCentroid(country)] as const];
+  }),
+);
+
+/** Where a market sits, as [longitude, latitude]: the centre of its country's mainland. */
+export function marketLocation(marketId: string): [number, number] | undefined {
+  return marketLocations.get(marketId);
+}
+
+/** Where a market's marker sits on a projected map. */
 export function marketAnchor(
   marketId: string,
   project: GeoProjection,
 ): [number, number] | undefined {
-  const country = countryOf(marketId);
-  if (country === undefined) return undefined;
-  return project(geoCentroid(country)) ?? undefined;
+  const location = marketLocation(marketId);
+  if (location === undefined) return undefined;
+  return project(location) ?? undefined;
 }
