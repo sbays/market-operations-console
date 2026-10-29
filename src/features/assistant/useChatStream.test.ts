@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { StreamEvent } from "@/domain/schema";
 import { server, sseResponse, type TestFrame } from "@/test/msw";
-import { useChatStream } from "./useChatStream";
+import { useChatStream, type ChatState } from "./useChatStream";
 
 const QUESTION = "Why did Germany's revenue dip in March 2026?";
 
@@ -28,10 +28,14 @@ function token(text: string): StreamEvent {
   return { type: "token", text };
 }
 
+function textOf(state: ChatState): string {
+  return state.status === "idle" ? "" : state.text;
+}
+
 describe("useChatStream", () => {
   it("starts idle", () => {
     const { result } = renderHook(() => useChatStream());
-    expect(result.current.state).toEqual({ status: "idle", text: "" });
+    expect(result.current.state).toEqual({ status: "idle" });
   });
 
   it("connects, streams and completes with the answer and its evidence", async () => {
@@ -56,8 +60,12 @@ describe("useChatStream", () => {
 
     await waitFor(() => expect(result.current.state.status).toBe("complete"));
     expect(seen).toEqual(["idle", "connecting", "streaming", "complete"]);
-    expect(result.current.state.text).toBe("Germany fell [1] in March");
-    expect(result.current.state.final).toEqual(final);
+    expect(result.current.state).toEqual({
+      status: "complete",
+      question: QUESTION,
+      text: "Germany fell [1] in March",
+      final,
+    });
   });
 
   it("ignores stop once the answer has finished", async () => {
@@ -79,11 +87,11 @@ describe("useChatStream", () => {
     const { result } = renderHook(() => useChatStream());
 
     act(() => result.current.ask(QUESTION));
-    await waitFor(() => expect(result.current.state.text).toContain("One"));
+    await waitFor(() => expect(textOf(result.current.state)).toContain("One"));
     act(() => result.current.stop());
 
     expect(result.current.state.status).toBe("stopped");
-    const partial = result.current.state.text;
+    const partial = textOf(result.current.state);
     expect(partial.length).toBeGreaterThan(0);
 
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -91,7 +99,7 @@ describe("useChatStream", () => {
       status: "stopped",
       text: partial,
     });
-    expect(result.current.state.final).toBeUndefined();
+    expect(result.current.state).not.toHaveProperty("final");
   });
 
   it("treats an abstention as its own outcome, not an error", async () => {
@@ -105,8 +113,8 @@ describe("useChatStream", () => {
 
     act(() => result.current.ask("What will revenue be in Q1 2027?"));
     await waitFor(() => expect(result.current.state.status).toBe("abstained"));
-    expect(result.current.state.abstain).toEqual(abstain);
-    expect(result.current.state.error).toBeUndefined();
+    expect(result.current.state).toMatchObject({ abstain });
+    expect(result.current.state).not.toHaveProperty("error");
   });
 
   it("keeps the partial answer when the stream reports an error", async () => {
@@ -151,7 +159,7 @@ describe("useChatStream", () => {
 
     act(() => result.current.ask(QUESTION));
     await waitFor(() => expect(result.current.state.status).toBe("complete"));
-    expect(result.current.state.text).toBe("Germany");
+    expect(textOf(result.current.state)).toBe("Germany");
   });
 
   it("fails visibly when the stream ends without a final event", async () => {
@@ -160,8 +168,35 @@ describe("useChatStream", () => {
 
     act(() => result.current.ask(QUESTION));
     await waitFor(() => expect(result.current.state.status).toBe("error"));
-    expect(result.current.state.text).toBe("Germany fell");
-    expect(result.current.state.error?.retryable).toBe(true);
+    expect(result.current.state).toMatchObject({
+      text: "Germany fell",
+      error: { retryable: true },
+    });
+  });
+
+  it("reports an HTTP failure in plain words and logs the status", async () => {
+    server.use(
+      http.post("*/api/chat", () =>
+        HttpResponse.json({ error: "boom" }, { status: 503 }),
+      ),
+    );
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { result } = renderHook(() => useChatStream());
+
+    act(() => result.current.ask(QUESTION));
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+
+    expect(result.current.state).toMatchObject({
+      error: {
+        message: "The assistant isn't available right now.",
+        retryable: true,
+      },
+    });
+    expect(logged).toHaveBeenCalledWith(
+      "Assistant request failed:",
+      expect.objectContaining({ status: 503 }),
+    );
+    logged.mockRestore();
   });
 
   it("reports an HTTP failure as a retryable error, and retry asks again", async () => {
@@ -178,7 +213,7 @@ describe("useChatStream", () => {
 
     act(() => result.current.ask(QUESTION));
     await waitFor(() => expect(result.current.state.status).toBe("error"));
-    expect(result.current.state.text).toBe("");
+    expect(textOf(result.current.state)).toBe("");
 
     act(() => result.current.retry());
     await waitFor(() => expect(result.current.state.status).toBe("complete"));
@@ -208,7 +243,7 @@ describe("useChatStream", () => {
     const { result } = renderHook(() => useChatStream());
 
     act(() => result.current.ask("first"));
-    await waitFor(() => expect(result.current.state.text).toContain("old"));
+    await waitFor(() => expect(textOf(result.current.state)).toContain("old"));
     act(() => result.current.ask("second"));
     await waitFor(() => expect(result.current.state.status).toBe("complete"));
 
@@ -226,9 +261,9 @@ describe("useChatStream", () => {
     act(() => result.current.ask(QUESTION));
     await waitFor(() => expect(result.current.state.status).toBe("error"));
 
-    expect(result.current.state.error?.message).toBe(
-      "Couldn't reach the assistant.",
-    );
+    expect(result.current.state).toMatchObject({
+      error: { message: "Couldn't reach the assistant." },
+    });
     expect(logged).toHaveBeenCalledWith(
       "Assistant request failed:",
       expect.any(TypeError),
@@ -247,7 +282,7 @@ describe("useChatStream", () => {
 
     act(() => result.current.ask(QUESTION));
     await waitFor(() => expect(result.current.state.status).toBe("complete"));
-    expect(result.current.state.text.startsWith("t0 t1 t2 ")).toBe(true);
+    expect(textOf(result.current.state).startsWith("t0 t1 t2 ")).toBe(true);
     expect(renders).toBeLessThan(20);
   });
 });

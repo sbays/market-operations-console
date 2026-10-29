@@ -13,23 +13,17 @@ import type { StreamEvent } from "@/domain/schema";
 type FinalEvent = Extract<StreamEvent, { type: "final" }>;
 type AbstainEvent = Extract<StreamEvent, { type: "abstain" }>;
 
-export type ChatStatus =
-  | "idle"
-  | "connecting"
-  | "streaming"
-  | "complete"
-  | "abstained"
-  | "stopped"
-  | "error";
+type Run = { question: string; text: string };
 
-export type ChatState = {
-  status: ChatStatus;
-  question?: string;
-  text: string;
-  final?: FinalEvent;
-  abstain?: AbstainEvent;
-  error?: { message: string; retryable: boolean };
-};
+/** Each status carries exactly what it needs: a complete answer always has its evidence. */
+export type ChatState =
+  | { status: "idle" }
+  | ({ status: "connecting" | "streaming" | "stopped" } & Run)
+  | ({ status: "complete"; final: FinalEvent } & Run)
+  | ({ status: "abstained"; abstain: AbstainEvent } & Run)
+  | ({ status: "error"; error: { message: string; retryable: boolean } } & Run);
+
+export type ChatStatus = ChatState["status"];
 
 type Action =
   | { type: "start"; question: string }
@@ -39,32 +33,39 @@ type Action =
   | { type: "error"; message: string; retryable: boolean }
   | { type: "stop" };
 
-const initialState: ChatState = { status: "idle", text: "" };
+const initialState: ChatState = { status: "idle" };
 
+/** Anything but `start` only applies to a run still in flight; otherwise the state stands. */
 function reducer(state: ChatState, action: Action): ChatState {
+  if (action.type === "start") {
+    return { status: "connecting", question: action.question, text: "" };
+  }
+  if (state.status !== "connecting" && state.status !== "streaming") {
+    return state;
+  }
+  const run = { question: state.question, text: state.text };
   switch (action.type) {
-    case "start":
-      return { status: "connecting", question: action.question, text: "" };
     case "tokens":
-      return { ...state, status: "streaming", text: state.text + action.text };
+      return { ...run, status: "streaming", text: run.text + action.text };
     case "final":
-      return { ...state, status: "complete", final: action.event };
+      return { ...run, status: "complete", final: action.event };
     case "abstain":
-      return { ...state, status: "abstained", abstain: action.event };
+      return { ...run, status: "abstained", abstain: action.event };
     case "error":
       return {
-        ...state,
+        ...run,
         status: "error",
         error: { message: action.message, retryable: action.retryable },
       };
     case "stop":
-      return { ...state, status: "stopped" };
+      return { ...run, status: "stopped" };
   }
 }
 
 const INTERRUPTED = "Answer interrupted";
 const ENDED_EARLY = "The answer ended before it was complete.";
 const UNREACHABLE = "Couldn't reach the assistant.";
+const UNAVAILABLE = "The assistant isn't available right now.";
 
 export function useChatStream() {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -140,10 +141,9 @@ export function useChatStream() {
       } catch (error) {
         // An abort is a stop or a newer question; both already updated the state.
         if (current.signal.aborted) return;
-        if (error instanceof ChatRequestError) return fail(error.message);
-        // Anything else is a network failure or our own bug: say so in the console, not just the UI.
+        // Say what failed in the console, not just the UI: an HTTP status, the network or our own bug.
         console.error("Assistant request failed:", error);
-        fail(UNREACHABLE);
+        fail(error instanceof ChatRequestError ? UNAVAILABLE : UNREACHABLE);
       }
     })();
   };
