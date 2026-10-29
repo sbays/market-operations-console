@@ -5,8 +5,15 @@
 import { createSseParser } from "@/domain/sse";
 import { classifyFrame, type ClassifiedFrame } from "@/domain/stream";
 
+/** The request failed before a stream started. `status` is the HTTP status, for the logs. */
 export class ChatRequestError extends Error {
   override name = "ChatRequestError";
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
 }
 
 export async function* streamChat(
@@ -20,12 +27,20 @@ export async function* streamChat(
     signal,
   });
   if (!response.ok) {
-    throw new ChatRequestError(`The assistant returned ${response.status}`);
+    throw new ChatRequestError(
+      `The assistant returned ${response.status}`,
+      response.status,
+    );
   }
   if (!response.headers.get("content-type")?.startsWith("text/event-stream")) {
-    throw new ChatRequestError("The assistant didn't send an event stream");
+    throw new ChatRequestError(
+      "The assistant didn't send an event stream",
+      response.status,
+    );
   }
-  if (!response.body) throw new ChatRequestError("The response had no body");
+  if (!response.body) {
+    throw new ChatRequestError("The response had no body", response.status);
+  }
 
   const parser = createSseParser();
   const decoder = new TextDecoder();
