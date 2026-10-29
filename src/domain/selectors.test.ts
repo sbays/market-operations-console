@@ -4,6 +4,7 @@ import {
   childrenOf,
   confidenceBand,
   coverageOf,
+  entityCode,
   entityName,
   expandPeriod,
   latestQuarter,
@@ -374,5 +375,24 @@ describe("entityName", () => {
     expect(
       entityName(dataset, { level: "product", marketId: "DE", id: "zephyr" }),
     ).toBeUndefined();
+  });
+});
+
+describe("entityCode", () => {
+  it("is the short form a citation chip shows", () => {
+    expect(entityCode(dataset, { level: "portfolio" })).toBe("Portfolio");
+    expect(entityCode(dataset, { level: "region", id: "eu" })).toBe("Europe");
+    expect(entityCode(dataset, germany)).toBe("DE");
+    expect(
+      entityCode(dataset, { level: "product", marketId: "DE", id: "beacon" }),
+    ).toBe("DE Beacon");
+  });
+
+  it("falls back to the ids for an entity the data doesn't contain", () => {
+    expect(entityCode(dataset, { level: "market", id: "NZ" })).toBe("NZ");
+    expect(entityCode(dataset, { level: "region", id: "apac" })).toBe("apac");
+    expect(
+      entityCode(dataset, { level: "product", marketId: "DE", id: "zephyr" }),
+    ).toBe("DE zephyr");
   });
 });

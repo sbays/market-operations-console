@@ -8,6 +8,7 @@ import {
   QueryClient,
   type DehydratedState,
 } from "@tanstack/react-query";
+import { cacheLife } from "next/cache";
 import type { ReactNode } from "react";
 import { loadDataset } from "./pack";
 import { datasetQuery } from "./queries";
@@ -18,6 +19,7 @@ import { datasetQuery } from "./queries";
  */
 export async function dehydrateDataset(): Promise<DehydratedState> {
   "use cache";
+  cacheLife("max");
   const queryClient = new QueryClient();
   queryClient.setQueryData(datasetQuery.queryKey, loadDataset());
   return dehydrate(queryClient);

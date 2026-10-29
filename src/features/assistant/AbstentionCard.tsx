@@ -2,6 +2,9 @@ import { CircleSlash } from "lucide-react";
 import { useId } from "react";
 import { formatCoverage } from "@/domain/format";
 import type { StreamEvent } from "@/domain/schema";
+import { AiLabel } from "./AiLabel";
+import { AnswerBody } from "./AnswerBody";
+import { NO_EVIDENCE } from "./citations";
 
 type Props = {
   abstain: Extract<StreamEvent, { type: "abstain" }>;
@@ -24,7 +27,13 @@ export function AbstentionCard({ abstain, text }: Props) {
         <CircleSlash aria-hidden className="size-4" />
         This isn&apos;t in the data
       </h3>
-      {text && <p>{text}</p>}
+      {text && (
+        // The lead-in is the assistant's own text: AI surface and label, like an answer.
+        <div className="space-y-2 rounded-md border-l-4 border-border-ai bg-surface-ai p-3 text-surface-ai-foreground">
+          <AiLabel />
+          <AnswerBody text={text} evidence={NO_EVIDENCE} />
+        </div>
+      )}
       <p>{abstain.reason}</p>
       <p className="text-muted-foreground">
         The data covers {formatCoverage(abstain.coverage)}.

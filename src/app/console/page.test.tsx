@@ -1,8 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { QueryProvider } from "@/data/QueryProvider";
 import ConsolePage from "./page";
+
+// cacheLife() needs Next's runtime; the cache scope doesn't change what the page renders.
+vi.mock("next/cache", () => ({ cacheLife: () => {} }));
 
 /** The page inside the providers the root layout gives it. */
 async function renderPage() {

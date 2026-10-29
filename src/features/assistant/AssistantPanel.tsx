@@ -36,14 +36,17 @@ function announcement(state: ChatState): string {
 export function AssistantPanel({ suggestedQuestions }: Props) {
   const headingId = useId();
   const inputId = useId();
+  const errorId = useId();
   const input = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState("");
+  const [empty, setEmpty] = useState(false);
   const { state, ask, stop, retry } = useChatStream();
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const request = ChatRequestSchema.safeParse({ question: draft });
     if (!request.success) {
+      setEmpty(true);
       input.current?.focus();
       return;
     }
@@ -79,7 +82,12 @@ export function AssistantPanel({ suggestedQuestions }: Props) {
               ref={input}
               id={inputId}
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                setEmpty(false);
+              }}
+              aria-invalid={empty || undefined}
+              aria-describedby={empty ? errorId : undefined}
               maxLength={500}
               className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 text-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
             />
@@ -88,6 +96,11 @@ export function AssistantPanel({ suggestedQuestions }: Props) {
               Ask
             </Button>
           </div>
+          {empty && (
+            <p id={errorId} className="text-xs text-destructive">
+              Type a question first.
+            </p>
+          )}
         </form>
         <p role="status" className="sr-only">
           {announcement(state)}
