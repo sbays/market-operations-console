@@ -1,24 +1,19 @@
 import type { ReactNode } from "react";
-import { formatMetric, formatPeriod } from "@/domain/format";
+import { formatMetricOrMissing, formatPeriod } from "@/domain/format";
 import type { Dataset, EntityRef, Metric, PeriodRef } from "@/domain/schema";
-import { childrenOf, statusAt, valueAt } from "@/domain/selectors";
+import { childStatusCounts, statusAt, valueAt } from "@/domain/selectors";
 import { StatusBadge } from "@/ui/StatusBadge";
 
 type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
 
-const NO_DATA = "No data";
-
 /** The selection's headline figures: source data, so a solid surface and tabular figures. */
 export function KpiStrip({ dataset, selected, period }: Props) {
-  const figure = (metric: Metric) => {
-    const value = valueAt(dataset, selected, period, metric);
-    return value === undefined ? NO_DATA : formatMetric(metric, value);
-  };
+  const figure = (metric: Metric) =>
+    formatMetricOrMissing(metric, valueAt(dataset, selected, period, metric));
   const status = statusAt(dataset, selected, period);
-  const children = childrenOf(dataset, selected);
-  const flagged = children.filter(
-    (child) => statusAt(dataset, child, period) !== "on-track",
-  ).length;
+  const counts = childStatusCounts(dataset, selected, period);
+  const flagged = counts["at-risk"] + counts["off-track"];
+  const judged = flagged + counts["on-track"];
 
   return (
     <section aria-label="Key figures" className="flex flex-col gap-2">
@@ -32,9 +27,9 @@ export function KpiStrip({ dataset, selected, period }: Props) {
           {status && <StatusBadge status={status} />}
         </Tile>
         <Tile label="Growth vs prior year">{figure("growth")}</Tile>
-        {children.length > 0 && (
+        {judged > 0 && (
           <Tile label="Off track or at risk">
-            {flagged} of {children.length}
+            {flagged} of {judged}
           </Tile>
         )}
       </dl>

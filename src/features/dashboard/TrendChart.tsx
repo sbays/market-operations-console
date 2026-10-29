@@ -5,8 +5,7 @@ import { LinePath } from "@visx/shape";
 import { formatCurrency, formatPeriod } from "@/domain/format";
 import type { Dataset, EntityRef, PeriodRef } from "@/domain/schema";
 import {
-  entityCode,
-  entityName,
+  entityLabel,
   monthlySeries,
   type TrendPoint,
 } from "@/domain/selectors";
@@ -28,8 +27,13 @@ const LABEL_COLOUR = "var(--muted-foreground)";
 export function TrendChart({ dataset, selected, period }: Props) {
   const setPeriod = useSetPeriod();
   const series = monthlySeries(dataset, selected);
-  const roving = useRovingIndex(series.length);
-  const name = entityName(dataset, selected) ?? entityCode(dataset, selected);
+  const selectedIndex = series.findIndex((point) => point.period === period);
+  // Keyboard users enter on the selected month, or the latest when a quarter is shown.
+  const roving = useRovingIndex(
+    series.length,
+    selectedIndex === -1 ? undefined : selectedIndex,
+  );
+  const name = entityLabel(dataset, selected);
 
   const scales = ({ width, height }: { width: number; height: number }) => {
     const peak = Math.max(
@@ -54,6 +58,7 @@ export function TrendChart({ dataset, selected, period }: Props) {
       title={`${name} revenue`}
       summary={trendSummary(series, name)}
       table={<TrendTable name={name} series={series} />}
+      legend={<TrendLegend />}
       drawing={(size) => {
         const { x, y } = scales(size);
         const line = (pick: (p: TrendPoint) => number) => ({
@@ -107,7 +112,7 @@ export function TrendChart({ dataset, selected, period }: Props) {
               key={point.period}
               type="button"
               {...roving.itemProps(index)}
-              aria-label={`${formatPeriod(point.period)}: revenue ${formatCurrency(point.actual)}, forecast ${formatCurrency(point.forecast)}`}
+              aria-label={`${formatPeriod(point.period)}: revenue ${formatCurrency(point.actual)}, forecast ${formatCurrency(point.forecast)}, prior year ${formatCurrency(point.priorYear)}`}
               aria-current={selectedMonth ? "date" : undefined}
               onClick={() => setPeriod(point.period)}
               style={{ left: x(index), top: y(point.actual) }}
@@ -120,6 +125,28 @@ export function TrendChart({ dataset, selected, period }: Props) {
         });
       }}
     />
+  );
+}
+
+/** Each line by colour and by style, so the dashed line isn't explained by colour alone. */
+function TrendLegend() {
+  const items = [
+    { label: "Actual", line: "border-chart-1" },
+    { label: "Forecast", line: "border-chart-2" },
+    { label: "Prior year", line: "border-dashed border-chart-5" },
+  ];
+  return (
+    <ul
+      aria-label="Legend"
+      className="flex flex-wrap gap-4 text-xs text-muted-foreground"
+    >
+      {items.map(({ label, line }) => (
+        <li key={label} className="flex items-center gap-1.5">
+          <span aria-hidden className={cn("w-5 border-t-2", line)} />
+          {label}
+        </li>
+      ))}
+    </ul>
   );
 }
 

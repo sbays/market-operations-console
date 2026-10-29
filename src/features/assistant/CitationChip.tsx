@@ -4,7 +4,7 @@ import { use } from "react";
 import { useDataset } from "@/data/useDataset";
 import { formatMetric, formatMetricName, formatPeriod } from "@/domain/format";
 import type { Citation } from "@/domain/schema";
-import { entityCode, entityName, pathOf, valueAt } from "@/domain/selectors";
+import { entityCode, entityLabel, pathOf, valueAt } from "@/domain/selectors";
 import { useDrill } from "@/state/url";
 import { cn } from "@/ui/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
@@ -42,7 +42,7 @@ function ResolvedChip({ citation }: { citation: Citation }) {
     return <span className={UNCHECKED}>{label} · not in the data</span>;
   }
 
-  const source = `${entityName(dataset, ref) ?? entityCode(dataset, ref)}, ${formatPeriod(period)}, ${formatMetricName(metric)}`;
+  const source = `${entityLabel(dataset, ref)}, ${formatPeriod(period)}, ${formatMetricName(metric)}`;
   return (
     <Tooltip>
       <TooltipTrigger asChild>

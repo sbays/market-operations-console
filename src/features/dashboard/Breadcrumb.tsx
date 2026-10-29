@@ -1,11 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import type { Dataset, EntityRef } from "@/domain/schema";
-import {
-  ancestorsOf,
-  entityCode,
-  entityName,
-  pathOf,
-} from "@/domain/selectors";
+import { ancestorsOf, entityLabel, pathOf } from "@/domain/selectors";
 import { useDrill } from "@/state/url";
 
 type Props = { dataset: Dataset; selected: EntityRef };
@@ -19,7 +14,7 @@ export function Breadcrumb({ dataset, selected }: Props) {
     <nav aria-label="Breadcrumb">
       <ol className="flex flex-wrap items-center gap-1 text-sm">
         {trail.map((ref, index) => {
-          const name = entityName(dataset, ref) ?? entityCode(dataset, ref);
+          const name = entityLabel(dataset, ref);
           const current = index === trail.length - 1;
           return (
             <li
