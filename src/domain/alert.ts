@@ -3,6 +3,9 @@
  * Pure: the schema cannot see the dataset, so scope paths are checked by the form's options.
  */
 import { z } from "zod";
+import { formatMetric, formatMetricName } from "./format";
+import type { Dataset } from "./schema";
+import { entityLabel, refFromPath } from "./selectors";
 
 export const AlertMetricSchema = z.enum(["growth", "attainment"]);
 export type AlertMetric = z.infer<typeof AlertMetricSchema>;
@@ -56,12 +59,28 @@ function checkThresholdRange(
   }
 }
 
-export const AlertRuleInputSchema = RuleFieldsSchema.superRefine(
-  checkThresholdRange,
-);
+export const AlertRuleInputSchema =
+  RuleFieldsSchema.superRefine(checkThresholdRange);
 export type AlertRuleInput = z.infer<typeof AlertRuleInputSchema>;
 
 export const AlertRuleSchema = RuleFieldsSchema.extend({
   id: z.string().min(1),
 }).superRefine(checkThresholdRange);
 export type AlertRule = z.infer<typeof AlertRuleSchema>;
+
+/**
+ * One line for the rule list: "Forecast attainment below 95.0% in Germany, France". The
+ * threshold is a typed percentage (95 means 95%), so it is divided by 100 before formatting.
+ * Scope paths the dataset no longer contains are left out rather than shown as raw ids.
+ */
+export function describeAlert(
+  rule: Pick<AlertRule, "scope" | "metric" | "operator" | "threshold">,
+  dataset: Dataset,
+): string {
+  const scope = rule.scope
+    .map((path) => refFromPath(dataset, path))
+    .flatMap((ref) => (ref ? [entityLabel(dataset, ref)] : []))
+    .join(", ");
+  const threshold = formatMetric(rule.metric, rule.threshold / 100);
+  return `${formatMetricName(rule.metric)} ${rule.operator} ${threshold} in ${scope}`;
+}
