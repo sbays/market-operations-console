@@ -1,10 +1,43 @@
 import { describe, expect, it } from "vitest";
+import { DatasetSchema } from "./schema";
 import {
   AlertRuleInputSchema,
   AlertRuleSchema,
+  describeAlert,
   THRESHOLD_RANGE,
   type AlertRuleInput,
 } from "./alert";
+
+/** A tiny dataset: the description only needs names, so each series holds one point. */
+const point = {
+  period: "2026-01",
+  actual: 1,
+  units: 1,
+  forecast: 1,
+  priorYear: 1,
+  marketSize: 1,
+};
+const dataset = DatasetSchema.parse({
+  currency: "USD",
+  periods: ["2026-01"],
+  regions: [{ id: "eu", name: "Europe" }],
+  products: [{ id: "beacon", name: "Beacon" }],
+  markets: [
+    {
+      id: "DE",
+      name: "Germany",
+      regionId: "eu",
+      series: { beacon: [point] },
+    },
+    {
+      id: "FR",
+      name: "France",
+      regionId: "eu",
+      series: { beacon: [point] },
+    },
+  ],
+  anomalies: [],
+});
 
 const valid: AlertRuleInput = {
   name: "Europe attainment",
@@ -107,9 +140,7 @@ describe("threshold range by metric", () => {
   });
 
   it("still reports the range when another field is also invalid", () => {
-    expect(
-      issuesOf({ ...valid, name: "", scope: [], threshold: 300 }),
-    ).toEqual(
+    expect(issuesOf({ ...valid, name: "", scope: [], threshold: 300 })).toEqual(
       expect.arrayContaining([
         "name: Give the rule a name.",
         "scope: Pick at least one region or market.",
@@ -150,5 +181,49 @@ describe("AlertRuleSchema", () => {
         threshold: 300,
       }).success,
     ).toBe(true);
+  });
+});
+
+describe("describeAlert", () => {
+  it("reads the rule as one sentence, with the scope named and the threshold formatted", () => {
+    const rule = {
+      id: "r1",
+      name: "Watch Germany",
+      scope: ["eu.DE", "eu.FR"],
+      metric: "attainment",
+      operator: "below",
+      threshold: 95,
+    } as const;
+    expect(describeAlert(rule, dataset)).toBe(
+      "Forecast attainment below 95.0% in Germany, France",
+    );
+  });
+
+  it("formats growth thresholds as signed percentages", () => {
+    const rule = {
+      id: "r2",
+      name: "Big growth",
+      scope: ["eu"],
+      metric: "growth",
+      operator: "above",
+      threshold: 300,
+    } as const;
+    expect(describeAlert(rule, dataset)).toBe(
+      "Growth vs prior year above +300.0% in Europe",
+    );
+  });
+
+  it("skips a scope path the dataset no longer has", () => {
+    const rule = {
+      id: "r3",
+      name: "Stale",
+      scope: ["eu.DE", "na.US"],
+      metric: "attainment",
+      operator: "below",
+      threshold: 90,
+    } as const;
+    expect(describeAlert(rule, dataset)).toBe(
+      "Forecast attainment below 90.0% in Germany",
+    );
   });
 });
