@@ -181,6 +181,16 @@ Charts decisions (29 Oct, `feat/dashboard-charts`):
 - Each chart sits in its own `ErrorBoundary`, so one failing chart leaves the dashboard working.
 - Built by three parallel agents in worktrees (map, radar, heat map), each test-first on its own files; every agent's tests were mutation-checked before integration.
 
+Midday decisions (29 Oct, `feat/modes-and-alerts`):
+
+- `mode` defaults to analyst (Simon, 29 Oct): a bare link shows every panel, and `?mode=exec` is the summary view. Exec shows the key figures, top risks, the map and the trend (actual vs forecast); analyst adds units and share, the movers, the prior-year line, the heat map, the radar and the detail table. The toggle replaces history.
+- Top risks: the selection's at-risk and off-track children, lowest attainment first. The reason is the dataset's anomaly note for that child inside the shown period (any metric: a revenue shortfall is what moves attainment), else the gap to forecast in points. Movers are ranked among the selection's children, not all markets.
+- The detail table replaces the breakdown table. Sort state is local `useState`, not URL state: it's a view preference, not part of what a shared link selects. Unsorted, rows keep the data's order; names sort A to Z first, figures high to low first; missing values sort last.
+- A citation drill moves focus to the key figures (`ui/dashboardFocus`, a shared DOM id), so keyboard and screen-reader users land on the proof.
+- The alert form is a dialog (Simon, 29 Oct) opened from the console header, scope prefilled from the selection; saved rules are listed under the dashboard. `?fail=1` on the page is forwarded to `POST /api/alerts`, which then answers 500 after a delay; the optimistic row rolls back with a Retry toast. The mock store is in memory per server instance.
+- New dependencies: `react-hook-form` and `@hookform/resolvers` (in the stack, not yet installed), `sonner` for toasts (with our own token-styled `ui/Toaster`, not shadcn's wrapper, which needs `next-themes`). `ui/dialog.tsx` was taken from the shadcn registry by hand because the CLI can't run under Node 26's corepack.
+- Built by two parallel agents in worktrees (alerts; risks, movers and detail table), each test-first, mutation-checked by the agents and spot-checked again before integration.
+
 ## Coordinated views and URL state
 
 The URL is the selection store. Views never talk to each other; they read from and write to the URL, and everything else is derived. This keeps wiring linear: N views, one store, not N² handlers.
