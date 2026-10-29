@@ -35,7 +35,7 @@ A small, working, well-engineered build beats a large, broken one. Do not add fe
 - React Hook Form + Zod
 - Streaming: `fetch` + `ReadableStream` with our own SSE parser. No Vercel AI SDK, no `EventSource`.
 - Vitest + Testing Library + MSW; Playwright + axe-core
-- `web-vitals` (console reporting). Sentry is described in the README, not wired.
+- `web-vitals` through Next's `useReportWebVitals` (console reporting, `app/WebVitals.tsx`). Sentry is described in the README, not wired.
 
 Package manager: pnpm. Fonts come from the `geist` package (self-hosted; builds make no network calls).
 
