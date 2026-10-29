@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { loadDataset } from "@/data/pack";
 import { datasetQuery } from "@/data/queries";
+import { Toaster } from "@/ui/Toaster";
 import { Dashboard } from "./Dashboard";
 
 /*
@@ -35,7 +36,13 @@ function renderDashboard(searchParams = "") {
       </Nuqs>
     );
   }
-  render(<Dashboard />, { wrapper: Wrapper });
+  render(
+    <>
+      <Dashboard />
+      <Toaster />
+    </>,
+    { wrapper: Wrapper },
+  );
   return { user: userEvent.setup(), onUrlUpdate };
 }
 
@@ -122,11 +129,21 @@ describe("Dashboard", () => {
     expect(kpis).toHaveTextContent(/16\.7%/);
   });
 
-  it("falls back to the portfolio for a link the data doesn't contain", () => {
-    renderDashboard("?path=xx.YY");
+  it("falls back to the portfolio for a link the data doesn't contain, and says so", async () => {
+    const { onUrlUpdate } = renderDashboard("?path=xx.YY&period=2026-03");
 
     expect(within(breadcrumb()).getAllByRole("listitem")).toHaveLength(1);
-    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$116\.8M/);
+    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$[\d.]+M/);
+    expect(
+      await screen.findByText(
+        "That link points to something not in the data, so you're seeing the portfolio.",
+      ),
+    ).toBeInTheDocument();
+    // The bad path leaves the URL, so sharing the page doesn't pass the broken link on.
+    expect(lastUrl(onUrlUpdate)).toEqual({
+      query: "?period=2026-03",
+      history: "replace",
+    });
   });
 
   it("describes the trend chart in words and offers it as a table", async () => {

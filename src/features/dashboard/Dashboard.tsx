@@ -1,10 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { toast } from "sonner";
 import { useDataset } from "@/data/useDataset";
 import { pathOf, selectionPeriod } from "@/domain/selectors";
-import { useMode, useSelection } from "@/state/url";
+import { useMode, useSelection, useUnknownPath } from "@/state/url";
 import { ErrorBoundary } from "@/ui/ErrorBoundary";
 import { AttainmentHeatMap } from "./AttainmentHeatMap";
 import { Breadcrumb } from "./Breadcrumb";
@@ -34,6 +35,18 @@ export function Dashboard() {
   const analyst = mode === "analyst";
   const shown = selectionPeriod(dataset, period);
   const props = { dataset, selected: ref, period: shown };
+  const unknownPath = useUnknownPath();
+  // Telling the reader and cleaning the URL are side effects of reading a bad link, so they
+  // run after render. Clearing the path makes this false, so it runs once per bad link.
+  useEffect(() => {
+    if (unknownPath.path === null) return;
+    toast(
+      "That link points to something not in the data, so you're seeing the portfolio.",
+      // A fixed id: a render before the URL updates can't show the notice twice.
+      { id: "unknown-path" },
+    );
+    unknownPath.clear();
+  }, [unknownPath]);
   // A failed chart is retried when the selection changes.
   const resetKey = `${pathOf(dataset, ref) ?? ""}@${shown}`;
 
