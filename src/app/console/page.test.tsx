@@ -9,7 +9,10 @@ vi.mock("next/cache", () => ({ cacheLife: () => {} }));
 
 /** The page inside the providers the root layout gives it. */
 async function renderPage() {
-  const page = await ConsolePage();
+  const page = await ConsolePage({
+    params: Promise.resolve({}),
+    searchParams: Promise.resolve({}),
+  });
   render(
     <NuqsTestingAdapter>
       <QueryProvider>{page}</QueryProvider>

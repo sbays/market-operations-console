@@ -1,10 +1,12 @@
-import { Suspense } from "react";
+import { Suspense, use } from "react";
 import { DatasetHydration, dehydrateDataset } from "@/data/DatasetHydration";
 import { loadFixtures } from "@/data/pack";
 import { AssistantPanel } from "@/features/assistant/AssistantPanel";
 import { Dashboard } from "@/features/dashboard/Dashboard";
 
-export default async function ConsolePage() {
+export default async function ConsolePage({
+  searchParams,
+}: PageProps<"/console">) {
   const suggestedQuestions = loadFixtures()
     .filter((fixture) => fixture.suggested)
     .map((fixture) => fixture.question);
@@ -17,9 +19,8 @@ export default async function ConsolePage() {
       <div className="flex min-h-full flex-1 flex-col lg:flex-row">
         <main id="main" className="flex min-w-0 flex-1 flex-col gap-6 p-6">
           <h1 className="text-xl font-semibold">Market Operations</h1>
-          {/* The dashboard reads the selection from the URL, known only at request time. */}
           <Suspense fallback={<DashboardSkeleton />}>
-            <Dashboard />
+            <RequestDashboard searchParams={searchParams} />
           </Suspense>
         </main>
         <div className="border-t lg:w-96 lg:shrink-0 lg:border-t-0 lg:border-l">
@@ -31,6 +32,21 @@ export default async function ConsolePage() {
       </div>
     </DatasetHydration>
   );
+}
+
+/**
+ * The dashboard depends on the URL, so it can't be in the static shell. Reading the request's
+ * search params makes this Suspense hole dynamic: the shell (and the assistant) is served
+ * prerendered, and the dashboard is server-rendered for this exact URL and streamed into the
+ * same response, instead of waiting for client JavaScript.
+ */
+function RequestDashboard({
+  searchParams,
+}: {
+  searchParams: PageProps<"/console">["searchParams"];
+}) {
+  use(searchParams);
+  return <Dashboard />;
 }
 
 function DashboardSkeleton() {
