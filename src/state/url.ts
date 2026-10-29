@@ -44,6 +44,24 @@ export function useSelection(): { ref: EntityRef; period: PeriodRef | null } {
 }
 
 /**
+ * The URL's `path` when the data doesn't contain it (a hand-edited or stale link), else null,
+ * and a way to drop it from the URL. useSelection already shows the portfolio for it.
+ */
+export function useUnknownPath(): { path: string | null; clear: () => void } {
+  const dataset = useDataset();
+  const [path, setPath] = useQueryState(
+    "path",
+    selectionParsers.path.withOptions({ history: "replace" }),
+  );
+  return {
+    path: path !== "" && refFromPath(dataset, path) === undefined ? path : null,
+    clear: () => {
+      void setPath(null);
+    },
+  };
+}
+
+/**
  * Drills to an entity, and to a period when one is given (otherwise the period stays).
  * Pushes history, so Back returns to the previous view. An entity the data doesn't contain
  * is ignored rather than drilled to the portfolio.
