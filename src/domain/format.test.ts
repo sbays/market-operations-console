@@ -11,6 +11,7 @@ import {
   formatPoints,
   formatStatus,
   formatTypedPercent,
+  formatWebVital,
 } from "./format";
 
 describe("formatCurrency", () => {
@@ -132,5 +133,22 @@ describe("formatTypedPercent", () => {
     expect(formatTypedPercent(95)).toBe("95%");
     expect(formatTypedPercent(-100)).toBe("-100%");
     expect(formatTypedPercent(1000)).toBe("1,000%");
+  });
+});
+
+describe("formatWebVital", () => {
+  it("shows timings in whole milliseconds with their rating", () => {
+    expect(
+      formatWebVital({ name: "LCP", value: 1234.56, rating: "good" }),
+    ).toBe("LCP 1,235ms (good)");
+    expect(
+      formatWebVital({ name: "INP", value: 312, rating: "needs-improvement" }),
+    ).toBe("INP 312ms (needs improvement)");
+  });
+
+  it("shows layout shift as a unitless score", () => {
+    expect(formatWebVital({ name: "CLS", value: 0.0812, rating: "good" })).toBe(
+      "CLS 0.081 (good)",
+    );
   });
 });

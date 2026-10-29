@@ -146,3 +146,29 @@ export function formatMetricOrMissing(
 ): string {
   return value === undefined ? "No data" : formatMetric(metric, value);
 }
+
+const milliseconds = new Intl.NumberFormat(LOCALE, {
+  maximumFractionDigits: 0,
+});
+const layoutShift = new Intl.NumberFormat(LOCALE, {
+  minimumFractionDigits: 3,
+  maximumFractionDigits: 3,
+});
+
+/** A Core Web Vitals reading for the console: "LCP 1,235ms (good)", "CLS 0.081 (good)". */
+export function formatWebVital({
+  name,
+  value,
+  rating,
+}: {
+  name: string;
+  value: number;
+  rating: "good" | "needs-improvement" | "poor";
+}): string {
+  // CLS is a unitless score; every other vital is a duration in milliseconds.
+  const reading =
+    name === "CLS"
+      ? layoutShift.format(value)
+      : `${milliseconds.format(value)}ms`;
+  return `${name} ${reading} (${rating.replace("-", " ")})`;
+}
