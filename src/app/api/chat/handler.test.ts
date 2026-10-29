@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { loadFixtures } from "@/data/pack";
 import type { StreamEvent } from "@/domain/schema";
 import { createSseParser } from "@/domain/sse";
@@ -110,8 +110,13 @@ describe("POST /api/chat", () => {
     );
     const reader = response.body?.getReader();
     await reader?.read();
+    const timeout = vi.spyOn(globalThis, "setTimeout");
     await reader?.cancel();
-    // Give the producer time to try writing again; an enqueue after cancel would reject.
+
+    // Give the producer time to carry on; it should schedule no more pacing waits.
     await new Promise((resolve) => setTimeout(resolve, 50));
+    const pacingWaits = timeout.mock.calls.filter(([, ms]) => ms === 5);
+    timeout.mockRestore();
+    expect(pacingWaits).toHaveLength(0);
   });
 });
