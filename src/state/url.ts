@@ -7,6 +7,7 @@
 import {
   createParser,
   parseAsArrayOf,
+  parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
   useQueryState,
@@ -124,4 +125,13 @@ export function useSetMode(): (mode: Mode) => void {
     // The default leaves no param, so analyst links stay short.
     void setMode(mode === "analyst" ? null : mode);
   };
+}
+
+/**
+ * `?fail=1` makes the mock refuse alert saves, so reviewers and tests can see the rollback.
+ * A test switch, read here so the data layer never parses the URL.
+ */
+export function useFailSaves(): boolean {
+  const [fail] = useQueryState("fail", parseAsInteger);
+  return fail === 1;
 }

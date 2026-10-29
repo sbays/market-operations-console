@@ -16,7 +16,7 @@ import {
 import { formatMetricName } from "@/domain/format";
 import type { Dataset, EntityRef } from "@/domain/schema";
 import { pathOf } from "@/domain/selectors";
-import { useSelection } from "@/state/url";
+import { useFailSaves, useSelection } from "@/state/url";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -190,7 +190,7 @@ function AlertForm({ onSaved }: { onSaved: () => void }) {
   const id = useId();
   const dataset = useDataset();
   const { ref } = useSelection();
-  const createAlert = useCreateAlert();
+  const createAlert = useCreateAlert({ fail: useFailSaves() });
 
   const form = useForm<AlertRuleInput>({
     resolver: zodResolver(AlertRuleInputSchema),
