@@ -209,53 +209,62 @@ describe("Dashboard", () => {
     expect(screen.getByText(summary)).not.toHaveAttribute("aria-hidden");
   });
 
-  it("picks rows to compare from the breakdown, up to four", async () => {
+  it("ticks the compared rows, up to four, starting from the radar's defaults", async () => {
     const { user, onUrlUpdate } = renderDashboard("?path=eu");
     const table = screen.getByRole("table", { name: /Europe by market/ });
+    const box = (market: string) =>
+      within(table).getByRole("checkbox", { name: `Compare ${market}` });
 
-    await user.click(
-      within(table).getByRole("checkbox", { name: "Compare Germany" }),
+    // The radar's default comparison shows as ticked, so the boxes match the chart.
+    for (const market of ["Germany", "France", "United Kingdom", "Italy"]) {
+      expect(box(market)).toBeChecked();
+    }
+    expect(box("Spain")).toBeDisabled();
+    expect(box("Spain")).toHaveAccessibleDescription(
+      "You can compare up to 4.",
     );
+
+    // Unticking one keeps the other three rather than collapsing to one.
+    await user.click(box("Germany"));
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu&compare=eu.DE",
+      query: "?path=eu&compare=eu.FR,eu.GB,eu.IT",
       history: "replace",
     });
+    expect(box("Spain")).toBeEnabled();
 
-    for (const market of ["France", "United Kingdom", "Italy"]) {
-      await user.click(
-        within(table).getByRole("checkbox", { name: `Compare ${market}` }),
-      );
-    }
-    const spain = within(table).getByRole("checkbox", {
-      name: "Compare Spain",
-    });
-    expect(spain).toBeDisabled();
-    expect(spain).toHaveAccessibleDescription("You can compare up to 4.");
-
-    await user.click(
-      within(table).getByRole("checkbox", { name: "Compare Germany" }),
-    );
+    await user.click(box("Spain"));
     expect(lastUrl(onUrlUpdate).query).toBe(
-      "?path=eu&compare=eu.FR,eu.GB,eu.IT",
+      "?path=eu&compare=eu.FR,eu.GB,eu.IT,eu.ES",
     );
-    expect(spain).toBeEnabled();
   });
 
   it("compares the rows ticked in the breakdown", async () => {
     const { user } = renderDashboard("?path=eu");
     const table = screen.getByRole("table", { name: /Europe by market/ });
 
-    await user.click(
-      within(table).getByRole("checkbox", { name: "Compare Germany" }),
-    );
-    await user.click(
-      within(table).getByRole("checkbox", { name: "Compare Spain" }),
-    );
+    for (const market of ["France", "United Kingdom", "Italy", "Spain"]) {
+      await user.click(
+        within(table).getByRole("checkbox", { name: `Compare ${market}` }),
+      );
+    }
 
     const compare = screen.getByRole("figure", { name: "Compare" });
     const legend = within(compare).getByRole("list", { name: "Legend" });
     expect(within(legend).getAllByRole("listitem")).toHaveLength(2);
     expect(legend).toHaveTextContent(/Germany.*Spain/);
+  });
+
+  it("compares the new level's children after a drill", async () => {
+    const { user } = renderDashboard("?path=eu&compare=eu.DE,eu.ES");
+    const table = screen.getByRole("table", { name: /Europe by market/ });
+
+    await user.click(within(table).getByRole("button", { name: "Germany" }));
+
+    // Markets picked at Europe don't apply to Germany's products.
+    const compare = screen.getByRole("figure", { name: "Compare" });
+    const legend = within(compare).getByRole("list", { name: "Legend" });
+    expect(legend).not.toHaveTextContent(/Spain/);
+    expect(legend).toHaveTextContent(/in Germany/);
   });
 
   it("focuses a month from the heat map, and the key figures follow", async () => {

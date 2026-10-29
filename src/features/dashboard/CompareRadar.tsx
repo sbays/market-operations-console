@@ -12,8 +12,8 @@ import {
   type RadarValue,
 } from "@/domain/radar";
 import type { Dataset, EntityRef, PeriodRef } from "@/domain/schema";
-import { childrenOf, entityLabel } from "@/domain/selectors";
-import { MAX_COMPARE, useCompare } from "@/state/url";
+import { entityLabel } from "@/domain/selectors";
+import { useCompare } from "@/state/url";
 import { ChartFrame } from "@/ui/ChartFrame";
 import { cn } from "@/ui/cn";
 import { useRovingIndex } from "@/ui/useRovingIndex";
@@ -41,16 +41,11 @@ const SERIES_STYLES = [
 ] as const;
 
 /**
- * The entities compared on five axes: the ones the URL names, or else the first few children of
- * the selection. Nothing is compared below a product, so the radar renders nothing there.
+ * The compared entities on five axes (see comparedRefs). Nothing is compared below a product,
+ * so the radar renders nothing there.
  */
 export function CompareRadar({ dataset, selected, period }: Props) {
-  const chosen = useCompare();
-  const refs =
-    chosen.length > 0
-      ? chosen
-      : childrenOf(dataset, selected).slice(0, MAX_COMPARE);
-  const series = radarAxes(dataset, refs, period);
+  const series = radarAxes(dataset, useCompare(selected), period);
   // Hooks run before the early return; the grid is one row per series, one column per axis.
   const roving = useRovingIndex(
     series.length * RADAR_METRICS.length,
@@ -205,7 +200,7 @@ function anchorFor(
 }
 
 function styleFor(row: number) {
-  // The compare list is capped at MAX_COMPARE, so this only guards the index type.
+  // comparedRefs caps the list at MAX_COMPARE, so this only guards the index type.
   return SERIES_STYLES[row] ?? SERIES_STYLES[0];
 }
 

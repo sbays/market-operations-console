@@ -106,7 +106,10 @@ test("a comparison survives a reload, because it lives in the URL", async ({
   await page.goto("/console?path=eu");
   const table = page.getByRole("table", { name: /Europe by market/ });
 
-  await table.getByRole("checkbox", { name: "Compare Germany" }).check();
+  // The radar starts on the first four markets; swap three of them for Spain.
+  for (const market of ["France", "United Kingdom", "Italy"]) {
+    await table.getByRole("checkbox", { name: `Compare ${market}` }).uncheck();
+  }
   await table.getByRole("checkbox", { name: "Compare Spain" }).check();
   await expect(page).toHaveURL(/compare=eu\.DE,eu\.ES/);
 

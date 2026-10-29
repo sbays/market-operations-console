@@ -70,14 +70,21 @@ describe("CompareRadar", () => {
   });
 
   it("compares exactly the entities the URL names, in the order it names them", () => {
-    renderRadar("?path=eu&compare=eu.DE,na.US");
+    renderRadar("?path=eu&compare=eu.ES,eu.DE");
 
-    expect(legend()).toHaveTextContent(/^GermanyUnited States$/);
+    expect(legend()).toHaveTextContent(/^SpainGermany$/);
     expect(
       screen.getByRole("img", {
-        name: /^Comparing Germany and United States in Q3 2026 on revenue/,
+        name: /^Comparing Spain and Germany in Q3 2026 on revenue/,
       }),
-    ).toHaveAccessibleName(/United States leads on revenue\.$/);
+    ).toHaveAccessibleName(/Germany leads on revenue\.$/);
+  });
+
+  it("ignores compared entities that aren't children of the selection", () => {
+    // United States is in North America, so it can't sit on a radar of European markets.
+    renderRadar("?path=eu&compare=eu.DE,na.US");
+
+    expect(legend()).toHaveTextContent(/^Germany$/);
   });
 
   it("renders nothing below a product, where there is nothing to compare", () => {
@@ -90,7 +97,7 @@ describe("CompareRadar", () => {
   });
 
   it("names each vertex with its real formatted value", () => {
-    renderRadar("?path=eu&compare=eu.DE,na.US");
+    renderRadar("?path=eu&compare=eu.DE,eu.ES");
 
     expect(
       screen.getByRole("button", { name: "Germany, Revenue: $13.6M" }),
@@ -102,13 +109,13 @@ describe("CompareRadar", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: "United States, Forecast attainment: 99.2%",
+        name: "Spain, Forecast attainment: 99.0%",
       }),
     ).toBeInTheDocument();
   });
 
   it("moves focus between vertices with the arrow keys", async () => {
-    const { user } = renderRadar("?path=eu&compare=eu.DE,na.US");
+    const { user } = renderRadar("?path=eu&compare=eu.DE,eu.ES");
     const germanyRevenue = screen.getByRole("button", {
       name: "Germany, Revenue: $13.6M",
     });
@@ -122,20 +129,20 @@ describe("CompareRadar", () => {
 
     await user.keyboard("{ArrowDown}");
     expect(
-      screen.getByRole("button", { name: "United States, Units: 315K" }),
+      screen.getByRole("button", { name: "Spain, Units: 54.7K" }),
     ).toHaveFocus();
   });
 
   it("shows the raw values and the scaled share in the table alternative", async () => {
-    const { user } = renderRadar("?path=eu&compare=eu.DE,na.US");
+    const { user } = renderRadar("?path=eu&compare=eu.DE,eu.ES");
 
     await user.click(screen.getByRole("button", { name: "View as table" }));
 
     const table = screen.getByRole("table", { name: "Compared values" });
-    const germany = within(table).getByRole("row", { name: /^Germany/ });
-    expect(germany).toHaveTextContent("$13.6M");
-    expect(germany).toHaveTextContent("95.4%");
-    expect(germany).toHaveTextContent("scaled 45.0%");
+    const spain = within(table).getByRole("row", { name: /^Spain/ });
+    expect(spain).toHaveTextContent("$5.2M");
+    expect(spain).toHaveTextContent("99.0%");
+    expect(spain).toHaveTextContent("scaled 38.6%");
     expect(
       screen.queryByRole("img", { name: /^Comparing/ }),
     ).not.toBeInTheDocument();
