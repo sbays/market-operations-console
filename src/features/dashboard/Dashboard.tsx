@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useDataset } from "@/data/useDataset";
 import { ancestorsOf, pathOf, selectionPeriod } from "@/domain/selectors";
 import { useDrill, useMode, useSelection, useUnknownPath } from "@/state/url";
+import { focusDashboard } from "@/ui/dashboardFocus";
 import { ErrorBoundary } from "@/ui/ErrorBoundary";
 import { AttainmentHeatMap } from "./AttainmentHeatMap";
 import { Breadcrumb } from "./Breadcrumb";
@@ -37,33 +38,43 @@ export function Dashboard() {
   const props = { dataset, selected: ref, period: shown };
   const unknownPath = useUnknownPath();
   // Telling the reader and cleaning the URL are side effects of reading a bad link, so they
-  // run after render. Clearing the path makes this false, so it runs once per bad link.
-  useEffect(() => {
-    if (unknownPath.path === null) return;
+  // run after render, once per bad path (clearing it ends the run).
+  const announceUnknownPath = useEffectEvent(() => {
     toast(
       "That link points to something not in the data, so you're seeing the portfolio.",
       // A fixed id: a render before the URL updates can't show the notice twice.
       { id: "unknown-path" },
     );
     unknownPath.clear();
-  }, [unknownPath]);
-  // Escape goes up a level, from anywhere inside the dashboard. A window listener rather than
-  // a handler on the wrapper, which has no interactive role. Focus outside the dashboard (the
-  // chat, an open dialog in its portal) is left alone, and so is an Escape already handled.
+  });
+  useEffect(() => {
+    if (unknownPath.path !== null) announceUnknownPath();
+  }, [unknownPath.path]);
+
+  // Escape goes up a level from inside the dashboard, or when nothing has focus (Safari
+  // doesn't focus a clicked button, so focus stays on the body). A window listener, since the
+  // wrapper has no interactive role. Focus elsewhere (the chat, a dialog in its portal) is
+  // left alone, and so is an Escape something else already handled.
   const rootRef = useRef<HTMLDivElement>(null);
   const drill = useDrill();
   const parent = ancestorsOf(dataset, ref).at(-2);
+  // An effect event reads the current parent, so the listener is added once, not per render.
+  const goUp = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    if (parent === undefined || !(event.target instanceof Node)) return;
+    const inDashboard =
+      event.target === document.body ||
+      rootRef.current?.contains(event.target) === true;
+    if (!inDashboard) return;
+    drill(parent);
+    // The focused element may belong to the level just left; land on the new key figures.
+    focusDashboard();
+  });
   useEffect(() => {
-    if (parent === undefined) return;
-    const goUp = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      if (!(event.target instanceof Node)) return;
-      if (!rootRef.current?.contains(event.target)) return;
-      drill(parent);
-    };
-    window.addEventListener("keydown", goUp);
-    return () => window.removeEventListener("keydown", goUp);
-  }, [parent, drill]);
+    const onKeyDown = (event: KeyboardEvent) => goUp(event);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   // A failed chart is retried when the selection changes.
   const resetKey = `${pathOf(dataset, ref) ?? ""}@${shown}`;
 

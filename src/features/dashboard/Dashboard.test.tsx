@@ -133,7 +133,8 @@ describe("Dashboard", () => {
     const { onUrlUpdate } = renderDashboard("?path=xx.YY&period=2026-03");
 
     expect(within(breadcrumb()).getAllByRole("listitem")).toHaveLength(1);
-    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$[\d.]+M/);
+    // The portfolio's March figure; Europe's would be $15.6M.
+    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$40\.5M/);
     expect(
       await screen.findByText(
         "That link points to something not in the data, so you're seeing the portfolio.",
@@ -432,7 +433,7 @@ describe("Dashboard", () => {
     const heatMapTabStop = () =>
       within(screen.getByRole("figure", { name: /and month$/ }))
         .getAllByRole("button", { name: /, \w{3} \d{4}: / })
-        .find((cell) => cell.tabIndex === 0);
+        .filter((cell) => cell.tabIndex === 0);
     expect(within(radar()).getByRole("img")).toHaveAccessibleName(/in Q3 2026/);
 
     await user.click(
@@ -446,6 +447,34 @@ describe("Dashboard", () => {
       /in Mar 2026/,
     );
     // The heat map enters keyboard users on the chosen month's column.
-    expect(heatMapTabStop()).toHaveAccessibleName(/, Mar 2026: /);
+    // Exactly one cell is the tab stop, and it's in the chosen month's column.
+    expect(heatMapTabStop()).toHaveLength(1);
+    expect(heatMapTabStop()[0]).toHaveAccessibleName(/, Mar 2026: /);
+  });
+
+  it("moves focus to the key figures after Escape, so the next Escape still works", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+    act(() =>
+      within(screen.getByRole("table", { name: /Germany by product/ }))
+        .getAllByRole("checkbox")[0]
+        ?.focus(),
+    );
+
+    await user.keyboard("{Escape}");
+    expect(keyFigures()).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(lastUrl(onUrlUpdate).query).toBe("");
+  });
+
+  it("goes up on Escape when nothing has focus, as after a click in Safari", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+    act(() => {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
+
+    await user.keyboard("{Escape}");
+    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu");
   });
 });
