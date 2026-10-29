@@ -342,4 +342,34 @@ describe("Dashboard", () => {
     await user.click(screen.getByRole("button", { name: "Analyst" }));
     expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.DE");
   });
+
+  it("drills from a top risk, and the other panels follow", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=latam&period=2026-Q2");
+    const risks = screen.getByRole("region", { name: "Top risks" });
+
+    await user.click(within(risks).getByRole("button", { name: "Brazil" }));
+
+    expect(lastUrl(onUrlUpdate)).toEqual({
+      query: "?path=latam.BR&period=2026-Q2",
+      history: "push",
+    });
+    expect(within(breadcrumb()).getByText("Brazil")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      screen.getByRole("table", { name: /Brazil by product/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the top risks in exec mode, without the movers", () => {
+    renderDashboard("?path=latam&mode=exec");
+
+    expect(
+      screen.getByRole("region", { name: "Top risks" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Biggest movers" }),
+    ).not.toBeInTheDocument();
+  });
 });
