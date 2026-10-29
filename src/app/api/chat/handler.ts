@@ -49,7 +49,9 @@ export function createChatHandler(options: ChatHandlerOptions) {
       matchFixture(loadFixtures(), parsed.data.question),
       coverageOf(loadDataset()),
     );
-    const signal = request.signal;
+    // Stop on either a client abort or the body being cancelled.
+    const cancelled = new AbortController();
+    const signal = AbortSignal.any([request.signal, cancelled.signal]);
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream<Uint8Array>({
@@ -62,7 +64,10 @@ export function createChatHandler(options: ChatHandlerOptions) {
           if (signal.aborted) break;
           controller.enqueue(encoder.encode(encodeSseEvent(event)));
         }
-        controller.close();
+        if (!cancelled.signal.aborted) controller.close();
+      },
+      cancel() {
+        cancelled.abort();
       },
     });
 
