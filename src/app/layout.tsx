@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { QueryProvider } from "@/data/QueryProvider";
 import { cn } from "@/ui/cn";
+import { WebVitals } from "./WebVitals";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       )}
     >
       <body className="flex min-h-full flex-col">
+        <WebVitals />
         <NuqsAdapter>
           <QueryProvider>{children}</QueryProvider>
         </NuqsAdapter>
