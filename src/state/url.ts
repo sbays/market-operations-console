@@ -35,10 +35,11 @@ export function useSelection(): { ref: EntityRef; period: PeriodRef | null } {
 }
 
 /**
- * Drills to an entity and period. Pushes history, so Back returns to the previous view.
- * An entity the data doesn't contain is ignored rather than drilled to the portfolio.
+ * Drills to an entity, and to a period when one is given (otherwise the period stays).
+ * Pushes history, so Back returns to the previous view. An entity the data doesn't contain
+ * is ignored rather than drilled to the portfolio.
  */
-export function useDrill(): (ref: EntityRef, period: PeriodRef) => void {
+export function useDrill(): (ref: EntityRef, period?: PeriodRef) => void {
   const dataset = useDataset();
   const [, setSelection] = useQueryStates(selectionParsers, {
     history: "push",
@@ -47,6 +48,20 @@ export function useDrill(): (ref: EntityRef, period: PeriodRef) => void {
     const path = pathOf(dataset, ref);
     if (path === undefined) return;
     // The portfolio is the default, so it leaves no path in the URL.
-    void setSelection({ path: path || null, period });
+    void setSelection(
+      period === undefined
+        ? { path: path || null }
+        : { path: path || null, period },
+    );
+  };
+}
+
+/** Focuses a period. Replaces history: stepping through periods shouldn't flood Back. */
+export function useSetPeriod(): (period: PeriodRef) => void {
+  const [, setSelection] = useQueryStates(selectionParsers, {
+    history: "replace",
+  });
+  return (period) => {
+    void setSelection({ period });
   };
 }
