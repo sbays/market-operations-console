@@ -250,6 +250,7 @@ function AlertForm({ onSaved }: { onSaved: () => void }) {
       className="flex flex-col gap-5"
     >
       {issues.length > 0 ? (
+        // tabIndex -1: a failed submit focuses the summary; it never joins the tab order.
         <div
           ref={summaryRef}
           role="alert"

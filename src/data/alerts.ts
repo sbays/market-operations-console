@@ -92,6 +92,9 @@ export function useCreateAlert({ fail }: { fail: boolean }) {
         },
       });
     },
+    onSuccess: (rule) => {
+      toast.success(`Saved alert rule “${rule.name}”.`);
+    },
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: alertsQuery.queryKey }),
   });
