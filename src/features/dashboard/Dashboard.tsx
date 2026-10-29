@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useDataset } from "@/data/useDataset";
 import { ancestorsOf, pathOf, selectionPeriod } from "@/domain/selectors";
 import { useDrill, useMode, useSelection, useUnknownPath } from "@/state/url";
+import { clearHighlight } from "@/state/highlight";
 import { focusDashboard } from "@/ui/dashboardFocus";
 import { ErrorBoundary } from "@/ui/ErrorBoundary";
 import { AttainmentHeatMap } from "./AttainmentHeatMap";
@@ -75,6 +76,13 @@ export function Dashboard() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+  // A drill usually unmounts the hovered or focused item without its leave or blur firing, so
+  // the highlight is cleared for each new selection, and when the dashboard goes away.
+  const selectedPath = pathOf(dataset, ref);
+  useEffect(() => {
+    clearHighlight();
+    return clearHighlight;
+  }, [selectedPath]);
   // A failed chart is retried when the selection changes.
   const resetKey = `${pathOf(dataset, ref) ?? ""}@${shown}`;
 
