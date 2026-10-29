@@ -4,13 +4,14 @@ import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { useDataset } from "@/data/useDataset";
 import { pathOf, selectionPeriod } from "@/domain/selectors";
-import { useSelection } from "@/state/url";
+import { useMode, useSelection } from "@/state/url";
 import { ErrorBoundary } from "@/ui/ErrorBoundary";
 import { AttainmentHeatMap } from "./AttainmentHeatMap";
 import { Breadcrumb } from "./Breadcrumb";
 import { BreakdownTable } from "./BreakdownTable";
 import { CompareRadar } from "./CompareRadar";
 import { KpiStrip } from "./KpiStrip";
+import { ModeToggle } from "./ModeToggle";
 import { TrendChart } from "./TrendChart";
 
 // The world TopoJSON is the largest asset on the page: load it after the rest of the
@@ -28,6 +29,8 @@ const MarketMap = dynamic(
 export function Dashboard() {
   const dataset = useDataset();
   const { ref, period } = useSelection();
+  const mode = useMode();
+  const analyst = mode === "analyst";
   const shown = selectionPeriod(dataset, period);
   const props = { dataset, selected: ref, period: shown };
   // A failed chart is retried when the selection changes.
@@ -35,25 +38,33 @@ export function Dashboard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Breadcrumb dataset={dataset} selected={ref} />
-      <KpiStrip {...props} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Breadcrumb dataset={dataset} selected={ref} />
+        <ModeToggle />
+      </div>
+      <KpiStrip {...props} mode={mode} />
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel label="Market map" resetKey={resetKey}>
           <MarketMap {...props} />
         </Panel>
         <Panel label="Trend chart" resetKey={resetKey}>
-          <TrendChart {...props} />
+          <TrendChart {...props} mode={mode} />
         </Panel>
       </div>
-      <Panel label="Heat map" resetKey={resetKey}>
-        <AttainmentHeatMap {...props} />
-      </Panel>
-      <div className="grid items-start gap-6 xl:grid-cols-2">
-        <Panel label="Compare chart" resetKey={resetKey}>
-          <CompareRadar {...props} />
-        </Panel>
-        <BreakdownTable {...props} />
-      </div>
+      {/* Exec hides the dense panels; analysts get the full grid, radar and table. */}
+      {analyst && (
+        <>
+          <Panel label="Heat map" resetKey={resetKey}>
+            <AttainmentHeatMap {...props} />
+          </Panel>
+          <div className="grid items-start gap-6 xl:grid-cols-2">
+            <Panel label="Compare chart" resetKey={resetKey}>
+              <CompareRadar {...props} />
+            </Panel>
+            <BreakdownTable {...props} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

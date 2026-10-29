@@ -10,13 +10,19 @@ import {
   type TrendPoint,
 } from "@/domain/selectors";
 import { trendSummary } from "@/domain/summaries";
-import { useSetPeriod } from "@/state/url";
+import { useSetPeriod, type Mode } from "@/state/url";
 import { ChartFrame } from "@/ui/ChartFrame";
 import { ChartLegend } from "@/ui/ChartLegend";
 import { cn } from "@/ui/cn";
 import { useRovingIndex } from "@/ui/useRovingIndex";
 
-type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
+type Props = {
+  dataset: Dataset;
+  selected: EntityRef;
+  period: PeriodRef;
+  /** Exec shows actual against forecast; analyst adds the prior year. */
+  mode: Mode;
+};
 
 const MARGIN = { top: 12, right: 16, bottom: 28, left: 64 };
 /** Label every third month, so the axis stays readable at any width. */
@@ -24,8 +30,9 @@ const TICK_EVERY = 3;
 const AXIS_COLOUR = "var(--border)";
 const LABEL_COLOUR = "var(--muted-foreground)";
 
-/** Revenue against forecast and prior year by month; a point focuses its month. */
-export function TrendChart({ dataset, selected, period }: Props) {
+/** Revenue against forecast (and prior year, for analysts) by month; a point focuses its month. */
+export function TrendChart({ dataset, selected, period, mode }: Props) {
+  const showPriorYear = mode === "analyst";
   const setPeriod = useSetPeriod();
   const series = monthlySeries(dataset, selected);
   const selectedIndex = series.findIndex((point) => point.period === period);
@@ -39,7 +46,11 @@ export function TrendChart({ dataset, selected, period }: Props) {
   const scales = ({ width, height }: { width: number; height: number }) => {
     const peak = Math.max(
       1,
-      ...series.flatMap((p) => [p.actual, p.forecast, p.priorYear]),
+      ...series.flatMap((p) =>
+        showPriorYear
+          ? [p.actual, p.forecast, p.priorYear]
+          : [p.actual, p.forecast],
+      ),
     );
     return {
       x: scaleLinear({
@@ -58,8 +69,10 @@ export function TrendChart({ dataset, selected, period }: Props) {
     <ChartFrame
       title={`${name} revenue`}
       summary={trendSummary(series, name)}
-      table={<TrendTable name={name} series={series} />}
-      legend={<TrendLegend />}
+      table={
+        <TrendTable name={name} series={series} showPriorYear={showPriorYear} />
+      }
+      legend={<TrendLegend showPriorYear={showPriorYear} />}
       drawing={(size) => {
         const { x, y } = scales(size);
         const line = (pick: (p: TrendPoint) => number) => ({
@@ -94,11 +107,13 @@ export function TrendChart({ dataset, selected, period }: Props) {
               tickStroke={AXIS_COLOUR}
               tickLabelProps={{ fill: LABEL_COLOUR, fontSize: 11 }}
             />
-            <LinePath
-              {...line((p) => p.priorYear)}
-              className="stroke-chart-5"
-              strokeDasharray="4 4"
-            />
+            {showPriorYear && (
+              <LinePath
+                {...line((p) => p.priorYear)}
+                className="stroke-chart-5"
+                strokeDasharray="4 4"
+              />
+            )}
             <LinePath {...line((p) => p.forecast)} className="stroke-chart-2" />
             <LinePath {...line((p) => p.actual)} className="stroke-chart-1" />
           </Group>
@@ -113,7 +128,7 @@ export function TrendChart({ dataset, selected, period }: Props) {
               key={point.period}
               type="button"
               {...roving.itemProps(index)}
-              aria-label={`${formatPeriod(point.period)}: revenue ${formatCurrency(point.actual)}, forecast ${formatCurrency(point.forecast)}, prior year ${formatCurrency(point.priorYear)}`}
+              aria-label={`${formatPeriod(point.period)}: revenue ${formatCurrency(point.actual)}, forecast ${formatCurrency(point.forecast)}${showPriorYear ? `, prior year ${formatCurrency(point.priorYear)}` : ""}`}
               aria-current={selectedMonth ? "date" : undefined}
               onClick={() => setPeriod(point.period)}
               style={{ left: x(index), top: y(point.actual) }}
@@ -130,11 +145,13 @@ export function TrendChart({ dataset, selected, period }: Props) {
 }
 
 /** Each line by colour and by style, so the dashed line isn't explained by colour alone. */
-function TrendLegend() {
+function TrendLegend({ showPriorYear }: { showPriorYear: boolean }) {
   const items = [
     { label: "Actual", line: "border-chart-1" },
     { label: "Forecast", line: "border-chart-2" },
-    { label: "Prior year", line: "border-dashed border-chart-5" },
+    ...(showPriorYear
+      ? [{ label: "Prior year", line: "border-dashed border-chart-5" }]
+      : []),
   ];
   return (
     <ChartLegend
@@ -146,7 +163,15 @@ function TrendLegend() {
   );
 }
 
-function TrendTable({ name, series }: { name: string; series: TrendPoint[] }) {
+function TrendTable({
+  name,
+  series,
+  showPriorYear,
+}: {
+  name: string;
+  series: TrendPoint[];
+  showPriorYear: boolean;
+}) {
   return (
     <table className="w-full text-sm">
       <caption className="pb-2 text-left text-muted-foreground">
@@ -163,9 +188,11 @@ function TrendTable({ name, series }: { name: string; series: TrendPoint[] }) {
           <th scope="col" className="py-1.5 text-right font-medium">
             Forecast
           </th>
-          <th scope="col" className="py-1.5 text-right font-medium">
-            Prior year
-          </th>
+          {showPriorYear && (
+            <th scope="col" className="py-1.5 text-right font-medium">
+              Prior year
+            </th>
+          )}
         </tr>
       </thead>
       <tbody className="tabular-nums">
@@ -180,9 +207,11 @@ function TrendTable({ name, series }: { name: string; series: TrendPoint[] }) {
             <td className="py-1.5 text-right">
               {formatCurrency(point.forecast)}
             </td>
-            <td className="py-1.5 text-right">
-              {formatCurrency(point.priorYear)}
-            </td>
+            {showPriorYear && (
+              <td className="py-1.5 text-right">
+                {formatCurrency(point.priorYear)}
+              </td>
+            )}
           </tr>
         ))}
       </tbody>
