@@ -164,6 +164,13 @@ Advanced chart pick: the heat map. It shows *when* things went wrong across mark
 
 Status is never colour alone: on-track, at-risk and off-track each get an icon and label, and the map adds a hatch pattern for off-track. Diverging palette checked for colour-blind safety.
 
+Gate decisions (29 Oct, `feat/dashboard-gate`):
+
+- The drill-down surface for the gate is a breakdown table of the current level's children (name, revenue, attainment, status); a row's name drills in. It grows into the analyst detail table on day 2.
+- With no `period` in the URL, panels show the latest full quarter; a URL month or quarter overrides it (`selectionPeriod`). Status badges use `statusAt` over the shown period, so a badge always matches the attainment beside it.
+- The chart shell (`ui/ChartFrame`) draws the static chart in `<svg role="img">` with the generated summary as its name, and puts focusable data points in an HTML overlay above it: `role="img"` makes svg children presentational, so points can't live inside it. Points use a roving tabindex (`ui/useRovingIndex`); charts have no transitions.
+- Breadcrumb and breakdown drills push history and keep the period; focusing a month from a chart replaces history (`useSetPeriod`).
+
 ## Coordinated views and URL state
 
 The URL is the selection store. Views never talk to each other; they read from and write to the URL, and everything else is derived. This keeps wiring linear: N views, one store, not N² handlers.
