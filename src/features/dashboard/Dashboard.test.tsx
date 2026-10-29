@@ -202,4 +202,36 @@ describe("Dashboard", () => {
     await user.click(screen.getByRole("button", { name: "View as table" }));
     expect(screen.getByText(summary)).not.toHaveAttribute("aria-hidden");
   });
+
+  it("picks rows to compare from the breakdown, up to four", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=eu");
+    const table = screen.getByRole("table", { name: /Europe by market/ });
+
+    await user.click(
+      within(table).getByRole("checkbox", { name: "Compare Germany" }),
+    );
+    expect(lastUrl(onUrlUpdate)).toEqual({
+      query: "?path=eu&compare=eu.DE",
+      history: "replace",
+    });
+
+    for (const market of ["France", "United Kingdom", "Italy"]) {
+      await user.click(
+        within(table).getByRole("checkbox", { name: `Compare ${market}` }),
+      );
+    }
+    const spain = within(table).getByRole("checkbox", {
+      name: "Compare Spain",
+    });
+    expect(spain).toBeDisabled();
+    expect(spain).toHaveAccessibleDescription("You can compare up to 4.");
+
+    await user.click(
+      within(table).getByRole("checkbox", { name: "Compare Germany" }),
+    );
+    expect(lastUrl(onUrlUpdate).query).toBe(
+      "?path=eu&compare=eu.FR,eu.GB,eu.IT",
+    );
+    expect(spain).toBeEnabled();
+  });
 });
