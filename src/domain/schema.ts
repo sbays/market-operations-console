@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normaliseQuestion } from "./fixtures";
 import { MonthSchema, nextMonth, parsePeriod, PeriodRefSchema } from "./period";
 
 export { MonthSchema, PeriodRefSchema, QuarterSchema } from "./period";
@@ -230,11 +231,6 @@ export const ChatRequestSchema = z.object({
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;
 
 // Fixtures -----------------------------------------------------------------
-
-/** How questions are compared for an exact fixture match: case- and spacing-insensitive. */
-export function normaliseQuestion(question: string): string {
-  return question.trim().replace(/\s+/g, " ").toLowerCase();
-}
 
 export const FixtureResponseSchema = z.discriminatedUnion("kind", [
   z.object({
