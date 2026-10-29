@@ -25,6 +25,7 @@ export function KpiStrip({ dataset, selected, period, mode }: Props) {
 
   return (
     // A citation drill focuses this, so the figures that check the answer are read first.
+    // tabIndex -1 makes it a script focus target only; it never joins the tab order.
     <section
       id={DASHBOARD_FOCUS_ID}
       tabIndex={-1}

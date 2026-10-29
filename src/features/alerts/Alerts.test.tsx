@@ -275,6 +275,10 @@ describe("AlertDialog", () => {
     );
     expect(within(rules).getByText("Watch Germany")).toBeInTheDocument();
     expect(saved).toHaveLength(1);
+    // Screen-reader users hear the save land, through the toast's live region.
+    expect(
+      await screen.findByText("Saved alert rule “Watch Germany”."),
+    ).toBeInTheDocument();
   });
 });
 
