@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DatasetSchema } from "./schema";
 import {
   AlertRuleInputSchema,
+  type AlertRule,
   AlertRuleSchema,
   describeAlert,
   THRESHOLD_RANGE,
@@ -186,42 +187,42 @@ describe("AlertRuleSchema", () => {
 
 describe("describeAlert", () => {
   it("reads the rule as one sentence, with the scope named and the threshold formatted", () => {
-    const rule = {
+    const rule: AlertRule = {
       id: "r1",
       name: "Watch Germany",
       scope: ["eu.DE", "eu.FR"],
       metric: "attainment",
       operator: "below",
       threshold: 95,
-    } as const;
+    };
     expect(describeAlert(rule, dataset)).toBe(
       "Forecast attainment below 95.0% in Germany, France",
     );
   });
 
   it("formats growth thresholds as signed percentages", () => {
-    const rule = {
+    const rule: AlertRule = {
       id: "r2",
       name: "Big growth",
       scope: ["eu"],
       metric: "growth",
       operator: "above",
       threshold: 300,
-    } as const;
+    };
     expect(describeAlert(rule, dataset)).toBe(
       "Growth vs prior year above +300.0% in Europe",
     );
   });
 
   it("skips a scope path the dataset no longer has", () => {
-    const rule = {
+    const rule: AlertRule = {
       id: "r3",
       name: "Stale",
       scope: ["eu.DE", "na.US"],
       metric: "attainment",
       operator: "below",
       threshold: 90,
-    } as const;
+    };
     expect(describeAlert(rule, dataset)).toBe(
       "Forecast attainment below 90.0% in Germany",
     );
