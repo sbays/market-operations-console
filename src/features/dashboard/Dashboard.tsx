@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { useDataset } from "@/data/useDataset";
-import { selectionPeriod } from "@/domain/selectors";
+import { pathOf, selectionPeriod } from "@/domain/selectors";
 import { useSelection } from "@/state/url";
 import { ErrorBoundary } from "@/ui/ErrorBoundary";
 import { AttainmentHeatMap } from "./AttainmentHeatMap";
@@ -30,24 +30,26 @@ export function Dashboard() {
   const { ref, period } = useSelection();
   const shown = selectionPeriod(dataset, period);
   const props = { dataset, selected: ref, period: shown };
+  // A failed chart is retried when the selection changes.
+  const resetKey = `${pathOf(dataset, ref) ?? ""}@${shown}`;
 
   return (
     <div className="flex flex-col gap-6">
       <Breadcrumb dataset={dataset} selected={ref} />
       <KpiStrip {...props} />
       <div className="grid gap-6 xl:grid-cols-2">
-        <Panel label="Market map">
+        <Panel label="Market map" resetKey={resetKey}>
           <MarketMap {...props} />
         </Panel>
-        <Panel label="Trend chart">
+        <Panel label="Trend chart" resetKey={resetKey}>
           <TrendChart {...props} />
         </Panel>
       </div>
-      <Panel label="Heat map">
+      <Panel label="Heat map" resetKey={resetKey}>
         <AttainmentHeatMap {...props} />
       </Panel>
       <div className="grid items-start gap-6 xl:grid-cols-2">
-        <Panel label="Compare chart">
+        <Panel label="Compare chart" resetKey={resetKey}>
           <CompareRadar {...props} />
         </Panel>
         <BreakdownTable {...props} />
@@ -56,9 +58,17 @@ export function Dashboard() {
   );
 }
 
-function Panel({ label, children }: { label: string; children: ReactNode }) {
+function Panel({
+  label,
+  resetKey,
+  children,
+}: {
+  label: string;
+  resetKey: string;
+  children: ReactNode;
+}) {
   return (
-    <ErrorBoundary label={label}>
+    <ErrorBoundary label={label} resetKey={resetKey}>
       <div className="min-w-0">{children}</div>
     </ErrorBoundary>
   );
