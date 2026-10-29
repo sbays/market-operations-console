@@ -119,7 +119,7 @@ The assistant is where we win or lose on trust, so every answer renders as a str
 
 **Citations**
 
-- Inline markers (decided 28 Oct): tokens contain markers like `[1]`; the final event maps each number to `{ id, ref: EntityRef, period, metric }` alongside `confidence`. Markers render as pending chips until the final event resolves them; a remark plugin turns `[n]` into citation nodes, including markers split across tokens.
+- Inline markers (decided 28 Oct): tokens contain markers like `[1]`; the final event maps each number to `{ id, ref: EntityRef, period, metric }` alongside `confidence`. Markers render as pending chips until the final event resolves them; a rehype plugin (`rehypeCitations`) turns each complete `[n]` into a citation element, so a marker split across tokens stays text until it completes.
 - Each marker renders as a chip ("DE · Mar 2026 · Revenue"). Hover or focus shows the actual figure from the dataset, pulled live, not from the model.
 - Clicking a chip drills the dashboard to that entity and period. Verifying is one click, and the dashboard becomes the proof.
 
@@ -134,6 +134,13 @@ The assistant is where we win or lose on trust, so every answer renders as a str
 - Authoritative numbers use the solid surface, tabular figures and a "Source data" label.
 - AI content sits on a distinct tinted surface with a left rule, a sparkle mark and an "AI-generated · verify with sources" label.
 - Numbers the AI states are never restyled as authoritative; the citation chip shows the real one beside it.
+
+Answer-card decisions (29 Oct, `feat/answer-card`):
+
+- The dataset reaches the client in this PR: `DatasetHydration` seeds TanStack Query from the RSC and `useDataset` reads it, so citation chips check real values from day one. The dehydrated state is built in a `"use cache"` function, because `dehydrate()` calls `Date.now()` and the static route only allows that in a cache scope.
+- nuqs `path` and `period` land with the chips, so a chip click drills the URL now. The path uses the real ids, region to product (`eu.DE.beacon`); `refFromPath` rejects ids the data doesn't contain and the URL falls back to the portfolio (no toast yet).
+- Answers render per Markdown block (`splitBlocks`, which keeps a loose list in one block): settled blocks keep their props, so only the growing block is re-parsed per frame. Citations reach the chips through context, so resolving them doesn't re-parse the text.
+- `ChatState` is a union on `status`, and the reducer ignores everything but a new question once a run settles. HTTP failures read "The assistant isn't available right now."; the status goes to the console.
 
 Fixture coverage to demo: the four example questions, low-confidence, abstention, error, long response. Suggested-question chips seed these on first open; they are the main way in, because free text only matches fixtures exactly and everything else abstains (decided 28 Oct).
 
@@ -163,7 +170,7 @@ The URL is the selection store. Views never talk to each other; they read from a
 
 | Param | Example | Written by | Read by |
 | --- | --- | --- | --- |
-| `path` | `eu.de.prodA` | Map click, table row, breadcrumb, citation chip, cmd-K | Every panel |
+| `path` | `eu.DE.beacon` | Map click, table row, breadcrumb, citation chip, cmd-K | Every panel |
 | `period` | `2026-03` | Heat map cell, time-series click | Radar, time-series (highlighted point), KPI strip, map |
 | `compare` | `de,fr,jp` | Table checkboxes | Radar |
 | `mode` | `exec` or `analyst` | Mode toggle | Layout |
