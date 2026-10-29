@@ -99,3 +99,23 @@ test("the dashboard drills through the breakdown, and Back goes up", async ({
     "page",
   );
 });
+
+test("a comparison survives a reload, because it lives in the URL", async ({
+  page,
+}) => {
+  await page.goto("/console?path=eu");
+  const table = page.getByRole("table", { name: /Europe by market/ });
+
+  await table.getByRole("checkbox", { name: "Compare Germany" }).check();
+  await table.getByRole("checkbox", { name: "Compare Spain" }).check();
+  await expect(page).toHaveURL(/compare=eu\.DE,eu\.ES/);
+
+  await page.reload();
+
+  const legend = page
+    .getByRole("figure", { name: "Compare" })
+    .getByRole("list", { name: "Legend" });
+  await expect(legend.getByRole("listitem")).toHaveCount(2);
+  await expect(legend).toContainText("Germany");
+  await expect(legend).toContainText("Spain");
+});
