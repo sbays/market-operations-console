@@ -196,7 +196,11 @@ export function MarketMap({ dataset, selected, period }: Props) {
           if (anchor === undefined) return null;
           const [x, y] = anchor;
           const item = roving.itemProps(index);
-          const link = linkedProps(marketPath(mark.id), highlighted, item);
+          const link = linkedProps(
+            marketPath(mark.id),
+            isLinked(marketPath(mark.id) ?? "", highlighted),
+            item,
+          );
           return (
             <button
               key={mark.id}

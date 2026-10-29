@@ -151,7 +151,11 @@ export function CompareRadar({ dataset, selected, period }: Props) {
                 key={`${row}-${metric}`}
                 type="button"
                 {...item}
-                {...linkedProps(seriesPath(entry), highlighted, item)}
+                {...linkedProps(
+                  seriesPath(entry),
+                  linkedSeries[row] === true,
+                  item,
+                )}
                 aria-label={`${name}, ${formatMetricName(metric)}: ${formatMetricOrMissing(metric, raw)}`}
                 style={{ left: x, top: y }}
                 className={cn(
