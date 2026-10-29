@@ -13,6 +13,12 @@ const eslintConfig = defineConfig([
       // eslint-config-next registers jsx-a11y but enables only a few rules; turn on the full recommended set.
       ...jsxA11y.flatConfigs.recommended.rules,
       "jsx-a11y/no-autofocus": "error",
+      // A scrollable region must be focusable so keyboard users can scroll it (WAI-ARIA
+      // "region" pattern; axe scrollable-region-focusable). The default allows only tabpanel.
+      "jsx-a11y/no-noninteractive-tabindex": [
+        "error",
+        { tags: [], roles: ["tabpanel", "region"] },
+      ],
 
       // CLAUDE.md hard rules: no `any`, no `as` casts (`as const` is still allowed), no non-null escapes.
       "@typescript-eslint/no-explicit-any": "error",

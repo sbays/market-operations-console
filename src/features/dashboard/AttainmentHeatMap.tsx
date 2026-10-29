@@ -210,7 +210,14 @@ function HeatMapTable({
   dataset: Dataset;
 }) {
   return (
-    <div className="overflow-x-auto">
+    // 24 months don't fit narrow screens: the table scrolls, so keyboard users must be able
+    // to focus the scroll container to scroll it (WCAG 2.1.1, axe scrollable-region-focusable).
+    <div
+      role="region"
+      aria-label={`${name} attainment table`}
+      tabIndex={0}
+      className="overflow-x-auto rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+    >
       <table className="w-full text-sm">
         <caption className="pb-2 text-left text-muted-foreground">
           {name} attainment by month
