@@ -4,7 +4,7 @@
  * and AI-quoted numbers format exactly like source data.
  */
 import { parsePeriod } from "./period";
-import type { Metric, Month, PeriodRef } from "./schema";
+import type { Metric, Month, PeriodRef, Status } from "./schema";
 
 export const LOCALE = "en-US";
 export const CURRENCY = "USD";
@@ -106,4 +106,15 @@ export function formatCoverage({
   to: Month;
 }): string {
   return `${formatPeriod(from)} to ${formatPeriod(to)}`;
+}
+
+const STATUS_NAMES: Record<Status, string> = {
+  "on-track": "On track",
+  "at-risk": "At risk",
+  "off-track": "Off track",
+};
+
+/** The text label that always accompanies a status colour and icon. */
+export function formatStatus(status: Status): string {
+  return STATUS_NAMES[status];
 }

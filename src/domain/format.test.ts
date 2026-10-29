@@ -7,6 +7,7 @@ import {
   formatNumber,
   formatPercent,
   formatPeriod,
+  formatStatus,
 } from "./format";
 
 describe("formatCurrency", () => {
@@ -98,5 +99,13 @@ describe("formatCoverage", () => {
     expect(formatCoverage({ from: "2024-10", to: "2026-09" })).toBe(
       "Oct 2024 to Sep 2026",
     );
+  });
+});
+
+describe("formatStatus", () => {
+  it("names each status in words, never by colour alone", () => {
+    expect(formatStatus("on-track")).toBe("On track");
+    expect(formatStatus("at-risk")).toBe("At risk");
+    expect(formatStatus("off-track")).toBe("Off track");
   });
 });
