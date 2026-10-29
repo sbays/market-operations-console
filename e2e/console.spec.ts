@@ -158,6 +158,11 @@ test("the alert dialog has no axe violations", async ({ page }) => {
   await page.getByRole("button", { name: "New alert" }).click();
   const dialog = page.getByRole("dialog", { name: "New alert rule" });
   await expect(dialog.getByRole("checkbox", { name: "Germany" })).toBeChecked();
+  // Scan after the zoom-in finishes: mid-animation, text is partly transparent and axe
+  // measures a contrast the user never sees (this flaked on WebKit).
+  await dialog.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+  );
 
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -174,8 +179,8 @@ test("a refused save rolls the alert rule back", async ({ page }) => {
   await dialog.getByRole("spinbutton", { name: "Threshold" }).fill("5");
   await dialog.getByRole("button", { name: "Save rule" }).click();
 
-  const rules = page.getByRole("list", { name: "Alert rules" });
-  await expect(rules).toContainText("Saving");
+  // The optimistic "Saving…" row lives only until the refusal (about 600ms), too short to
+  // assert reliably here (it flaked on WebKit); Alerts.test.tsx covers it with a held response.
   await expect(page.getByText("Couldn't save the alert rule.")).toBeVisible();
   await expect(page.getByText("Doomed")).toHaveCount(0);
 });
