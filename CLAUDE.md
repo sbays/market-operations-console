@@ -94,7 +94,8 @@ replace one module. Fixture text must quote numbers that match the dataset; a te
 ## Assistant specifics
 
 - Batch token updates per animation frame; don't re-render per token.
-- States: idle → connecting → streaming → complete | stopped | error. "Stop" keeps the partial answer and labels it as partial.
+- States: idle → connecting → streaming → complete | abstained | stopped | error (`features/assistant/useChatStream.ts`).
+  "Stop" keeps the partial answer and labels it as partial; every failure keeps the text that already arrived.
 - A citation chip's tooltip shows the real value from the dataset, not the model's number. Clicking it drills the dashboard.
 - Confidence is a labelled badge (High / Medium / Low) with icon and text. Abstention is its own card state, not an error.
 - AI content gets its own surface style and label. Never style AI-stated numbers as source data.

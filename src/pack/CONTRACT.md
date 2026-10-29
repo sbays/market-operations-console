@@ -65,8 +65,8 @@ as an error.
 ## Fixtures
 
 `fixtures.json` (`FixturesSchema`) holds the canned answers. A question matches a fixture only when it is
-equal after trimming, collapsing whitespace and lower-casing (`normaliseQuestion`); anything else gets an
-`abstain`. `suggested: true` fixtures appear as suggested-question chips.
+equal after trimming, collapsing whitespace and lower-casing (`normaliseQuestion` in `src/domain/fixtures.ts`);
+anything else gets an `abstain`. `fixtureEvents` in the same file turns a fixture into the events below. `suggested: true` fixtures appear as suggested-question chips.
 
 How the route turns a fixture into events:
 
