@@ -424,4 +424,28 @@ describe("Dashboard", () => {
     await user.keyboard("{Escape}");
     expect(onUrlUpdate).not.toHaveBeenCalled();
   });
+
+  it("moves the radar and the heat map when a month is chosen on the trend", async () => {
+    const { user } = renderDashboard("?path=eu");
+    const radar = () => screen.getByRole("figure", { name: "Compare" });
+    // Heat-map cells are named "<child>, <month>: …"; the one in the tab order is the entry.
+    const heatMapTabStop = () =>
+      within(screen.getByRole("figure", { name: /and month$/ }))
+        .getAllByRole("button", { name: /, \w{3} \d{4}: / })
+        .find((cell) => cell.tabIndex === 0);
+    expect(within(radar()).getByRole("img")).toHaveAccessibleName(/in Q3 2026/);
+
+    await user.click(
+      within(screen.getByRole("figure", { name: "Europe revenue" })).getByRole(
+        "button",
+        { name: /^Mar 2026:/ },
+      ),
+    );
+
+    expect(within(radar()).getByRole("img")).toHaveAccessibleName(
+      /in Mar 2026/,
+    );
+    // The heat map enters keyboard users on the chosen month's column.
+    expect(heatMapTabStop()).toHaveAccessibleName(/, Mar 2026: /);
+  });
 });
