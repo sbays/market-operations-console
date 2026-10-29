@@ -75,6 +75,28 @@ describe("MarketMap", () => {
     expect(screen.getByRole("img", { name: SUMMARY })).toBeInTheDocument();
   });
 
+  it("summarises only the selected region's markets", () => {
+    renderMap({ selected: { level: "region", id: "eu" } });
+
+    expect(
+      screen.getByRole("img", {
+        name: "1 of 5 markets in Europe is off track or at risk in Q3 2026; the lowest is Germany at 95.4%.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("summarises the selected market on its own", () => {
+    renderMap({
+      selected: { level: "product", marketId: "DE", id: "atlas" },
+    });
+
+    expect(
+      screen.getByRole("img", {
+        name: "Germany: attainment 95.4%, at risk, in Q3 2026.",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("gives every market a labelled marker with its attainment and status", () => {
     renderMap();
 

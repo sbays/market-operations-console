@@ -15,7 +15,8 @@ const STATUS_STYLES: Record<Status, { Icon: LucideIcon; className: string }> = {
   "off-track": { Icon: CircleX, className: "text-status-off-track" },
 };
 
-export function StatusBadge({
+/** A status's icon in its colour, for places too small for the label (which must sit nearby). */
+export function StatusIcon({
   status,
   className,
 }: {
@@ -24,14 +25,29 @@ export function StatusBadge({
 }) {
   const { Icon, className: colour } = STATUS_STYLES[status];
   return (
+    <Icon
+      aria-hidden="true"
+      className={cn("size-4 shrink-0", colour, className)}
+    />
+  );
+}
+
+export function StatusBadge({
+  status,
+  className,
+}: {
+  status: Status;
+  className?: string;
+}) {
+  return (
     <span
       className={cn(
         "inline-flex items-center gap-1 text-sm font-medium",
-        colour,
+        STATUS_STYLES[status].className,
         className,
       )}
     >
-      <Icon aria-hidden="true" className="size-4 shrink-0" />
+      <StatusIcon status={status} />
       {formatStatus(status)}
     </span>
   );

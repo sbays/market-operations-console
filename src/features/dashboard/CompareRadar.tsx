@@ -15,6 +15,7 @@ import type { Dataset, EntityRef, PeriodRef } from "@/domain/schema";
 import { entityLabel } from "@/domain/selectors";
 import { useCompare } from "@/state/url";
 import { ChartFrame } from "@/ui/ChartFrame";
+import { ChartLegend } from "@/ui/ChartLegend";
 import { cn } from "@/ui/cn";
 import { useRovingIndex } from "@/ui/useRovingIndex";
 
@@ -221,15 +222,13 @@ function RadarLegend({
   series: RadarSeries[];
 }) {
   return (
-    <ul
-      aria-label="Legend"
-      className="flex flex-wrap gap-4 text-xs text-muted-foreground"
-    >
-      {series.map((entry, row) => {
+    <ChartLegend
+      items={series.map((entry, row) => {
         const style = styleFor(row);
-        return (
-          <li key={row} className="flex items-center gap-1.5">
-            <svg aria-hidden width={20} height={4} className="block">
+        return {
+          label: entityLabel(dataset, entry.ref),
+          swatch: (
+            <svg width={20} height={4} className="block">
               <line
                 x1={0}
                 y1={2}
@@ -240,11 +239,10 @@ function RadarLegend({
                 className={style.stroke}
               />
             </svg>
-            {entityLabel(dataset, entry.ref)}
-          </li>
-        );
+          ),
+        };
       })}
-    </ul>
+    />
   );
 }
 

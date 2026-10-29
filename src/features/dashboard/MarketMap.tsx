@@ -1,12 +1,6 @@
 "use client";
 
 import { geoPath } from "d3-geo";
-import {
-  CircleCheck,
-  CircleX,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
 import { useId } from "react";
 import {
   countryFeatures,
@@ -17,10 +11,11 @@ import {
 } from "@/domain/geo";
 import { formatMetric, formatPeriod, formatStatus } from "@/domain/format";
 import type { Dataset, EntityRef, PeriodRef, Status } from "@/domain/schema";
-import { statusForAttainment, valueAt } from "@/domain/selectors";
+import { entityLabel, statusAt, valueAt } from "@/domain/selectors";
 import { useDrill } from "@/state/url";
 import { ChartFrame } from "@/ui/ChartFrame";
-import { cn } from "@/ui/cn";
+import { ChartLegend } from "@/ui/ChartLegend";
+import { StatusBadge, StatusIcon } from "@/ui/StatusBadge";
 import { useRovingIndex } from "@/ui/useRovingIndex";
 
 type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
@@ -33,17 +28,7 @@ type Mark = {
   inSelection: boolean;
 };
 
-// Each status has its own icon and label; the map fill and hatch only reinforce them.
-const STATUS_ICONS: Record<Status, LucideIcon> = {
-  "on-track": CircleCheck,
-  "at-risk": TriangleAlert,
-  "off-track": CircleX,
-};
-const STATUS_TEXT: Record<Status, string> = {
-  "on-track": "text-status-on-track",
-  "at-risk": "text-status-at-risk",
-  "off-track": "text-status-off-track",
-};
+// Each marker has its status icon and label; the map fill and hatch only reinforce them.
 const STATUS_FILL: Record<Status, string> = {
   "on-track": "fill-status-on-track",
   "at-risk": "fill-status-at-risk",
@@ -61,19 +46,16 @@ function marksFor(
 ): Mark[] {
   const inSelection = marketsInSelection(dataset, selected);
   return dataset.markets.flatMap((market) => {
-    const attainment = valueAt(
-      dataset,
-      { level: "market", id: market.id },
-      period,
-      "attainment",
-    );
-    if (attainment === undefined) return [];
+    const ref: EntityRef = { level: "market", id: market.id };
+    const attainment = valueAt(dataset, ref, period, "attainment");
+    const status = statusAt(dataset, ref, period);
+    if (attainment === undefined || status === undefined) return [];
     return [
       {
         id: market.id,
         name: market.name,
         attainment,
-        status: statusForAttainment(attainment),
+        status,
         inSelection: inSelection.has(market.id),
       },
     ];
@@ -84,13 +66,33 @@ function byAttainment(marks: Mark[]): Mark[] {
   return [...marks].sort((a, b) => a.attainment - b.attainment);
 }
 
-/** The map's one-sentence description, built from the same figures the markers show. */
-function mapSummary(marks: Mark[], period: PeriodRef): string {
-  const [lowest] = byAttainment(marks);
-  if (!lowest) return `No market data for ${formatPeriod(period)}.`;
-  const flagged = marks.filter((m) => m.status !== "on-track").length;
+/** "Germany: attainment 95.4%, at risk", the words a marker is read out as. */
+function markLabel(mark: Mark): string {
+  return `${mark.name}: attainment ${formatMetric("attainment", mark.attainment)}, ${formatStatus(mark.status).toLowerCase()}`;
+}
+
+/**
+ * The map's one-sentence description of the markets in the selection, built from the same
+ * figures the markers show. Muted markets are outside it, so they aren't described.
+ */
+function mapSummary(
+  dataset: Dataset,
+  selected: EntityRef,
+  marks: Mark[],
+  period: PeriodRef,
+): string {
+  const shown = marks.filter((m) => m.inSelection);
+  const when = formatPeriod(period);
+  const [lowest] = byAttainment(shown);
+  if (!lowest) return `No market data for ${when}.`;
+  if (selected.level === "market" || selected.level === "product") {
+    return `${markLabel(lowest)}, in ${when}.`;
+  }
+  const flagged = shown.filter((m) => m.status !== "on-track").length;
   const verb = flagged === 1 ? "is" : "are";
-  return `${flagged} of ${marks.length} markets ${verb} off track or at risk in ${formatPeriod(period)}; the lowest is ${lowest.name} at ${formatMetric("attainment", lowest.attainment)}.`;
+  const where =
+    selected.level === "region" ? ` in ${entityLabel(dataset, selected)}` : "";
+  return `${flagged} of ${shown.length} markets${where} ${verb} off track or at risk in ${when}; the lowest is ${lowest.name} at ${formatMetric("attainment", lowest.attainment)}.`;
 }
 
 /**
@@ -116,7 +118,7 @@ export function MarketMap({ dataset, selected, period }: Props) {
   );
   const roving = useRovingIndex(marks.length, entryIndex);
 
-  const summary = mapSummary(marks, period);
+  const summary = mapSummary(dataset, selected, marks, period);
 
   return (
     <ChartFrame
@@ -180,21 +182,17 @@ export function MarketMap({ dataset, selected, period }: Props) {
           const anchor = marketAnchor(mark.id, project);
           if (anchor === undefined) return null;
           const [x, y] = anchor;
-          const Icon = STATUS_ICONS[mark.status];
           return (
             <button
               key={mark.id}
               type="button"
               {...roving.itemProps(index)}
-              aria-label={`${mark.name}: attainment ${formatMetric("attainment", mark.attainment)}, ${formatStatus(mark.status).toLowerCase()}`}
+              aria-label={markLabel(mark)}
               onClick={() => drill({ level: "market", id: mark.id })}
               style={{ left: x, top: y }}
               className="pointer-events-auto absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
             >
-              <Icon
-                aria-hidden="true"
-                className={cn("size-4", STATUS_TEXT[mark.status])}
-              />
+              <StatusIcon status={mark.status} />
             </button>
           );
         });
@@ -203,28 +201,39 @@ export function MarketMap({ dataset, selected, period }: Props) {
   );
 }
 
+/** Statuses by icon, plus the two map-only marks: the off-track hatch and muted markets. */
 function MapLegend() {
   return (
-    <ul
-      aria-label="Legend"
-      className="flex flex-wrap gap-4 text-xs text-muted-foreground"
-    >
-      {STATUS_ORDER.map((status) => {
-        const Icon = STATUS_ICONS[status];
-        return (
-          <li key={status} className="flex items-center gap-1.5">
-            <Icon
-              aria-hidden="true"
-              className={cn("size-4", STATUS_TEXT[status])}
-            />
-            {formatStatus(status)}
-          </li>
-        );
-      })}
-      <li className="flex items-center gap-1.5">
-        Off track is hatched. Muted markets are outside the selection.
-      </li>
-    </ul>
+    <ChartLegend
+      items={[
+        ...STATUS_ORDER.map((status) => ({
+          label: formatStatus(status),
+          swatch: <StatusIcon status={status} />,
+        })),
+        {
+          label: "Hatched: off track",
+          swatch: (
+            <svg width={12} height={12} className="block">
+              <rect
+                width={12}
+                height={12}
+                rx={2}
+                className="fill-status-off-track"
+              />
+              <path
+                d="M0 6 L6 0 M0 12 L12 0 M6 12 L12 6"
+                strokeWidth={2}
+                className="stroke-background"
+              />
+            </svg>
+          ),
+        },
+        {
+          label: "Muted: outside the selection",
+          swatch: <span className="size-3 rounded-sm bg-muted" />,
+        },
+      ]}
+    />
   );
 }
 
@@ -257,21 +266,11 @@ function MarketTable({ marks }: { marks: Mark[] }) {
               {formatMetric("attainment", mark.attainment)}
             </td>
             <td className="py-1.5">
-              <StatusText status={mark.status} />
+              <StatusBadge status={mark.status} className="font-normal" />
             </td>
           </tr>
         ))}
       </tbody>
     </table>
-  );
-}
-
-function StatusText({ status }: { status: Status }) {
-  const Icon = STATUS_ICONS[status];
-  return (
-    <span className={cn("inline-flex items-center gap-1", STATUS_TEXT[status])}>
-      <Icon aria-hidden="true" className="size-4 shrink-0" />
-      {formatStatus(status)}
-    </span>
   );
 }

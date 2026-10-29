@@ -16,6 +16,7 @@ import type { Dataset, EntityRef, PeriodRef } from "@/domain/schema";
 import { childLevelOf, entityLabel, pathOf } from "@/domain/selectors";
 import { useSetPeriod } from "@/state/url";
 import { ChartFrame } from "@/ui/ChartFrame";
+import { ChartLegend } from "@/ui/ChartLegend";
 import { useRovingIndex } from "@/ui/useRovingIndex";
 
 type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
@@ -182,21 +183,17 @@ function HeatMapLegend() {
     { label: "No data", colour: heatColour(undefined) },
   ];
   return (
-    <ul
-      aria-label="Legend"
-      className="flex flex-wrap gap-4 text-xs text-muted-foreground"
-    >
-      {items.map(({ label, colour }) => (
-        <li key={label} className="flex items-center gap-1.5">
+    <ChartLegend
+      items={items.map(({ label, colour }) => ({
+        label,
+        swatch: (
           <span
-            aria-hidden
             className="size-3 rounded-sm"
             style={{ backgroundColor: colour }}
           />
-          {label}
-        </li>
-      ))}
-    </ul>
+        ),
+      }))}
+    />
   );
 }
 
