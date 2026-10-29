@@ -29,6 +29,7 @@ Next.js 16 App Router with React 19 on Vercel, with TanStack Query for server st
 | Area | Pick | Weighed against | Why |
 | --- | --- | --- | --- |
 | Meta-framework | Next.js 16 App Router, React 19 | Remix, TanStack Start | Route handlers host the mock SSE endpoint; RSC loads the dataset server-side; best Vercel story |
+| Memoization | React Compiler (`reactCompiler: true`, decided 29 Oct) | Hand-written `useCallback`/`useMemo` | Stable callbacks and memoized renders without manual dependency arrays; its lint rules ship in `eslint-plugin-react-hooks` 7, already on via `eslint-config-next` |
 | Language | TypeScript strict, `noUncheckedIndexedAccess` | — | Brief demands no `any`; ESLint bans it |
 | Components | shadcn/ui on Radix primitives | MUI, Mantine, Chakra | We own the code; Radix gives keyboard and ARIA behaviour for free |
 | Styling and tokens | Tailwind v4 with CSS-variable tokens | CSS Modules, vanilla-extract | Tokens in one file drive both UI and chart colours; themes switch by variable |

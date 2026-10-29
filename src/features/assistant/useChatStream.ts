@@ -6,7 +6,7 @@
  * Tokens are buffered and flushed once per animation frame, so a long answer doesn't
  * re-render per token. Every failure keeps whatever text already arrived.
  */
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { ChatRequestError, streamChat } from "@/data/chatStream";
 import type { StreamEvent } from "@/domain/schema";
 
@@ -74,96 +74,90 @@ export function useChatStream() {
   const question = useRef<string | undefined>(undefined);
 
   /** Hands buffered tokens to React now (before a terminal state, or on stop). */
-  const flush = useCallback(() => {
+  const flush = () => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     frame.current = null;
     if (buffer.current) {
       dispatch({ type: "tokens", text: buffer.current });
       buffer.current = "";
     }
-  }, []);
+  };
 
-  const append = useCallback(
-    (text: string) => {
-      buffer.current += text;
-      frame.current ??= requestAnimationFrame(flush);
-    },
-    [flush],
-  );
+  const append = (text: string) => {
+    buffer.current += text;
+    frame.current ??= requestAnimationFrame(flush);
+  };
 
-  const ask = useCallback(
-    (text: string) => {
-      controller.current?.abort();
+  const ask = (text: string) => {
+    controller.current?.abort();
+    flush();
+    const current = new AbortController();
+    controller.current = current;
+    question.current = text;
+    buffer.current = "";
+    dispatch({ type: "start", question: text });
+
+    const isCurrent = () => controller.current === current;
+    /** Ends this run: aborting closes the connection and makes a later stop() a no-op. */
+    const settle = (action: Action) => {
       flush();
-      const current = new AbortController();
-      controller.current = current;
-      question.current = text;
-      buffer.current = "";
-      dispatch({ type: "start", question: text });
+      dispatch(action);
+      current.abort();
+    };
+    const fail = (message: string) => {
+      if (isCurrent()) settle({ type: "error", message, retryable: true });
+    };
 
-      const isCurrent = () => controller.current === current;
-      /** Ends this run: aborting closes the connection and makes a later stop() a no-op. */
-      const settle = (action: Action) => {
-        flush();
-        dispatch(action);
-        current.abort();
-      };
-      const fail = (message: string) => {
-        if (isCurrent()) settle({ type: "error", message, retryable: true });
-      };
-
-      void (async () => {
-        try {
-          for await (const item of streamChat(text, {
-            signal: current.signal,
-          })) {
-            if (!isCurrent()) return;
-            if (item.kind === "ignored") continue;
-            if (item.kind === "invalid") {
-              console.error("Assistant stream event rejected:", item.reason);
-              return fail(INTERRUPTED);
-            }
-            const event = item.event;
-            switch (event.type) {
-              case "token":
-                append(event.text);
-                continue;
-              case "final":
-                return settle({ type: "final", event });
-              case "abstain":
-                return settle({ type: "abstain", event });
-              case "error":
-                return settle({
-                  type: "error",
-                  message: event.message,
-                  retryable: event.retryable,
-                });
-            }
+    void (async () => {
+      try {
+        for await (const item of streamChat(text, {
+          signal: current.signal,
+        })) {
+          if (!isCurrent()) return;
+          if (item.kind === "ignored") continue;
+          if (item.kind === "invalid") {
+            console.error("Assistant stream event rejected:", item.reason);
+            return fail(INTERRUPTED);
           }
-          fail(ENDED_EARLY);
-        } catch (error) {
-          // An abort is a stop or a newer question; both already updated the state.
-          if (current.signal.aborted) return;
-          if (error instanceof ChatRequestError) return fail(error.message);
-          // Anything else is a network failure or our own bug: say so in the console, not just the UI.
-          console.error("Assistant request failed:", error);
-          fail(UNREACHABLE);
+          const event = item.event;
+          switch (event.type) {
+            case "token":
+              append(event.text);
+              continue;
+            case "final":
+              return settle({ type: "final", event });
+            case "abstain":
+              return settle({ type: "abstain", event });
+            case "error":
+              return settle({
+                type: "error",
+                message: event.message,
+                retryable: event.retryable,
+              });
+          }
         }
-      })();
-    },
-    [append, flush],
-  );
+        fail(ENDED_EARLY);
+      } catch (error) {
+        // An abort is a stop or a newer question; both already updated the state.
+        if (current.signal.aborted) return;
+        if (error instanceof ChatRequestError) return fail(error.message);
+        // Anything else is a network failure or our own bug: say so in the console, not just the UI.
+        console.error("Assistant request failed:", error);
+        fail(UNREACHABLE);
+      }
+    })();
+  };
 
-  const stop = useCallback(() => {
+  const stop = () => {
     if (!controller.current || controller.current.signal.aborted) return;
     flush();
     controller.current.abort();
     dispatch({ type: "stop" });
-  }, [flush]);
+  };
 
-  const retry = useCallback(() => {
+  const retry = () => {
     if (question.current !== undefined) ask(question.current);
-  }, [ask]);
+  };
 
   useEffect(
     () => () => {

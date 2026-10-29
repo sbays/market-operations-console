@@ -24,6 +24,7 @@ A small, working, well-engineered build beats a large, broken one. Do not add fe
 - Next.js 16 App Router, React 19, TypeScript strict (use current stable releases)
 - Pinned on purpose, don't upgrade: TypeScript 6.0 (`typescript-eslint` needs `<6.1`), ESLint 9 (`eslint-plugin-jsx-a11y`
   peers on `≤9`). Node 24 (`.nvmrc`); pnpm version comes from `packageManager` in `package.json`.
+- React Compiler is on (`reactCompiler: true`): don't hand-write `useCallback`, `useMemo` or `memo`. Vitest does not run it, so code must stay correct without it.
 - `cacheComponents` is on (Next 16 default): dynamic reads such as nuqs/`useSearchParams` need a Suspense boundary.
 - Every dependency must declare React 19 support. Don't force installs with overrides or `--legacy-peer-deps`; flag the library instead.
 - Tailwind v4 with CSS-variable tokens, shadcn/ui on Radix
