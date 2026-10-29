@@ -26,4 +26,20 @@ describe("splitBlocks", () => {
     expect(after[0]).toBe(before[0]);
     expect(after).toEqual(["One.", "Two is longer"]);
   });
+
+  it("never splits a fenced code block", () => {
+    expect(splitBlocks("Before.\n\n```\na\n\nb\n```\n\nAfter.")).toEqual([
+      "Before.",
+      "```\na\n\nb\n```",
+      "After.",
+    ]);
+  });
+
+  it("keeps an indented continuation paragraph inside its list", () => {
+    expect(
+      splitBlocks(
+        "- **Brazil** [1]\n\n  Detail on pricing.\n\n- **Japan** [2]",
+      ),
+    ).toEqual(["- **Brazil** [1]\n\n  Detail on pricing.\n\n- **Japan** [2]"]);
+  });
 });

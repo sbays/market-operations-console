@@ -290,4 +290,96 @@ describe("AssistantPanel", () => {
     );
     expect(input).toHaveValue("");
   });
+
+  it("marks citations unverified when the answer stops before its evidence", async () => {
+    respondWith([token("Germany fell [1]. "), token("More "), final()], {
+      delayMs: 80,
+    });
+    const { user } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
+    await screen.findByText("Citation 1, checking the source");
+    await user.click(screen.getByRole("button", { name: "Stop" }));
+
+    expect(screen.getByText("[1] Unverified")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Citation 1, checking the source"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows an abstention's lead-in as AI text, rendered like an answer", async () => {
+    respondWith([
+      token("Germany fell **sharply** [1] in March. "),
+      {
+        type: "abstain",
+        reason: "The data has no forecasts beyond Sep 2026.",
+        coverage: { from: "2024-10", to: "2026-09" },
+      },
+    ]);
+    const { user } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
+    const card = await screen.findByRole("article", {
+      name: "This isn't in the data",
+    });
+
+    expect(card).toHaveTextContent("AI-generated · verify with sources");
+    expect(card).not.toHaveTextContent("**");
+    expect(screen.getByText("sharply").tagName).toBe("STRONG");
+    expect(card).toHaveTextContent("[1] Unverified");
+  });
+
+  it("won't drill to a cited entity the data doesn't contain", async () => {
+    respondWith([
+      token("New Zealand grew [1]."),
+      final({
+        citations: [
+          { ...germanyMarchRevenue, ref: { level: "market", id: "NZ" } },
+        ],
+      }),
+    ]);
+    const { user } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
+    await screen.findByText("High confidence");
+
+    expect(
+      screen.queryByRole("button", { name: /NZ · Mar 2026/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("NZ · Mar 2026 · Revenue · not in the data"),
+    ).toBeInTheDocument();
+  });
+
+  it("doesn't turn links in the answer into live links", async () => {
+    respondWith([
+      token("See [the report](https://example.com/report) [1]."),
+      final(),
+    ]);
+    const { user } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
+    const answer = await screen.findByRole("article", { name: "Answer" });
+    await screen.findByText("High confidence");
+
+    expect(answer).toHaveTextContent("See the report");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "DE · Mar 2026 · Revenue" }),
+    ).toBeInTheDocument();
+  });
+
+  it("says why an empty question wasn't sent", async () => {
+    const { user } = renderPanel();
+    const input = screen.getByRole("textbox", { name: "Ask about the data" });
+
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+
+    expect(input).toHaveAccessibleDescription("Type a question first.");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveFocus();
+
+    await user.type(input, "W");
+    expect(input).not.toHaveAttribute("aria-invalid");
+  });
 });

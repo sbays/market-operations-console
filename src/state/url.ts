@@ -34,13 +34,19 @@ export function useSelection(): { ref: EntityRef; period: PeriodRef | null } {
   return { ref: refFromPath(dataset, path) ?? PORTFOLIO, period };
 }
 
-/** Drills to an entity and period. Pushes history, so Back returns to the previous view. */
+/**
+ * Drills to an entity and period. Pushes history, so Back returns to the previous view.
+ * An entity the data doesn't contain is ignored rather than drilled to the portfolio.
+ */
 export function useDrill(): (ref: EntityRef, period: PeriodRef) => void {
   const dataset = useDataset();
   const [, setSelection] = useQueryStates(selectionParsers, {
     history: "push",
   });
   return (ref, period) => {
-    void setSelection({ path: pathOf(dataset, ref) || null, period });
+    const path = pathOf(dataset, ref);
+    if (path === undefined) return;
+    // The portfolio is the default, so it leaves no path in the URL.
+    void setSelection({ path: path || null, period });
   };
 }

@@ -18,7 +18,7 @@ export default async function ConsolePage() {
           <h1 className="text-xl font-semibold">Market Operations</h1>
         </main>
         <div className="border-t lg:w-96 lg:shrink-0 lg:border-t-0 lg:border-l">
-          {/* The panel reads URL state, which is only known at request time. */}
+          {/* Citation chips read URL state (useDrill), which is only known at request time. */}
           <Suspense>
             <AssistantPanel suggestedQuestions={suggestedQuestions} />
           </Suspense>

@@ -58,8 +58,8 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      // A bare <button> inside a form submits it; make submit opt-in.
-      type={type}
+      // A bare <button> inside a form submits it, so submit is opt-in. A slotted link takes no type.
+      type={asChild ? undefined : type}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

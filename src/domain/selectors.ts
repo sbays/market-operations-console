@@ -301,3 +301,22 @@ export function entityName(
     }
   }
 }
+
+/**
+ * The short label a citation chip shows: market codes as the data writes them, names
+ * otherwise. Never undefined, so a citation the data can't resolve still says what it cites.
+ */
+export function entityCode(dataset: Dataset, ref: EntityRef): string {
+  switch (ref.level) {
+    case "market":
+      return ref.id;
+    case "product": {
+      const product = dataset.products.find((p) => p.id === ref.id);
+      return `${ref.marketId} ${product?.name ?? ref.id}`;
+    }
+    case "region":
+      return entityName(dataset, ref) ?? ref.id;
+    case "portfolio":
+      return "Portfolio";
+  }
+}

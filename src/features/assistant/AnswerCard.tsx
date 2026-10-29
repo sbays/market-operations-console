@@ -1,7 +1,9 @@
-import { CircleAlert, CircleStop, RotateCw, Sparkles } from "lucide-react";
+import { CircleAlert, CircleStop, RotateCw } from "lucide-react";
 import { confidenceBand } from "@/domain/selectors";
 import { Button } from "@/ui/button";
+import { AiLabel } from "./AiLabel";
 import { AnswerBody } from "./AnswerBody";
+import { NO_EVIDENCE, PENDING, type Evidence } from "./citations";
 import { ConfidenceBadge } from "./ConfidenceBadge";
 import type { ChatState } from "./useChatStream";
 
@@ -18,10 +20,7 @@ export function AnswerCard({ state, onStop, onRetry }: Props) {
       aria-label="Answer"
       className="space-y-3 rounded-lg border-l-4 border-border-ai bg-surface-ai p-4 text-surface-ai-foreground"
     >
-      <p className="flex items-center gap-1.5 text-xs font-medium">
-        <Sparkles aria-hidden className="size-3.5" />
-        AI-generated · verify with sources
-      </p>
+      <AiLabel />
       {state.status === "connecting" && (
         <div className="space-y-2">
           <div aria-hidden className="space-y-2">
@@ -31,12 +30,7 @@ export function AnswerCard({ state, onStop, onRetry }: Props) {
           <p className="text-sm">Reading the data…</p>
         </div>
       )}
-      <AnswerBody
-        text={state.text}
-        citations={
-          state.status === "complete" ? state.final.citations : undefined
-        }
-      />
+      <AnswerBody text={state.text} evidence={evidenceOf(state)} />
       {state.status === "streaming" && (
         <span
           aria-hidden
@@ -46,6 +40,19 @@ export function AnswerCard({ state, onStop, onRetry }: Props) {
       <AnswerFooter state={state} onStop={onStop} onRetry={onRetry} />
     </article>
   );
+}
+
+/** Citations wait for the final event; a stream that ends any other way verifies nothing. */
+function evidenceOf(state: Props["state"]): Evidence {
+  switch (state.status) {
+    case "connecting":
+    case "streaming":
+      return PENDING;
+    case "complete":
+      return { settled: true, citations: state.final.citations };
+    default:
+      return NO_EVIDENCE;
+  }
 }
 
 function AnswerFooter({ state, onStop, onRetry }: Props) {
