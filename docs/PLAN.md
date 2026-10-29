@@ -170,6 +170,7 @@ Gate decisions (29 Oct, `feat/dashboard-gate`):
 - With no `period` in the URL, panels show the latest full quarter; a URL month or quarter overrides it (`selectionPeriod`). Status badges use `statusAt` over the shown period, so a badge always matches the attainment beside it.
 - The chart shell (`ui/ChartFrame`) draws the static chart in `<svg role="img">` with the generated summary as its name, and puts focusable data points in an HTML overlay above it: `role="img"` makes svg children presentational, so points can't live inside it. Points use a roving tabindex (`ui/useRovingIndex`); charts have no transitions.
 - Breadcrumb and breakdown drills push history and keep the period; focusing a month from a chart replaces history (`useSetPeriod`).
+- `/console` is a partial prerender: the shell and the assistant are static, and the dashboard's Suspense hole reads the request's `searchParams`, so it is server-rendered for each URL and streamed in the same response rather than waiting for client JavaScript. Charts still draw after hydration, because they measure their container.
 
 ## Coordinated views and URL state
 
