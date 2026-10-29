@@ -2,3 +2,5 @@
 pnpm-lock.yaml
 *.md
 src/pack/data.json
+# Agent worktrees: full checkouts with their own build output.
+.claude
