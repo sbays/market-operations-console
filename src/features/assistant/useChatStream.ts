@@ -102,11 +102,14 @@ export function useChatStream() {
       dispatch({ type: "start", question: text });
 
       const isCurrent = () => controller.current === current;
-      const fail = (message: string) => {
-        if (!isCurrent()) return;
+      /** Ends this run: aborting closes the connection and makes a later stop() a no-op. */
+      const settle = (action: Action) => {
         flush();
-        dispatch({ type: "error", message, retryable: true });
+        dispatch(action);
         current.abort();
+      };
+      const fail = (message: string) => {
+        if (isCurrent()) settle({ type: "error", message, retryable: true });
       };
 
       void (async () => {
@@ -126,14 +129,11 @@ export function useChatStream() {
                 append(event.text);
                 continue;
               case "final":
-                flush();
-                return dispatch({ type: "final", event });
+                return settle({ type: "final", event });
               case "abstain":
-                flush();
-                return dispatch({ type: "abstain", event });
+                return settle({ type: "abstain", event });
               case "error":
-                flush();
-                return dispatch({
+                return settle({
                   type: "error",
                   message: event.message,
                   retryable: event.retryable,

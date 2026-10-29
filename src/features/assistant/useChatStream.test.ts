@@ -60,6 +60,17 @@ describe("useChatStream", () => {
     expect(result.current.state.final).toEqual(final);
   });
 
+  it("ignores stop once the answer has finished", async () => {
+    respondWith([token("Germany"), final]);
+    const { result } = renderHook(() => useChatStream());
+
+    act(() => result.current.ask(QUESTION));
+    await waitFor(() => expect(result.current.state.status).toBe("complete"));
+    act(() => result.current.stop());
+
+    expect(result.current.state.status).toBe("complete");
+  });
+
   it("stops on request and keeps the partial answer", async () => {
     respondWith(
       [token("One "), token("two "), token("three "), token("four "), final],
