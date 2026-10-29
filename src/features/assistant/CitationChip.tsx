@@ -8,6 +8,7 @@ import { entityCode, entityLabel, pathOf, valueAt } from "@/domain/selectors";
 import { useDrill } from "@/state/url";
 import { cn } from "@/ui/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
+import { focusDashboard } from "@/ui/dashboardFocus";
 import { EvidenceContext } from "./citations";
 
 const CHIP =
@@ -52,7 +53,10 @@ function ResolvedChip({ citation }: { citation: Citation }) {
             CHIP,
             "cursor-pointer border-border bg-card text-card-foreground hover:bg-accent",
           )}
-          onClick={() => drill(ref, period)}
+          onClick={() => {
+            drill(ref, period);
+            focusDashboard();
+          }}
         >
           {label}
         </button>
