@@ -12,8 +12,10 @@ import {
   type RadarValue,
 } from "@/domain/radar";
 import type { Dataset, EntityRef, PeriodRef } from "@/domain/schema";
-import { entityLabel } from "@/domain/selectors";
+import { isLinked } from "@/domain/highlight";
+import { entityLabel, pathOf } from "@/domain/selectors";
 import { useCompare } from "@/state/url";
+import { linkedProps, useHighlightedPath } from "@/state/highlight";
 import { ChartFrame } from "@/ui/ChartFrame";
 import { ChartLegend } from "@/ui/ChartLegend";
 import { cn } from "@/ui/cn";
@@ -47,6 +49,13 @@ const SERIES_STYLES = [
  */
 export function CompareRadar({ dataset, selected, period }: Props) {
   const series = radarAxes(dataset, useCompare(selected), period);
+  const highlighted = useHighlightedPath();
+  const seriesPath = (entry: RadarSeries) => pathOf(dataset, entry.ref);
+  // While one compared entity is highlighted, the others step back.
+  const linkedSeries = series.map((entry) =>
+    isLinked(seriesPath(entry) ?? "", highlighted),
+  );
+  const anyLinked = linkedSeries.includes(true);
   // Hooks run before the early return; the grid is one row per series, one column per axis.
   // Missing values have no point, so the tab stop is the first point that exists.
   const firstPoint = series
@@ -114,9 +123,12 @@ export function CompareRadar({ dataset, selected, period }: Props) {
                   key={row}
                   points={polygonPoints(geometry, plotted(entry))}
                   fill="none"
-                  strokeWidth={2}
+                  strokeWidth={linkedSeries[row] ? 3 : 2}
                   strokeDasharray={style.dash}
-                  className={style.stroke}
+                  className={cn(
+                    style.stroke,
+                    anyLinked && !linkedSeries[row] && "opacity-40",
+                  )}
                 />
               );
             })}
@@ -133,11 +145,13 @@ export function CompareRadar({ dataset, selected, period }: Props) {
             const { raw, scaled } = entry.values[metric];
             if (scaled === undefined) return [];
             const { x, y } = vertex(geometry, axis, scaled);
+            const item = roving.itemProps(row * RADAR_METRICS.length + axis);
             return (
               <button
                 key={`${row}-${metric}`}
                 type="button"
-                {...roving.itemProps(row * RADAR_METRICS.length + axis)}
+                {...item}
+                {...linkedProps(seriesPath(entry), highlighted, item)}
                 aria-label={`${name}, ${formatMetricName(metric)}: ${formatMetricOrMissing(metric, raw)}`}
                 style={{ left: x, top: y }}
                 className={cn(

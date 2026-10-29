@@ -11,10 +11,13 @@ import {
 } from "@/domain/geo";
 import { formatMetric, formatPeriod, formatStatus } from "@/domain/format";
 import type { Dataset, EntityRef, PeriodRef, Status } from "@/domain/schema";
-import { entityLabel, statusAt, valueAt } from "@/domain/selectors";
+import { isLinked } from "@/domain/highlight";
+import { entityLabel, pathOf, statusAt, valueAt } from "@/domain/selectors";
+import { linkedProps, useHighlightedPath } from "@/state/highlight";
 import { useDrill } from "@/state/url";
 import { ChartFrame } from "@/ui/ChartFrame";
 import { ChartLegend } from "@/ui/ChartLegend";
+import { cn } from "@/ui/cn";
 import { StatusBadge, StatusIcon } from "@/ui/StatusBadge";
 import { useRovingIndex } from "@/ui/useRovingIndex";
 
@@ -102,7 +105,9 @@ function mapSummary(
  */
 export function MarketMap({ dataset, selected, period }: Props) {
   const drill = useDrill();
+  const highlighted = useHighlightedPath();
   const marks = marksFor(dataset, selected, period);
+  const marketPath = (id: string) => pathOf(dataset, { level: "market", id });
   const hatchId = `hatch-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
 
   // Keyboard users enter on the selected market, or the first market at the portfolio.
@@ -160,9 +165,17 @@ export function MarketMap({ dataset, selected, period }: Props) {
                   : mark.inSelection
                     ? `${STATUS_FILL[mark.status]} stroke-background`
                     : "fill-muted stroke-border";
+              // A linked market's country gets a heavier outline, on top of its fill.
+              const linked =
+                mark !== undefined &&
+                isLinked(marketPath(mark.id) ?? "", highlighted);
               return (
                 <g key={String(country.id ?? index)}>
-                  <path d={d} className={className} strokeWidth={0.5} />
+                  <path
+                    d={d}
+                    className={cn(className, linked && "stroke-foreground")}
+                    strokeWidth={linked ? 1.5 : 0.5}
+                  />
                   {mark?.inSelection && mark.status === "off-track" ? (
                     <path
                       d={d}
@@ -182,15 +195,21 @@ export function MarketMap({ dataset, selected, period }: Props) {
           const anchor = marketAnchor(mark.id, project);
           if (anchor === undefined) return null;
           const [x, y] = anchor;
+          const item = roving.itemProps(index);
+          const link = linkedProps(marketPath(mark.id), highlighted, item);
           return (
             <button
               key={mark.id}
               type="button"
-              {...roving.itemProps(index)}
+              {...item}
+              {...link}
               aria-label={markLabel(mark)}
               onClick={() => drill({ level: "market", id: mark.id })}
               style={{ left: x, top: y }}
-              className="pointer-events-auto absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+              className={cn(
+                "pointer-events-auto absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                link["data-linked"] && "ring-2 ring-foreground",
+              )}
             >
               <StatusIcon status={mark.status} />
             </button>
