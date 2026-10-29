@@ -78,7 +78,7 @@ shared logic moves down into `data/`, `domain/` or `ui/`. Only `data/` talks to 
 - **One `EntityRef` type** for the URL, charts and citations: a union on `level`; the product variant also carries
   `marketId` (`{ level: 'product', marketId, id }`). Don't create parallel id formats.
 - **State has one home.** If someone opening the link should see it, it goes in the URL. Data from the server goes in TanStack Query. Derived values are computed with selectors, never stored. Zustand is only for ephemeral cross-view UI state: the hover highlight (`state/highlight.ts`). The stream buffer is a ref plus `useReducer` in `useChatStream`, batched per animation frame.
-- **Views don't talk to each other.** They read and write URL state; everything else is derived.
+- **Views don't talk to each other.** They read and write URL state; everything else is derived. The one other shared channel is the hover highlight store (`state/highlight.ts`), for emphasis only: it never changes what a view shows, only what it emphasises.
 - **Design tokens only.** No hex values or arbitrary Tailwind values in components. Chart colours come from tokens too.
   Exception: shadcn primitives vendored into `ui/` keep their upstream classes, so updates stay a re-run of the CLI rather than a hand edit.
   Exception: `app/icon.svg` repeats the primary token colours as literals, because an icon can't read CSS variables.
