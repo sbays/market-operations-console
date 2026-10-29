@@ -133,7 +133,7 @@ describe("CompareRadar", () => {
     ).toHaveFocus();
   });
 
-  it("shows the raw values and the scaled share in the table alternative", async () => {
+  it("shows the raw values and each axis position in the table alternative", async () => {
     const { user } = renderRadar("?path=eu&compare=eu.DE,eu.ES");
 
     await user.click(screen.getByRole("button", { name: "View as table" }));
@@ -142,7 +142,7 @@ describe("CompareRadar", () => {
     const spain = within(table).getByRole("row", { name: /^Spain/ });
     expect(spain).toHaveTextContent("$5.2M");
     expect(spain).toHaveTextContent("99.0%");
-    expect(spain).toHaveTextContent("scaled 38.6%");
+    expect(spain).toHaveTextContent("axis position 38.6%");
     expect(
       screen.queryByRole("img", { name: /^Comparing/ }),
     ).not.toBeInTheDocument();

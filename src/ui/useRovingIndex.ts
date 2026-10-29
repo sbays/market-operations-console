@@ -13,7 +13,8 @@ type ItemProps = {
  * Roving tabindex for sibling items (chart points, grid cells): one item is in the tab
  * order, arrow keys and Home/End move focus between them, stopping at the edges. The tab stop
  * is `preferredIndex` (e.g. the selected month) until the user moves focus themselves.
- * Siblings are found through the DOM, so there are no per-item refs to keep in sync.
+ * Siblings are found through the DOM, so there are no per-item refs to keep in sync, and an
+ * index with no item (a missing value) is skipped.
  */
 export function useRovingIndex(
   count: number,
@@ -32,21 +33,32 @@ export function useRovingIndex(
       onFocus: () => setFocusedIndex(index),
       onKeyDown: (event) => {
         const row = columns ?? 1;
-        const next = {
-          ArrowRight: index + 1,
-          ArrowDown: index + row,
-          ArrowLeft: index - 1,
-          ArrowUp: index - row,
-          Home: 0,
-          End: count - 1,
+        // Where to look first, and which way to keep looking if that cell has no item.
+        const move = {
+          ArrowRight: { from: index + 1, step: 1 },
+          ArrowDown: { from: index + row, step: row },
+          ArrowLeft: { from: index - 1, step: -1 },
+          ArrowUp: { from: index - row, step: -row },
+          Home: { from: 0, step: 1 },
+          End: { from: count - 1, step: -1 },
         }[event.key];
-        if (next === undefined) return;
+        if (move === undefined) return;
         event.preventDefault();
+        const parent = event.currentTarget.parentElement;
         // Past an edge, stay put (a grid's top row doesn't wrap to the first cell).
-        if (next < 0 || next >= count) return;
-        event.currentTarget.parentElement
-          ?.querySelector<HTMLElement>(`[data-roving-index="${next}"]`)
-          ?.focus();
+        for (
+          let next = move.from;
+          next >= 0 && next < count;
+          next += move.step
+        ) {
+          const target = parent?.querySelector<HTMLElement>(
+            `[data-roving-index="${next}"]`,
+          );
+          if (target) {
+            target.focus();
+            return;
+          }
+        }
       },
     };
   }

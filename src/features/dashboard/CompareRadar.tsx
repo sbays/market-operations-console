@@ -47,9 +47,13 @@ const SERIES_STYLES = [
 export function CompareRadar({ dataset, selected, period }: Props) {
   const series = radarAxes(dataset, useCompare(selected), period);
   // Hooks run before the early return; the grid is one row per series, one column per axis.
+  // Missing values have no point, so the tab stop is the first point that exists.
+  const firstPoint = series
+    .flatMap((entry) => RADAR_METRICS.map((m) => entry.values[m].scaled))
+    .findIndex((scaled) => scaled !== undefined);
   const roving = useRovingIndex(
     series.length * RADAR_METRICS.length,
-    0,
+    Math.max(0, firstPoint),
     RADAR_METRICS.length,
   );
 
@@ -71,7 +75,7 @@ export function CompareRadar({ dataset, selected, period }: Props) {
                 key={level}
                 points={polygonPoints(
                   geometry,
-                  RADAR_METRICS.map(() => level),
+                  RADAR_METRICS.map((_, axis) => ({ axis, scaled: level })),
                 )}
                 fill="none"
                 stroke={AXIS_COLOUR}
@@ -107,10 +111,7 @@ export function CompareRadar({ dataset, selected, period }: Props) {
               return (
                 <polygon
                   key={row}
-                  points={polygonPoints(
-                    geometry,
-                    RADAR_METRICS.map((metric) => entry.values[metric].scaled),
-                  )}
+                  points={polygonPoints(geometry, plotted(entry))}
                   fill="none"
                   strokeWidth={2}
                   strokeDasharray={style.dash}
@@ -126,13 +127,11 @@ export function CompareRadar({ dataset, selected, period }: Props) {
         return series.flatMap((entry, row) => {
           const style = styleFor(row);
           const name = entityLabel(dataset, entry.ref);
-          return RADAR_METRICS.map((metric, axis) => {
-            const { x, y } = vertex(
-              geometry,
-              axis,
-              entry.values[metric].scaled,
-            );
-            const raw = entry.values[metric].raw;
+          return RADAR_METRICS.flatMap((metric, axis) => {
+            // No data, no point: the table and the summary say what is missing.
+            const { raw, scaled } = entry.values[metric];
+            if (scaled === undefined) return [];
+            const { x, y } = vertex(geometry, axis, scaled);
             return (
               <button
                 key={`${row}-${metric}`}
@@ -178,11 +177,21 @@ function vertex(
   };
 }
 
-/** One vertex per axis, in axis order: `scaled[axis]` is that axis's distance from the centre. */
-function polygonPoints(geometry: Geometry, scaled: number[]): string {
-  return scaled
-    .map((value, axis) => {
-      const { x, y } = vertex(geometry, axis, value);
+type Plotted = { axis: number; scaled: number };
+
+/** A series' vertices, leaving out axes with no data. */
+function plotted(entry: RadarSeries): Plotted[] {
+  return RADAR_METRICS.flatMap((metric, axis) => {
+    const { scaled } = entry.values[metric];
+    return scaled === undefined ? [] : [{ axis, scaled }];
+  });
+}
+
+/** Vertices in axis order; `scaled` is the distance from the centre as a fraction of the radius. */
+function polygonPoints(geometry: Geometry, points: Plotted[]): string {
+  return points
+    .map(({ axis, scaled }) => {
+      const { x, y } = vertex(geometry, axis, scaled);
       return `${x},${y}`;
     })
     .join(" ");
@@ -297,9 +306,9 @@ function RadarCell({
   return (
     <td className="py-1.5 text-right">
       {formatMetricOrMissing(metric, value.raw)}
-      {value.raw === undefined ? null : (
+      {value.scaled === undefined ? null : (
         <span className="block text-xs text-muted-foreground">
-          scaled {formatPercent(value.scaled)}
+          axis position {formatPercent(value.scaled)}
         </span>
       )}
     </td>
