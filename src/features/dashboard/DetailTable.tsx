@@ -78,88 +78,100 @@ export function DetailTable({ dataset, selected, period }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      <table className="w-full text-sm">
-        <caption className="pb-2 text-left text-base font-semibold">
-          {name(selected)} by {childLevel}{" "}
-          <span className="text-sm font-normal text-muted-foreground">
-            · {formatPeriod(period)}
-          </span>
-        </caption>
-        <thead className="text-xs text-muted-foreground">
-          <tr className="border-b">
-            <SortableHeader
-              label="Name"
-              direction={directionOf("name")}
-              onSort={() => sortBy("name")}
-              align="left"
-            />
-            {FIGURE_COLUMNS.map((metric) => (
+      {/* Eight columns don't fit narrow screens: the table scrolls, so keyboard users must be
+          able to focus the scroll container (WCAG 2.1.1, axe scrollable-region-focusable). */}
+      <div
+        role="region"
+        aria-label={`${name(selected)} by ${childLevel} table`}
+        tabIndex={0}
+        className="overflow-x-auto rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      >
+        <table className="w-full text-sm">
+          <caption className="pb-2 text-left text-base font-semibold">
+            {name(selected)} by {childLevel}{" "}
+            <span className="text-sm font-normal text-muted-foreground">
+              · {formatPeriod(period)}
+            </span>
+          </caption>
+          <thead className="text-xs text-muted-foreground">
+            <tr className="border-b">
               <SortableHeader
-                key={metric}
-                label={formatMetricName(metric)}
-                direction={directionOf(metric)}
-                onSort={() => sortBy(metric)}
-                align="right"
+                label="Name"
+                direction={directionOf("name")}
+                onSort={() => sortBy("name")}
+                align="left"
               />
-            ))}
-            <th scope="col" className="py-2 pl-4 text-left font-medium">
-              Status
-            </th>
-            <th scope="col" className="py-2 pl-4 text-left font-medium">
-              Compare
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((ref) => {
-            const status = statusAt(dataset, ref, period);
-            const isCompared = comparedPaths.has(pathOf(dataset, ref));
-            const blocked = full && !isCompared;
-            return (
-              <tr key={pathOf(dataset, ref) ?? name(ref)} className="border-b">
-                <th scope="row" className="py-2 text-left font-medium">
-                  <button
-                    type="button"
-                    className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-                    onClick={() => drill(ref)}
-                  >
-                    {name(ref)}
-                  </button>
-                </th>
-                {FIGURE_COLUMNS.map((metric) => (
-                  <td
-                    key={metric}
-                    className="py-2 pl-4 text-right tabular-nums"
-                  >
-                    {formatMetricOrMissing(
-                      metric,
-                      valueAt(dataset, ref, period, metric),
+              {FIGURE_COLUMNS.map((metric) => (
+                <SortableHeader
+                  key={metric}
+                  label={formatMetricName(metric)}
+                  direction={directionOf(metric)}
+                  onSort={() => sortBy(metric)}
+                  align="right"
+                />
+              ))}
+              <th scope="col" className="py-2 pl-4 text-left font-medium">
+                Status
+              </th>
+              <th scope="col" className="py-2 pl-4 text-left font-medium">
+                Compare
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((ref) => {
+              const status = statusAt(dataset, ref, period);
+              const isCompared = comparedPaths.has(pathOf(dataset, ref));
+              const blocked = full && !isCompared;
+              return (
+                <tr
+                  key={pathOf(dataset, ref) ?? name(ref)}
+                  className="border-b"
+                >
+                  <th scope="row" className="py-2 text-left font-medium">
+                    <button
+                      type="button"
+                      className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                      onClick={() => drill(ref)}
+                    >
+                      {name(ref)}
+                    </button>
+                  </th>
+                  {FIGURE_COLUMNS.map((metric) => (
+                    <td
+                      key={metric}
+                      className="py-2 pl-4 text-right tabular-nums"
+                    >
+                      {formatMetricOrMissing(
+                        metric,
+                        valueAt(dataset, ref, period, metric),
+                      )}
+                    </td>
+                  ))}
+                  <td className="py-2 pl-4">
+                    {status ? (
+                      <StatusBadge status={status} />
+                    ) : (
+                      <span className="text-muted-foreground">No data</span>
                     )}
                   </td>
-                ))}
-                <td className="py-2 pl-4">
-                  {status ? (
-                    <StatusBadge status={status} />
-                  ) : (
-                    <span className="text-muted-foreground">No data</span>
-                  )}
-                </td>
-                <td className="py-2 pl-4">
-                  <input
-                    type="checkbox"
-                    aria-label={`Compare ${name(ref)}`}
-                    aria-describedby={blocked ? limitId : undefined}
-                    checked={isCompared}
-                    disabled={blocked}
-                    onChange={() => toggleCompare(ref)}
-                    className="size-4 accent-primary"
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  <td className="py-2 pl-4">
+                    <input
+                      type="checkbox"
+                      aria-label={`Compare ${name(ref)}`}
+                      aria-describedby={blocked ? limitId : undefined}
+                      checked={isCompared}
+                      disabled={blocked}
+                      onChange={() => toggleCompare(ref)}
+                      className="size-4 accent-primary"
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       {full && (
         <p id={limitId} className="text-xs text-muted-foreground">
           You can compare up to {MAX_COMPARE}.
