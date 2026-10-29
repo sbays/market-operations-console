@@ -12,6 +12,7 @@ import { CompareRadar } from "./CompareRadar";
 import { DetailTable } from "./DetailTable";
 import { KpiStrip } from "./KpiStrip";
 import { ModeToggle } from "./ModeToggle";
+import { RiskMovers } from "./RiskMovers";
 import { TrendChart } from "./TrendChart";
 
 // The world TopoJSON is the largest asset on the page: load it after the rest of the
@@ -43,6 +44,7 @@ export function Dashboard() {
         <ModeToggle />
       </div>
       <KpiStrip {...props} mode={mode} />
+      <RiskMovers {...props} mode={mode} />
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel label="Market map" resetKey={resetKey}>
           <MarketMap {...props} />
