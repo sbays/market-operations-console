@@ -33,14 +33,14 @@ export async function* streamChat(
   try {
     for (;;) {
       const { done, value } = await reader.read();
+      const frames = done
+        ? parser.end()
+        : parser.push(decoder.decode(value, { stream: true }));
+      for (const frame of frames) yield classifyFrame(frame);
       if (done) return;
-      for (const frame of parser.push(
-        decoder.decode(value, { stream: true }),
-      )) {
-        yield classifyFrame(frame);
-      }
     }
   } finally {
-    reader.releaseLock();
+    // The consumer may leave early (a terminal event, or an abort): close the body, don't just unlock it.
+    await reader.cancel().catch(() => undefined);
   }
 }
