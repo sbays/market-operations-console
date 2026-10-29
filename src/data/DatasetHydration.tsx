@@ -6,17 +6,29 @@ import {
   dehydrate,
   HydrationBoundary,
   QueryClient,
+  type DehydratedState,
 } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { loadDataset } from "./pack";
 import { datasetQuery } from "./queries";
 
-export function DatasetHydration({ children }: { children: ReactNode }) {
+/**
+ * Cached so the static page can prerender: the dataset never changes between builds, and
+ * dehydrate() timestamps with Date.now(), which Next only allows inside a cache scope.
+ */
+export async function dehydrateDataset(): Promise<DehydratedState> {
+  "use cache";
   const queryClient = new QueryClient();
   queryClient.setQueryData(datasetQuery.queryKey, loadDataset());
-  return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      {children}
-    </HydrationBoundary>
-  );
+  return dehydrate(queryClient);
+}
+
+export function DatasetHydration({
+  state,
+  children,
+}: {
+  state: DehydratedState;
+  children: ReactNode;
+}) {
+  return <HydrationBoundary state={state}>{children}</HydrationBoundary>;
 }
