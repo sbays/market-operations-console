@@ -148,10 +148,22 @@ describe("RiskMovers: biggest movers", () => {
     expect(up.getAllByRole("listitem").map((item) => item.textContent)).toEqual(
       ["Germany+2.4%", "Spain+2.2%", "United Kingdom+2.1%"],
     );
+    // Every European market grew, so nothing is listed as a decline.
+    expect(screen.queryByRole("list", { name: "Down" })).toBeNull();
+    expect(screen.getByText("None in Q3 2026.")).toBeInTheDocument();
+  });
+
+  it("lists only declining children under down", () => {
+    renderRiskMovers("?path=latam&period=2026-Q3", "analyst");
+
+    const up = within(screen.getByRole("list", { name: "Up" }));
+    expect(up.getAllByRole("listitem").map((item) => item.textContent)).toEqual(
+      ["Mexico+5.9%"],
+    );
     const down = within(screen.getByRole("list", { name: "Down" }));
     expect(
       down.getAllByRole("listitem").map((item) => item.textContent),
-    ).toEqual(["France+1.4%", "Italy+1.5%"]);
+    ).toEqual(["Brazil-8.6%"]);
   });
 
   it("drills to a mover when its name is pressed", async () => {
