@@ -4,7 +4,7 @@
  * and AI-quoted numbers format exactly like source data.
  */
 import { parsePeriod } from "./period";
-import type { Metric, PeriodRef } from "./schema";
+import type { Metric, Month, PeriodRef } from "./schema";
 
 export const LOCALE = "en-US";
 export const CURRENCY = "USD";
@@ -82,4 +82,28 @@ export function formatMetric(metric: Metric, value: number): string {
     case "growth":
       return formatPercent(value, { signed: true });
   }
+}
+
+const METRIC_NAMES: Record<Metric, string> = {
+  revenue: "Revenue",
+  units: "Units",
+  forecast: "Forecast",
+  growth: "Growth vs prior year",
+  attainment: "Forecast attainment",
+  share: "Market share",
+};
+
+export function formatMetricName(metric: Metric): string {
+  return METRIC_NAMES[metric];
+}
+
+/** The months a dataset covers: "Oct 2024 to Sep 2026". */
+export function formatCoverage({
+  from,
+  to,
+}: {
+  from: Month;
+  to: Month;
+}): string {
+  return `${formatPeriod(from)} to ${formatPeriod(to)}`;
 }
