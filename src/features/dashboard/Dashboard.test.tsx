@@ -389,4 +389,39 @@ describe("Dashboard", () => {
       screen.queryByRole("region", { name: "Biggest movers" }),
     ).not.toBeInTheDocument();
   });
+
+  it("goes up a level on Escape from inside the dashboard, pushing history", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-03");
+    const march = within(trendFigure()).getByRole("button", {
+      name: /^Mar 2026:/,
+    });
+
+    act(() => march.focus());
+    await user.keyboard("{Escape}");
+
+    expect(lastUrl(onUrlUpdate)).toEqual({
+      query: "?path=eu&period=2026-03",
+      history: "push",
+    });
+  });
+
+  it("ignores Escape outside the dashboard", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+    // Stands in for the chat input beside the dashboard.
+    const chatInput = document.createElement("input");
+    document.body.append(chatInput);
+
+    act(() => chatInput.focus());
+    await user.keyboard("{Escape}");
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+    chatInput.remove();
+  });
+
+  it("does nothing on Escape at the portfolio", async () => {
+    const { user, onUrlUpdate } = renderDashboard();
+
+    act(() => screen.getByRole("button", { name: "Analyst" }).focus());
+    await user.keyboard("{Escape}");
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+  });
 });
