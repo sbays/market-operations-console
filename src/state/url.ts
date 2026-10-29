@@ -8,6 +8,7 @@ import {
   createParser,
   parseAsArrayOf,
   parseAsString,
+  parseAsStringLiteral,
   useQueryState,
   useQueryStates,
 } from "nuqs";
@@ -99,5 +100,28 @@ export function useToggleCompare(
   return (ref) => {
     const paths = toggleCompared(dataset, compared, ref);
     void setPaths(paths.length > 0 ? paths : null);
+  };
+}
+
+export const MODES = ["analyst", "exec"] as const;
+export type Mode = (typeof MODES)[number];
+
+/** Analyst shows every panel; exec hides the dense ones. A bare link is analyst. */
+const modeParser = parseAsStringLiteral(MODES).withDefault("analyst");
+
+export function useMode(): Mode {
+  const [mode] = useQueryState("mode", modeParser);
+  return mode;
+}
+
+/** Switches mode. Replaces history: it's a view of the same selection, not a navigation. */
+export function useSetMode(): (mode: Mode) => void {
+  const [, setMode] = useQueryState(
+    "mode",
+    modeParser.withOptions({ history: "replace" }),
+  );
+  return (mode) => {
+    // The default leaves no param, so analyst links stay short.
+    void setMode(mode === "analyst" ? null : mode);
   };
 }
