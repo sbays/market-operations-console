@@ -256,7 +256,7 @@ Wired:
 
 - **CI** — GitHub Actions: typecheck, lint, unit and component tests, build, Playwright + axe against `next start` in CI. Vercel preview per PR for manual review.
 - **Loading** — the map is lazy-loaded with `next/dynamic`, so the world TopoJSON (110m, about 108 KB) stays out of the first bundle. It isn't trimmed: the base map draws every country, with the 12 markets coloured on top.
-- **RUM** — Core Web Vitals (LCP, INP, CLS and others) logged to the console by `app/WebVitals.tsx`, through Next's `useReportWebVitals`, which wraps the `web-vitals` library.
+- **RUM** — Core Web Vitals (CLS, LCP, INP, FCP and TTFB) logged to the console by `app/WebVitals.tsx`, through Next's `useReportWebVitals`, which wraps the `web-vitals` library.
 - **Errors** — per-panel error boundary, so one broken chart doesn't take the dashboard down.
 - **Safe output** — react-markdown with HTML disabled and an empty link allow-list (model links render as plain text); stream events validated before render.
 
