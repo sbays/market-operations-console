@@ -137,7 +137,16 @@ export function statusOf(
   ref: EntityRef,
   quarter: Quarter,
 ): Status | undefined {
-  const attainment = valueAt(dataset, ref, quarter, "attainment");
+  return statusAt(dataset, ref, quarter);
+}
+
+/** The status of an entity over a month or a quarter, or undefined outside the data. */
+export function statusAt(
+  dataset: Dataset,
+  ref: EntityRef,
+  period: PeriodRef,
+): Status | undefined {
+  const attainment = valueAt(dataset, ref, period, "attainment");
   return attainment === undefined ? undefined : statusForAttainment(attainment);
 }
 
@@ -173,6 +182,20 @@ export function latestQuarter(dataset: Dataset): Quarter | undefined {
   return undefined;
 }
 
+/**
+ * The period a view should show: the requested one when the data covers it, otherwise the
+ * latest complete quarter, otherwise the last month.
+ */
+export function selectionPeriod(
+  dataset: Dataset,
+  period: PeriodRef | null,
+): PeriodRef {
+  if (period !== null && expandPeriod(dataset, period).length > 0) {
+    return period;
+  }
+  return latestQuarter(dataset) ?? coverageOf(dataset).to;
+}
+
 /** The entities one level below `ref`, in dataset order. */
 export function childrenOf(dataset: Dataset, ref: EntityRef): EntityRef[] {
   switch (ref.level) {
@@ -191,6 +214,50 @@ export function childrenOf(dataset: Dataset, ref: EntityRef): EntityRef[] {
     case "product":
       return [];
   }
+}
+
+/** The chain from the portfolio down to `ref`, inclusive, for breadcrumbs. */
+export function ancestorsOf(dataset: Dataset, ref: EntityRef): EntityRef[] {
+  const portfolio: EntityRef = { level: "portfolio" };
+  switch (ref.level) {
+    case "portfolio":
+      return [portfolio];
+    case "region":
+      return [portfolio, ref];
+    case "market":
+    case "product": {
+      const marketId = ref.level === "market" ? ref.id : ref.marketId;
+      const market = dataset.markets.find((m) => m.id === marketId);
+      if (!market) return [portfolio, ref];
+      const region: EntityRef = { level: "region", id: market.regionId };
+      const marketRef: EntityRef = { level: "market", id: market.id };
+      return ref.level === "market"
+        ? [portfolio, region, marketRef]
+        : [portfolio, region, marketRef, ref];
+    }
+  }
+}
+
+export type TrendPoint = {
+  period: Month;
+  actual: number;
+  forecast: number;
+  priorYear: number;
+};
+
+/** One point per dataset month for the trend chart, or [] when the entity isn't in the data. */
+export function monthlySeries(dataset: Dataset, ref: EntityRef): TrendPoint[] {
+  const series = seriesUnder(dataset, ref);
+  if (!series) return [];
+  return dataset.periods.map((period) => {
+    const sum = totals(series, [period]);
+    return {
+      period,
+      actual: sum.actual,
+      forecast: sum.forecast,
+      priorYear: sum.priorYear,
+    };
+  });
 }
 
 export type Mover = { ref: EntityRef; growth: number };
