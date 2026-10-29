@@ -2,13 +2,20 @@ import type { ReactNode } from "react";
 import { formatMetricOrMissing, formatPeriod } from "@/domain/format";
 import type { Dataset, EntityRef, Metric, PeriodRef } from "@/domain/schema";
 import { childStatusCounts, statusAt, valueAt } from "@/domain/selectors";
+import type { Mode } from "@/state/url";
 import { DASHBOARD_FOCUS_ID } from "@/ui/dashboardFocus";
 import { StatusBadge } from "@/ui/StatusBadge";
 
-type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
+type Props = {
+  dataset: Dataset;
+  selected: EntityRef;
+  period: PeriodRef;
+  /** Analysts also see units and market share. */
+  mode: Mode;
+};
 
 /** The selection's headline figures: source data, so a solid surface and tabular figures. */
-export function KpiStrip({ dataset, selected, period }: Props) {
+export function KpiStrip({ dataset, selected, period, mode }: Props) {
   const figure = (metric: Metric) =>
     formatMetricOrMissing(metric, valueAt(dataset, selected, period, metric));
   const status = statusAt(dataset, selected, period);
@@ -34,6 +41,12 @@ export function KpiStrip({ dataset, selected, period }: Props) {
           {status && <StatusBadge status={status} />}
         </Tile>
         <Tile label="Growth vs prior year">{figure("growth")}</Tile>
+        {mode === "analyst" && (
+          <>
+            <Tile label="Units">{figure("units")}</Tile>
+            <Tile label="Market share">{figure("share")}</Tile>
+          </>
+        )}
         {judged > 0 && (
           <Tile label="Off track or at risk">
             {flagged} of {judged}

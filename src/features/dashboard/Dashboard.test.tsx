@@ -294,4 +294,52 @@ describe("Dashboard", () => {
     });
     expect(breadcrumb()).toHaveTextContent(/Portfolio.*Europe.*Germany/);
   });
+
+  it("shows every panel in analyst mode, the default", () => {
+    renderDashboard("?path=eu.DE");
+
+    expect(keyFigures()).toHaveTextContent(/Units\s*141\.9K/);
+    expect(keyFigures()).toHaveTextContent(/Market share\s*17\.0%/);
+    expect(
+      within(trendFigure()).getByRole("list", { name: "Legend" }),
+    ).toHaveTextContent("Prior year");
+    expect(screen.getByRole("figure", { name: "Compare" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Analyst" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("hides the dense panels in exec mode", () => {
+    renderDashboard("?path=eu.DE&mode=exec");
+
+    expect(keyFigures()).not.toHaveTextContent("Units");
+    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$13\.6M/);
+    expect(
+      within(trendFigure()).getByRole("list", { name: "Legend" }),
+    ).not.toHaveTextContent("Prior year");
+    expect(
+      screen.queryByRole("figure", { name: "Compare" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("figure", { name: /and month$/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("switches mode from the toggle, replacing history", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+
+    await user.click(screen.getByRole("button", { name: "Exec" }));
+    expect(lastUrl(onUrlUpdate)).toEqual({
+      query: "?path=eu.DE&mode=exec",
+      history: "replace",
+    });
+    expect(screen.getByRole("button", { name: "Exec" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Analyst" }));
+    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.DE");
+  });
 });
