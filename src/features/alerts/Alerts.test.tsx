@@ -30,6 +30,7 @@ type Harness = {
   release: () => void;
   /** Lets a held refetch of the list answer (only with holdRefetch). */
   releaseRefetch: () => void;
+  onUrlUpdate: ReturnType<typeof vi.fn<OnUrlUpdateFunction>>;
 };
 
 /** The saves the mock has accepted, in order; a failed save is never added. */
@@ -85,9 +86,10 @@ function renderAlerts(
     defaultOptions: { queries: { retry: false } },
   });
   queryClient.setQueryData(datasetQuery.queryKey, loadDataset());
+  const onUrlUpdate = vi.fn<OnUrlUpdateFunction>();
   const Nuqs = withNuqsTestingAdapter({
     searchParams,
-    onUrlUpdate: vi.fn<OnUrlUpdateFunction>(),
+    onUrlUpdate,
     hasMemory: true,
   });
   function Wrapper({ children }: { children: ReactNode }) {
@@ -107,7 +109,12 @@ function renderAlerts(
     </>,
     { wrapper: Wrapper },
   );
-  return { user: userEvent.setup(), release: save, releaseRefetch: refetch };
+  return {
+    user: userEvent.setup(),
+    release: save,
+    releaseRefetch: refetch,
+    onUrlUpdate,
+  };
 }
 
 /** The rules list only exists once there is at least one rule, so it is awaited. */
@@ -275,6 +282,9 @@ describe("AlertDialog", () => {
     );
     expect(within(rules).getByText("Watch Germany")).toBeInTheDocument();
     expect(saved).toHaveLength(1);
+    // The saved rule replaces the optimistic row in place: no refetch, which on a deployed
+    // mock could reach another server instance that never saw the rule.
+    expect(listCount).toBe(1);
     // Screen-reader users hear the save land, through the toast's live region.
     expect(
       await screen.findByText("Saved alert rule “Watch Germany”."),
@@ -308,6 +318,52 @@ describe("AlertList", () => {
       within(rules).getByText(
         "Forecast attainment below 95.0% in Germany, France",
       ),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("the markets a rule flags", () => {
+  const apacRule: AlertRule = {
+    id: "r1",
+    name: "APAC attainment",
+    scope: ["apac"],
+    metric: "attainment",
+    operator: "below",
+    threshold: 95,
+  };
+
+  it("names the flagged markets for the period shown, and each drills to its market", async () => {
+    const { user, onUrlUpdate } = renderAlerts("", { initial: [apacRule] });
+
+    const rules = await rulesList();
+    expect(
+      within(rules).getByText("Flags 2 markets in Q3 2026:"),
+    ).toBeInTheDocument();
+    await user.click(within(rules).getByRole("button", { name: "Japan" }));
+    expect(within(rules).getByRole("button", { name: "India" })).toBeVisible();
+
+    expect(onUrlUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ queryString: "?path=apac.JP" }),
+    );
+  });
+
+  it("follows the period in the URL", async () => {
+    renderAlerts("?period=2025-01", {
+      initial: [{ ...apacRule, threshold: 0 }],
+    });
+    const rules = await rulesList();
+    expect(
+      within(rules).getByText("No markets flagged in Jan 2025."),
+    ).toBeInTheDocument();
+  });
+
+  it("says so when no market in scope crosses the threshold", async () => {
+    renderAlerts("", {
+      initial: [{ ...apacRule, scope: ["eu.DE", "eu.FR"] }],
+    });
+    const rules = await rulesList();
+    expect(
+      within(rules).getByText("No markets flagged in Q3 2026."),
     ).toBeInTheDocument();
   });
 });

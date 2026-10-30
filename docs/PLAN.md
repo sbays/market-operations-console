@@ -126,7 +126,7 @@ The assistant is where we win or lose on trust, so every answer renders as a str
 **Confidence**
 
 - Three bands from the numeric value: High, Medium, Low. Shown as a labelled badge with an icon and text, never colour alone.
-- Low confidence adds a short "Why it's uncertain" line, only if the fixture provides the reason.
+- A "Why it's uncertain" line shows whenever the final event carries a reason, at any confidence band (review fix, 30 Oct: a medium answer's caveat was being hidden).
 - Abstentions get their own state: a neutral card, "This isn't in the data", and what the data does cover (e.g. the last period in the dataset).
 
 **AI vs authoritative**
@@ -236,6 +236,7 @@ A rule builder that flags markets crossing thresholds, saved optimistically and 
 - **Zod schema** — cross-field refinements: the threshold's valid range depends on the metric (growth −100 to 1000, attainment 0 to 200); at least one market in scope.
 - **Save** — TanStack Query `useMutation` with `onMutate` snapshot, optimistic insert, `onError` rollback plus a toast with retry. The mock route fails when `?fail=1` is set, so reviewers and tests can trigger the rollback deterministically.
 - **Errors** — inline, linked with `aria-describedby`; on submit, focus moves to an error summary at the top.
+- **Review fixes (30 Oct, `fix/trust-and-alerts`)** — the server checks scope against the dataset (`normaliseScope`: unknown paths answer 400; repeats and markets their ticked region covers are dropped). A save swaps the pending row for the server's rule in the cache and never refetches, and the list query never goes stale, because the in-memory mock store is per server instance and a refetch could reach one that never saw the save. Each rule lists the markets it flags in the shown period (`alertMatches`, judged on the displayed value like status), and each name drills the dashboard.
 
 ## Accessibility
 

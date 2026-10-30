@@ -31,9 +31,14 @@ async function fetchAlerts(): Promise<AlertListItem[]> {
   return AlertsResponseSchema.parse(await response.json()).rules;
 }
 
+/**
+ * Fetched once per page. The mock keeps rules in one server instance's memory, so a refetch
+ * could reach an instance that never saw a save; saves update the cache directly instead.
+ */
 export const alertsQuery = queryOptions({
   queryKey: ["alerts"],
   queryFn: fetchAlerts,
+  staleTime: Infinity,
 });
 
 /** The saved rules. Not suspense: nothing is hydrated, so the list shows its own loading state. */
@@ -92,11 +97,13 @@ export function useCreateAlert({ fail }: { fail: boolean }) {
         },
       });
     },
-    onSuccess: (rule) => {
+    onSuccess: (rule, _input, context) => {
+      // The saved rule takes the pending row's place, keeping the list's order.
+      queryClient.setQueryData(alertsQuery.queryKey, (rules) =>
+        rules?.map((row) => (row.id === context.pendingId ? rule : row)),
+      );
       toast.success(`Saved alert rule “${rule.name}”.`);
     },
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: alertsQuery.queryKey }),
   });
 
   return mutation;
