@@ -12,6 +12,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
+import { announce } from "@/ui/announce";
 import {
   AlertRuleSchema,
   type AlertRule,
@@ -93,7 +94,12 @@ export function useCreateAlert({ fail }: { fail: boolean }) {
       queryClient.setQueryData(alertsQuery.queryKey, (rules) =>
         rules?.filter((rule) => rule.id !== context?.pendingId),
       );
-      toast.error("Couldn't save the alert rule.", {
+      const message = "Couldn't save the alert rule.";
+      // Retry sits in the toast, which isn't in the tab order: sonner's hotkey is the way in,
+      // so the announcement names it, and the toast outlasts sonner's default 4 seconds.
+      announce(`${message} Press Alt+T to reach Retry.`, { urgent: true });
+      toast.error(message, {
+        duration: 10_000,
         action: {
           label: "Retry",
           onClick: () => mutation.mutate(input),
@@ -105,7 +111,9 @@ export function useCreateAlert({ fail }: { fail: boolean }) {
       queryClient.setQueryData(alertsQuery.queryKey, (rules) =>
         rules?.map((row) => (row.id === context.pendingId ? rule : row)),
       );
-      toast.success(`Saved alert rule “${rule.name}”.`);
+      const message = `Saved alert rule “${rule.name}”.`;
+      announce(message);
+      toast.success(message);
     },
     onSettled: (_rule, _error, _input, context) => {
       // Saved before the first load finished: that load was cancelled above, so the cache

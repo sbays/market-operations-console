@@ -14,6 +14,7 @@ import {
   useUnknownPath,
 } from "@/state/url";
 import { clearHighlight } from "@/state/highlight";
+import { announce } from "@/ui/announce";
 import { focusDashboard } from "@/ui/dashboardFocus";
 import { ErrorBoundary } from "@/ui/ErrorBoundary";
 import { AttainmentHeatMap } from "./AttainmentHeatMap";
@@ -50,11 +51,11 @@ export function Dashboard() {
   // Telling the reader and cleaning the URL are side effects of reading a bad link, so they
   // run after render, once per bad path (clearing it ends the run).
   const announceUnknownPath = useEffectEvent(() => {
-    toast(
-      "That link points to something not in the data, so you're seeing the portfolio.",
-      // A fixed id: a render before the URL updates can't show the notice twice.
-      { id: "unknown-path" },
-    );
+    const message =
+      "That link points to something not in the data, so you're seeing the portfolio.";
+    announce(message);
+    // A fixed id: a render before the URL updates can't show the notice twice.
+    toast(message, { id: "unknown-path" });
     unknownPath.clear();
   });
   useEffect(() => {

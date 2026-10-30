@@ -9,7 +9,8 @@ import {
   type OnUrlUpdateFunction,
 } from "nuqs/adapters/testing";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadDataset } from "@/data/pack";
 import {
   AlertRuleInputSchema,
@@ -18,6 +19,7 @@ import {
 } from "@/domain/alert";
 import { DASHBOARD_FOCUS_ID } from "@/ui/dashboardFocus";
 import { server } from "@/test/msw";
+import { LiveRegions } from "@/ui/LiveRegions";
 import { Toaster } from "@/ui/Toaster";
 import { AlertDialog } from "./AlertDialog";
 import { AlertList } from "./AlertList";
@@ -145,6 +147,7 @@ function renderAlerts(
       <section id={DASHBOARD_FOCUS_ID} tabIndex={-1} aria-label="Key figures" />
       <AlertList />
       <Toaster />
+      <LiveRegions />
     </>,
     { wrapper: Wrapper },
   );
@@ -157,8 +160,16 @@ function renderAlerts(
   };
 }
 
+// Sonner's store is global, so a toast from one test would otherwise show in the next.
+afterEach(() => {
+  toast.dismiss();
+});
+
 /** The rules list only exists once there is at least one rule, so it is awaited. */
 const rulesList = () => screen.findByRole("list", { name: "Alert rules" });
+
+/** Sonner's toast region: the toasts and their actions, not the announcements. */
+const toasts = () => screen.getByRole("region", { name: /Notifications/ });
 
 async function openDialog(user: Harness["user"]) {
   await user.click(screen.getByRole("button", { name: "New alert" }));
@@ -325,9 +336,14 @@ describe("AlertDialog", () => {
     // The saved rule replaces the optimistic row in place: no refetch, which on a deployed
     // mock could reach another server instance that never saw the rule.
     expect(listCount).toBe(1);
-    // Screen-reader users hear the save land, through the toast's live region.
+    // Screen-reader users hear the save land, through the polite live region.
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Saved alert rule “Watch Germany”.",
+      ),
+    );
     expect(
-      await screen.findByText("Saved alert rule “Watch Germany”."),
+      within(toasts()).getByText("Saved alert rule “Watch Germany”."),
     ).toBeInTheDocument();
   });
 });
@@ -468,6 +484,35 @@ describe("the markets a rule flags", () => {
 });
 
 describe("a save the server refuses", () => {
+  it("announces the refusal assertively, from a region already on the page", async () => {
+    const { user, release } = renderAlerts("?fail=1");
+    // Taken before the save: the region has to exist before anything is announced.
+    const urgent = screen.getByRole("alert");
+    expect(urgent).toBeEmptyDOMElement();
+    const dialog = await openDialog(user);
+    await fillRule(user, {
+      name: "Doomed",
+      metric: "Forecast attainment",
+      threshold: "95",
+    });
+
+    await user.click(within(dialog).getByRole("button", { name: "Save rule" }));
+    release();
+
+    await waitFor(() =>
+      expect(urgent).toHaveTextContent(
+        "Couldn't save the alert rule. Press Alt+T to reach Retry.",
+      ),
+    );
+    // Sonner's own region is silenced, so the message is not read twice. The toast and
+    // its Retry action stay in the accessibility tree.
+    expect(toasts()).toHaveAttribute("aria-live", "off");
+    expect(
+      within(toasts()).getByRole("button", { name: "Retry" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
   it("removes the optimistic row, shows a toast with Retry, and retries the same rule", async () => {
     // The list refetch is held, so the row can only go by the rollback, not by invalidation.
     const { user, release, releaseRefetch } = renderAlerts("?fail=1", {
@@ -493,7 +538,7 @@ describe("a save the server refuses", () => {
     expect(screen.getByText("No alert rules yet.")).toBeInTheDocument();
     releaseRefetch();
     expect(
-      await screen.findByText("Couldn't save the alert rule."),
+      await within(toasts()).findByText("Couldn't save the alert rule."),
     ).toBeInTheDocument();
     expect(saved).toHaveLength(0);
 
