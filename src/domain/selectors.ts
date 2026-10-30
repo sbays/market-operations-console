@@ -17,7 +17,10 @@ import {
 import { formatPercent, formatPoints, PERCENT_DECIMALS } from "./format";
 import { monthKey, monthsOfQuarter, parsePeriod, quarterKey } from "./period";
 
-/** Attainment thresholds for status, judged over a quarter. */
+/**
+ * Attainment thresholds for status, judged over the period shown: the latest quarter by
+ * default, or the quarter or month a reader picks.
+ */
 export const ON_TRACK_FROM = 0.98;
 export const AT_RISK_FROM = 0.92;
 
