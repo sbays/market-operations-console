@@ -358,6 +358,11 @@ export function pathOf(dataset: Dataset, ref: EntityRef): string | undefined {
   }
 }
 
+/** True when `ancestor` is a strict ancestor of `path` by whole segments ("eu" of "eu.DE"). */
+export function isAncestorPath(ancestor: string, path: string): boolean {
+  return ancestor === "" ? path !== "" : path.startsWith(`${ancestor}.`);
+}
+
 /** A display name for any entity: "Germany", "Beacon in Germany". */
 export function entityName(
   dataset: Dataset,
@@ -504,11 +509,6 @@ export function topRisks(
 
 export type TrendAnomaly = { period: Month; ref: EntityRef; note: string };
 
-/** Whether `path` is `scope` or below it. The portfolio's "" contains everything. */
-function isWithin(path: string, scope: string): boolean {
-  return scope === "" || path === scope || path.startsWith(`${scope}.`);
-}
-
 /**
  * The revenue anomalies behind a selection's trend, in period order. A child's anomaly shows
  * on every ancestor, because the parent's line is the sum of its children: the Beacon
@@ -527,7 +527,7 @@ export function trendAnomalies(
       return (
         anomaly.metric === "revenue" &&
         path !== undefined &&
-        isWithin(path, scope)
+        (path === scope || isAncestorPath(scope, path))
       );
     })
     .map(({ period, ref: from, note }) => ({ period, ref: from, note }))

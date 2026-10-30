@@ -258,6 +258,34 @@ describe("Dashboard", () => {
     );
   });
 
+  it("lists every anomaly month at the portfolio, from different entities", () => {
+    renderDashboard("");
+
+    expect(
+      screen.getByRole("img", { name: /^Portfolio revenue, / }),
+    ).toHaveAccessibleName(/\. Anomalies flagged in Mar 2026 and Apr 2026\.$/);
+  });
+
+  it("adds no anomaly column or legend item where the selection has none", async () => {
+    const { user } = renderDashboard("?path=na.US");
+    const usTrend = screen.getByRole("figure", {
+      name: "United States revenue",
+    });
+
+    expect(
+      within(usTrend).getByRole("list", { name: "Legend" }),
+    ).not.toHaveTextContent("Anomaly");
+    await user.click(
+      within(usTrend).getByRole("button", { name: "View as table" }),
+    );
+    const table = screen.getByRole("table", {
+      name: /United States revenue by month/,
+    });
+    expect(
+      within(table).queryByRole("columnheader", { name: "Anomaly" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps anomaly markers out of the executive view", () => {
     renderDashboard("?path=eu.DE&mode=exec");
 

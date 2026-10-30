@@ -43,4 +43,10 @@ describe("trendSummary", () => {
       "Portfolio revenue, Jan 2026 to Jun 2026: $150 in Jun 2026, 75.0% of forecast. Anomalies flagged in Feb 2026, Mar 2026, and Apr 2026.",
     );
   });
+
+  it("lists anomaly months in period order, whatever order they arrive in", () => {
+    expect(trendSummary(trend, "Portfolio", ["2026-04", "2026-02"])).toBe(
+      "Portfolio revenue, Jan 2026 to Jun 2026: $150 in Jun 2026, 75.0% of forecast. Anomalies flagged in Feb 2026 and Apr 2026.",
+    );
+  });
 });

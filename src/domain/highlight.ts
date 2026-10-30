@@ -3,10 +3,7 @@
  * are keyed by drill path (pathOf), the same id the URL uses.
  */
 
-/** True when `ancestor` is a strict ancestor of `path` by whole segments ("eu" of "eu.DE"). */
-function isAncestor(ancestor: string, path: string): boolean {
-  return path.startsWith(`${ancestor}.`);
-}
+import { isAncestorPath } from "./selectors";
 
 /**
  * Whether an item should be emphasised while `highlighted` is. The same entity links, and so
@@ -18,7 +15,7 @@ export function isLinked(item: string, highlighted: string | null): boolean {
   if (highlighted === null || highlighted === "" || item === "") return false;
   return (
     item === highlighted ||
-    isAncestor(highlighted, item) ||
-    isAncestor(item, highlighted)
+    isAncestorPath(highlighted, item) ||
+    isAncestorPath(item, highlighted)
   );
 }

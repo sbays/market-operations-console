@@ -29,7 +29,7 @@ type Props = {
 };
 
 /** An anomaly as the chart shows it: `source` names a descendant it rolled up from. */
-type MonthAnomaly = { period: Month; source: string | undefined; note: string };
+type MonthAnomaly = { source: string | undefined; note: string };
 
 const MARGIN = { top: 12, right: 16, bottom: 28, left: 64 };
 /** Label every third month, so the axis stays readable at any width. */
@@ -38,21 +38,24 @@ const AXIS_COLOUR = "var(--border)";
 const LABEL_COLOUR = "var(--muted-foreground)";
 
 /**
- * The anomalies to mark, analyst view only. One recorded against a descendant (Beacon in
- * Germany, on Germany's trend) names it, so the note is never read as the selection's own.
+ * The anomalies to mark by month, in period order, analyst view only. One recorded against a
+ * descendant (Beacon in Germany, on Germany's trend) names it, so the note is never read as
+ * the selection's own.
  */
-function monthAnomalies(
+function anomaliesByMonth(
   dataset: Dataset,
   selected: EntityRef,
   mode: Mode,
-): MonthAnomaly[] {
-  if (mode !== "analyst") return [];
+): Map<Month, MonthAnomaly[]> {
+  const byMonth = new Map<Month, MonthAnomaly[]>();
+  if (mode !== "analyst") return byMonth;
   const own = pathOf(dataset, selected);
-  return trendAnomalies(dataset, selected).map(({ period, ref, note }) => ({
-    period,
-    source: pathOf(dataset, ref) === own ? undefined : entityName(dataset, ref),
-    note,
-  }));
+  for (const { period, ref, note } of trendAnomalies(dataset, selected)) {
+    const source =
+      pathOf(dataset, ref) === own ? undefined : entityName(dataset, ref);
+    byMonth.set(period, [...(byMonth.get(period) ?? []), { source, note }]);
+  }
+  return byMonth;
 }
 
 /** "Anomaly in Beacon in Germany: …" for a point's label. */
@@ -70,10 +73,9 @@ function anomalyCell({ source, note }: MonthAnomaly): string {
 /** Revenue against forecast (and prior year, for analysts) by month; a point focuses its month. */
 export function TrendChart({ dataset, selected, period, mode }: Props) {
   const showPriorYear = mode === "analyst";
-  const anomalies = monthAnomalies(dataset, selected, mode);
-  const anomaliesIn = (month: Month) =>
-    anomalies.filter((anomaly) => anomaly.period === month);
-  const flaggedMonths = [...new Set(anomalies.map((a) => a.period))];
+  const anomalies = anomaliesByMonth(dataset, selected, mode);
+  const showAnomalies = anomalies.size > 0;
+  const anomaliesIn = (month: Month) => anomalies.get(month) ?? [];
   const setPeriod = useSetPeriod();
   const series = monthlySeries(dataset, selected);
   const selectedIndex = series.findIndex((point) => point.period === period);
@@ -109,20 +111,20 @@ export function TrendChart({ dataset, selected, period, mode }: Props) {
   return (
     <ChartFrame
       title={`${name} revenue`}
-      summary={trendSummary(series, name, flaggedMonths)}
+      summary={trendSummary(series, name, [...anomalies.keys()])}
       table={
         <TrendTable
           name={name}
           series={series}
           showPriorYear={showPriorYear}
-          showAnomalies={mode === "analyst"}
+          showAnomalies={showAnomalies}
           anomaliesIn={anomaliesIn}
         />
       }
       legend={
         <TrendLegend
           showPriorYear={showPriorYear}
-          showAnomalies={anomalies.length > 0}
+          showAnomalies={showAnomalies}
         />
       }
       drawing={(size) => {
