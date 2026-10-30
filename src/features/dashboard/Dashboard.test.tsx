@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TestDataset } from "@/test/dataset";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -7,8 +7,6 @@ import {
 } from "nuqs/adapters/testing";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadDataset } from "@/data/pack";
-import { datasetQuery } from "@/data/queries";
 import { clearHighlight } from "@/state/highlight";
 import { Toaster } from "@/ui/Toaster";
 import { Dashboard } from "./Dashboard";
@@ -20,8 +18,6 @@ import { Dashboard } from "./Dashboard";
 
 /** The dashboard as the console mounts it: dataset hydrated, URL state with memory. */
 function renderDashboard(searchParams = "") {
-  const queryClient = new QueryClient();
-  queryClient.setQueryData(datasetQuery.queryKey, loadDataset());
   const onUrlUpdate = vi.fn<OnUrlUpdateFunction>();
   const Nuqs = withNuqsTestingAdapter({
     searchParams,
@@ -31,9 +27,7 @@ function renderDashboard(searchParams = "") {
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <Nuqs>
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
+        <TestDataset>{children}</TestDataset>
       </Nuqs>
     );
   }

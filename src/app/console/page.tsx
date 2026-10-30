@@ -1,21 +1,19 @@
 import { Suspense, use } from "react";
-import { DatasetHydration, dehydrateDataset } from "@/data/DatasetHydration";
-import { loadFixtures } from "@/data/pack";
+import { DatasetProvider } from "@/data/DatasetProvider";
+import { loadDataset, loadFixtures } from "@/data/pack";
 import { AlertDialog } from "@/features/alerts/AlertDialog";
 import { AlertList } from "@/features/alerts/AlertList";
 import { AssistantPanel } from "@/features/assistant/AssistantPanel";
 import { Dashboard } from "@/features/dashboard/Dashboard";
 import { Toaster } from "@/ui/Toaster";
 
-export default async function ConsolePage({
-  searchParams,
-}: PageProps<"/console">) {
+export default function ConsolePage({ searchParams }: PageProps<"/console">) {
   const suggestedQuestions = loadFixtures()
     .filter((fixture) => fixture.suggested)
     .map((fixture) => fixture.question);
 
   return (
-    <DatasetHydration state={await dehydrateDataset()}>
+    <DatasetProvider dataset={loadDataset()}>
       <a href="#main" className="sr-only focus:not-sr-only">
         Skip to main content
       </a>
@@ -43,7 +41,7 @@ export default async function ConsolePage({
         </div>
       </div>
       <Toaster />
-    </DatasetHydration>
+    </DatasetProvider>
   );
 }
 
