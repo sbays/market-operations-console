@@ -6,6 +6,7 @@ import {
   formatMetric,
   formatMetricName,
   formatMetricOrMissing,
+  formatMetricShortName,
   formatNumber,
   formatPercent,
   formatPeriod,
@@ -103,6 +104,17 @@ describe("formatMetricName", () => {
     expect(formatMetricName("growth")).toBe("Growth vs prior year");
     expect(formatMetricName("attainment")).toBe("Forecast attainment");
     expect(formatMetricName("share")).toBe("Market share");
+  });
+});
+
+describe("formatMetricShortName", () => {
+  it("names every metric briefly, for controls and sentences", () => {
+    expect(formatMetricShortName("revenue")).toBe("Revenue");
+    expect(formatMetricShortName("units")).toBe("Units");
+    expect(formatMetricShortName("forecast")).toBe("Forecast");
+    expect(formatMetricShortName("growth")).toBe("Growth");
+    expect(formatMetricShortName("attainment")).toBe("Attainment");
+    expect(formatMetricShortName("share")).toBe("Market share");
   });
 });
 

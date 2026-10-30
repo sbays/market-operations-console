@@ -1,6 +1,7 @@
 "use client";
 
 import { geoPath } from "d3-geo";
+import { Minus } from "lucide-react";
 import { useId } from "react";
 import {
   countryFeatures,
@@ -9,15 +10,30 @@ import {
   marketsInSelection,
   worldProjection,
 } from "@/domain/geo";
-import { formatMetric, formatPeriod, formatStatus } from "@/domain/format";
+import { divergingColour, sequentialColour } from "@/domain/colour";
+import {
+  formatMetric,
+  formatMetricName,
+  formatMetricShortName,
+  formatPercent,
+  formatPeriod,
+  formatStatus,
+} from "@/domain/format";
 import type { Dataset, EntityRef, PeriodRef, Status } from "@/domain/schema";
 import { isLinked } from "@/domain/highlight";
 import { entityLabel, pathOf, statusAt, valueAt } from "@/domain/selectors";
 import { linkedProps, useHighlightedPath } from "@/state/highlight";
-import { useDrill } from "@/state/url";
+import {
+  MAP_METRICS,
+  useDrill,
+  useMapMetric,
+  useSetMapMetric,
+  type MapMetric,
+} from "@/state/url";
 import { ChartFrame } from "@/ui/ChartFrame";
 import { ChartLegend } from "@/ui/ChartLegend";
 import { cn } from "@/ui/cn";
+import { ToggleGroup } from "@/ui/ToggleGroup";
 import { StatusBadge, StatusIcon } from "@/ui/StatusBadge";
 import { useRovingIndex } from "@/ui/useRovingIndex";
 
@@ -26,10 +42,15 @@ type Props = { dataset: Dataset; selected: EntityRef; period: PeriodRef };
 type Mark = {
   id: string;
   name: string;
-  attainment: number;
-  status: Status;
+  /** The metric the map colours by. */
+  value: number;
+  /** Undefined when the market has no attainment (no forecast), even if `value` exists. */
+  status: Status | undefined;
   inSelection: boolean;
 };
+
+/** Growth this far from zero (on either side) reaches the full colour of its side. */
+const GROWTH_SPREAD = 0.1;
 
 // Each marker has its status icon and label; the map fill and hatch only reinforce them.
 const STATUS_FILL: Record<Status, string> = {
@@ -41,23 +62,27 @@ const STATUS_ORDER: Status[] = ["on-track", "at-risk", "off-track"];
 
 const HATCH_SPACING = 6;
 
-/** Attainment per dataset market over a period. Markets the data doesn't cover are left out. */
+/**
+ * One metric per dataset market over a period. A market without that metric is left out; one
+ * with the metric but no attainment stays, without a status.
+ */
 function marksFor(
   dataset: Dataset,
   selected: EntityRef,
   period: PeriodRef,
+  metric: MapMetric,
 ): Mark[] {
   const inSelection = marketsInSelection(dataset, selected);
   return dataset.markets.flatMap((market) => {
     const ref: EntityRef = { level: "market", id: market.id };
-    const attainment = valueAt(dataset, ref, period, "attainment");
+    const value = valueAt(dataset, ref, period, metric);
     const status = statusAt(dataset, ref, period);
-    if (attainment === undefined || status === undefined) return [];
+    if (value === undefined) return [];
     return [
       {
         id: market.id,
         name: market.name,
-        attainment,
+        value,
         status,
         inSelection: inSelection.has(market.id),
       },
@@ -65,13 +90,29 @@ function marksFor(
   });
 }
 
-function byAttainment(marks: Mark[]): Mark[] {
-  return [...marks].sort((a, b) => a.attainment - b.attainment);
+/** Lowest first: the market a reader most needs to find. */
+function byValue(marks: Mark[]): Mark[] {
+  return [...marks].sort((a, b) => a.value - b.value);
 }
 
 /** "Germany: attainment 95.4%, at risk", the words a marker is read out as. */
-function markLabel(mark: Mark): string {
-  return `${mark.name}: attainment ${formatMetric("attainment", mark.attainment)}, ${formatStatus(mark.status).toLowerCase()}`;
+function markLabel(mark: Mark, metric: MapMetric): string {
+  const reading = `${mark.name}: ${formatMetricShortName(metric).toLowerCase()} ${formatMetric(metric, mark.value)}`;
+  return mark.status === undefined
+    ? reading
+    : `${reading}, ${formatStatus(mark.status).toLowerCase()}`;
+}
+
+/** The largest share among the markets in the selection: the top of the share scale. */
+function maxShare(marks: Mark[]): number {
+  return Math.max(0, ...marks.filter((m) => m.inSelection).map((m) => m.value));
+}
+
+/** A country's fill for growth or share; attainment uses the status classes instead. */
+function scaleFill(metric: MapMetric, value: number, top: number): string {
+  return metric === "share"
+    ? sequentialColour(value, top)
+    : divergingColour(value, { midpoint: 0, spread: GROWTH_SPREAD });
 }
 
 /**
@@ -83,30 +124,46 @@ function mapSummary(
   selected: EntityRef,
   marks: Mark[],
   period: PeriodRef,
+  metric: MapMetric,
 ): string {
-  const shown = marks.filter((m) => m.inSelection);
+  const shown = byValue(marks.filter((m) => m.inSelection));
   const when = formatPeriod(period);
-  const [lowest] = byAttainment(shown);
-  if (!lowest) return `No market data for ${when}.`;
+  const lowest = shown[0];
+  const highest = shown.at(-1);
+  if (!lowest || !highest) return `No market data for ${when}.`;
   if (selected.level === "market" || selected.level === "product") {
-    return `${markLabel(lowest)}, in ${when}.`;
+    return `${markLabel(lowest, metric)}, in ${when}.`;
   }
-  const flagged = shown.filter((m) => m.status !== "on-track").length;
-  const verb = flagged === 1 ? "is" : "are";
   const where =
     selected.level === "region" ? ` in ${entityLabel(dataset, selected)}` : "";
-  return `${flagged} of ${shown.length} markets${where} ${verb} off track or at risk in ${when}; the lowest is ${lowest.name} at ${formatMetric("attainment", lowest.attainment)}.`;
+  if (metric !== "attainment") {
+    const subject = `${formatMetricShortName(metric)}${where} in ${when}`;
+    const at = (mark: Mark) =>
+      `${mark.name} at ${formatMetric(metric, mark.value)}`;
+    return lowest === highest
+      ? `${subject} is ${at(lowest)}.`
+      : `${subject} runs from ${at(lowest)} to ${at(highest)}.`;
+  }
+  const flagged = shown.filter(
+    (m) => m.status === "at-risk" || m.status === "off-track",
+  ).length;
+  const verb = flagged === 1 ? "is" : "are";
+  return `${flagged} of ${shown.length} markets${where} ${verb} off track or at risk in ${when}; the lowest is ${lowest.name} at ${formatMetric("attainment", lowest.value)}.`;
 }
 
 /**
- * Markets by attainment on a world map. Each country is status-coloured when it is in the
- * selection and muted otherwise; off track is also hatched. A marker per market focuses and
- * drills to that market.
+ * Markets on a world map, coloured by attainment (status), growth or share (the URL's
+ * `mapMetric`). Countries outside the selection are muted; for attainment, off track is also
+ * hatched. A marker per market shows its status icon, and focuses and drills to that market.
  */
 export function MarketMap({ dataset, selected, period }: Props) {
   const drill = useDrill();
   const highlighted = useHighlightedPath();
-  const marks = marksFor(dataset, selected, period);
+  const metric = useMapMetric();
+  const marks = marksFor(dataset, selected, period, metric);
+  // Only share uses a scale top; the other metrics have fixed scales.
+  const top = metric === "share" ? maxShare(marks) : 0;
+  const title = `Markets by ${formatMetricShortName(metric).toLowerCase()}`;
   const marketPath = (id: string) => pathOf(dataset, { level: "market", id });
   const hatchId = `hatch-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
 
@@ -123,134 +180,221 @@ export function MarketMap({ dataset, selected, period }: Props) {
   );
   const roving = useRovingIndex(marks.length, entryIndex);
 
-  const summary = mapSummary(dataset, selected, marks, period);
+  const summary = mapSummary(dataset, selected, marks, period, metric);
 
   return (
-    <ChartFrame
-      title="Markets by attainment"
-      summary={summary}
-      height={320}
-      table={<MarketTable marks={marks} />}
-      legend={<MapLegend />}
-      drawing={(size) => {
-        const path = geoPath(worldProjection(size));
-        return (
-          <g>
-            <defs>
-              <pattern
-                id={hatchId}
-                width={HATCH_SPACING}
-                height={HATCH_SPACING}
-                patternUnits="userSpaceOnUse"
-                patternTransform="rotate(45)"
-              >
-                <line
-                  x1={0}
-                  y1={0}
-                  x2={0}
-                  y2={HATCH_SPACING}
-                  strokeWidth={2}
-                  className="stroke-background"
-                />
-              </pattern>
-            </defs>
-            {countryFeatures.map((country, index) => {
-              const d = path(country) ?? undefined;
-              const mark = marks.find(
-                (m) => MARKET_GEO_IDS[m.id] === String(country.id),
-              );
-              const className =
-                mark === undefined
-                  ? "fill-muted stroke-background"
-                  : mark.inSelection
-                    ? `${STATUS_FILL[mark.status]} stroke-background`
-                    : "fill-muted stroke-border";
-              // A linked market's country gets a heavier outline, on top of its fill.
-              const linked =
-                mark !== undefined &&
-                isLinked(marketPath(mark.id), highlighted);
-              return (
-                <g key={String(country.id ?? index)}>
-                  <path
-                    d={d}
-                    className={cn(className, linked && "stroke-foreground")}
-                    strokeWidth={linked ? 1.5 : 0.5}
+    <div className="flex flex-col gap-3">
+      <MetricToggle metric={metric} />
+      <ChartFrame
+        title={title}
+        summary={summary}
+        height={320}
+        table={<MarketTable marks={marks} metric={metric} title={title} />}
+        legend={
+          <MapLegend
+            metric={metric}
+            top={top}
+            anyWithoutStatus={marks.some((m) => m.status === undefined)}
+          />
+        }
+        drawing={(size) => {
+          const path = geoPath(worldProjection(size));
+          return (
+            <g>
+              <defs>
+                <pattern
+                  id={hatchId}
+                  width={HATCH_SPACING}
+                  height={HATCH_SPACING}
+                  patternUnits="userSpaceOnUse"
+                  patternTransform="rotate(45)"
+                >
+                  <line
+                    x1={0}
+                    y1={0}
+                    x2={0}
+                    y2={HATCH_SPACING}
+                    strokeWidth={2}
+                    className="stroke-background"
                   />
-                  {mark?.inSelection && mark.status === "off-track" ? (
+                </pattern>
+              </defs>
+              {countryFeatures.map((country, index) => {
+                const d = path(country) ?? undefined;
+                const mark = marks.find(
+                  (m) => MARKET_GEO_IDS[m.id] === String(country.id),
+                );
+                const className =
+                  mark === undefined
+                    ? "fill-muted stroke-background"
+                    : !mark.inSelection
+                      ? "fill-muted stroke-border"
+                      : metric === "attainment"
+                        ? `${mark.status ? STATUS_FILL[mark.status] : "fill-muted"} stroke-background`
+                        : "stroke-background";
+                const fill =
+                  mark?.inSelection && metric !== "attainment"
+                    ? scaleFill(metric, mark.value, top)
+                    : undefined;
+                // A linked market's country gets a heavier outline, on top of its fill.
+                const linked =
+                  mark !== undefined &&
+                  isLinked(marketPath(mark.id), highlighted);
+                return (
+                  <g key={String(country.id ?? index)}>
                     <path
                       d={d}
-                      fill={`url(#${hatchId})`}
-                      pointerEvents="none"
+                      className={cn(className, linked && "stroke-foreground")}
+                      style={fill === undefined ? undefined : { fill }}
+                      strokeWidth={linked ? 1.5 : 0.5}
                     />
-                  ) : null}
-                </g>
-              );
-            })}
-          </g>
-        );
-      }}
-      points={(size) => {
-        const project = worldProjection(size);
-        return marks.map((mark, index) => {
-          const anchor = marketAnchor(mark.id, project);
-          if (anchor === undefined) return null;
-          const [x, y] = anchor;
-          const item = roving.itemProps(index);
-          const link = linkedProps(
-            marketPath(mark.id),
-            isLinked(marketPath(mark.id), highlighted),
-            item,
+                    {metric === "attainment" &&
+                    mark?.inSelection &&
+                    mark.status === "off-track" ? (
+                      <path
+                        d={d}
+                        fill={`url(#${hatchId})`}
+                        pointerEvents="none"
+                      />
+                    ) : null}
+                  </g>
+                );
+              })}
+            </g>
           );
-          return (
-            <button
-              key={mark.id}
-              type="button"
-              {...item}
-              {...link}
-              aria-label={markLabel(mark)}
-              onClick={() => drill({ level: "market", id: mark.id })}
-              style={{ left: x, top: y }}
-              className={cn(
-                "pointer-events-auto absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-                link["data-linked"] && "ring-2 ring-foreground",
-              )}
-            >
-              <StatusIcon status={mark.status} />
-            </button>
-          );
-        });
-      }}
+        }}
+        points={(size) => {
+          const project = worldProjection(size);
+          return marks.map((mark, index) => {
+            const anchor = marketAnchor(mark.id, project);
+            if (anchor === undefined) return null;
+            const [x, y] = anchor;
+            const item = roving.itemProps(index);
+            const link = linkedProps(
+              marketPath(mark.id),
+              isLinked(marketPath(mark.id), highlighted),
+              item,
+            );
+            return (
+              <button
+                key={mark.id}
+                type="button"
+                {...item}
+                {...link}
+                aria-label={markLabel(mark, metric)}
+                onClick={() => drill({ level: "market", id: mark.id })}
+                style={{ left: x, top: y }}
+                className={cn(
+                  "pointer-events-auto absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                  link["data-linked"] && "ring-2 ring-foreground",
+                )}
+              >
+                {mark.status ? (
+                  <StatusIcon status={mark.status} />
+                ) : (
+                  <NoStatusIcon />
+                )}
+              </button>
+            );
+          });
+        }}
+      />
+    </div>
+  );
+}
+
+/** What the map colours by. */
+function MetricToggle({ metric }: { metric: MapMetric }) {
+  return (
+    <ToggleGroup
+      label="Colour map by"
+      options={MAP_METRICS}
+      value={metric}
+      onChange={useSetMapMetric()}
+      labelOf={formatMetricShortName}
     />
   );
 }
 
-/** Statuses by icon, plus the two map-only marks: the off-track hatch and muted markets. */
-function MapLegend() {
+/**
+ * Statuses by icon (the markers always show them), then what the fill means: for attainment
+ * the off-track hatch, for growth and share labelled stops of the scale. Muted is outside
+ * the selection.
+ */
+function MapLegend({
+  metric,
+  top,
+  anyWithoutStatus,
+}: {
+  metric: MapMetric;
+  top: number;
+  /** Adds the "no status" mark only when a market shows it. */
+  anyWithoutStatus: boolean;
+}) {
+  const statuses = [
+    ...STATUS_ORDER.map((status) => ({
+      label: formatStatus(status),
+      swatch: <StatusIcon status={status} />,
+    })),
+    ...(anyWithoutStatus
+      ? [{ label: "No status: no forecast", swatch: <NoStatusIcon /> }]
+      : []),
+  ];
+  const swatch = (colour: string) => (
+    <span className="size-3 rounded-sm" style={{ background: colour }} />
+  );
+  const fill =
+    metric === "attainment"
+      ? [
+          {
+            label: "Hatched: off track",
+            swatch: (
+              <svg width={12} height={12} className="block">
+                <rect
+                  width={12}
+                  height={12}
+                  rx={2}
+                  className="fill-status-off-track"
+                />
+                <path
+                  d="M0 6 L6 0 M0 12 L12 0 M6 12 L12 6"
+                  strokeWidth={2}
+                  className="stroke-background"
+                />
+              </svg>
+            ),
+          },
+        ]
+      : metric === "growth"
+        ? [
+            {
+              label: `${formatPercent(-GROWTH_SPREAD, { signed: true })} or less`,
+              swatch: swatch(scaleFill(metric, -GROWTH_SPREAD, top)),
+            },
+            {
+              label: formatPercent(0, { signed: true }),
+              swatch: swatch(scaleFill(metric, 0, top)),
+            },
+            {
+              label: `${formatPercent(GROWTH_SPREAD, { signed: true })} or more`,
+              swatch: swatch(scaleFill(metric, GROWTH_SPREAD, top)),
+            },
+          ]
+        : [
+            {
+              label: formatPercent(0),
+              swatch: swatch(scaleFill(metric, 0, top)),
+            },
+            {
+              label: formatPercent(top),
+              swatch: swatch(scaleFill(metric, top, top)),
+            },
+          ];
   return (
     <ChartLegend
       items={[
-        ...STATUS_ORDER.map((status) => ({
-          label: formatStatus(status),
-          swatch: <StatusIcon status={status} />,
-        })),
-        {
-          label: "Hatched: off track",
-          swatch: (
-            <svg width={12} height={12} className="block">
-              <rect
-                width={12}
-                height={12}
-                rx={2}
-                className="fill-status-off-track"
-              />
-              <path
-                d="M0 6 L6 0 M0 12 L12 0 M6 12 L12 6"
-                strokeWidth={2}
-                className="stroke-background"
-              />
-            </svg>
-          ),
-        },
+        ...statuses,
+        ...fill,
         {
           label: "Muted: outside the selection",
           swatch: <span className="size-3 rounded-sm bg-muted" />,
@@ -260,11 +404,19 @@ function MapLegend() {
   );
 }
 
-function MarketTable({ marks }: { marks: Mark[] }) {
+function MarketTable({
+  marks,
+  metric,
+  title,
+}: {
+  marks: Mark[];
+  metric: MapMetric;
+  title: string;
+}) {
   return (
     <table className="w-full text-sm">
       <caption className="pb-2 text-left text-muted-foreground">
-        Markets by attainment
+        {title}
       </caption>
       <thead className="text-xs text-muted-foreground">
         <tr className="border-b">
@@ -272,7 +424,7 @@ function MarketTable({ marks }: { marks: Mark[] }) {
             Market
           </th>
           <th scope="col" className="py-1.5 text-right font-medium">
-            Attainment
+            {formatMetricName(metric)}
           </th>
           <th scope="col" className="py-1.5 text-left font-medium">
             Status
@@ -280,20 +432,29 @@ function MarketTable({ marks }: { marks: Mark[] }) {
         </tr>
       </thead>
       <tbody className="tabular-nums">
-        {byAttainment(marks).map((mark) => (
+        {byValue(marks).map((mark) => (
           <tr key={mark.id} className="border-b">
             <th scope="row" className="py-1.5 text-left font-normal">
               {mark.name}
             </th>
             <td className="py-1.5 text-right">
-              {formatMetric("attainment", mark.attainment)}
+              {formatMetric(metric, mark.value)}
             </td>
             <td className="py-1.5">
-              <StatusBadge status={mark.status} className="font-normal" />
+              {mark.status ? (
+                <StatusBadge status={mark.status} className="font-normal" />
+              ) : (
+                <span className="text-muted-foreground">No data</span>
+              )}
             </td>
           </tr>
         ))}
       </tbody>
     </table>
   );
+}
+
+/** The marker for a market with a value but no status (no forecast to attain). */
+function NoStatusIcon() {
+  return <Minus aria-hidden className="size-3.5 text-muted-foreground" />;
 }

@@ -24,25 +24,72 @@ const regions = [
 ] as const;
 type RegionId = (typeof regions)[number]["id"];
 
-/** Monthly revenue at the start of the history, in USD. */
+/**
+ * `base`: monthly revenue at the start of the history, in USD. `position`: how strong the
+ * portfolio is in that country, scaling every product's typical share (1 is typical), so
+ * market share varies by country: strong in Japan and the US, still building in India.
+ */
 const markets: {
   id: string;
   name: string;
   regionId: RegionId;
   base: number;
+  position: number;
 }[] = [
-  { id: "US", name: "United States", regionId: "na", base: 9_000_000 },
-  { id: "CA", name: "Canada", regionId: "na", base: 1_600_000 },
-  { id: "DE", name: "Germany", regionId: "eu", base: 4_400_000 },
-  { id: "FR", name: "France", regionId: "eu", base: 3_200_000 },
-  { id: "GB", name: "United Kingdom", regionId: "eu", base: 3_600_000 },
-  { id: "IT", name: "Italy", regionId: "eu", base: 2_100_000 },
-  { id: "ES", name: "Spain", regionId: "eu", base: 1_700_000 },
-  { id: "JP", name: "Japan", regionId: "apac", base: 4_000_000 },
-  { id: "AU", name: "Australia", regionId: "apac", base: 1_500_000 },
-  { id: "IN", name: "India", regionId: "apac", base: 1_200_000 },
-  { id: "BR", name: "Brazil", regionId: "latam", base: 1_400_000 },
-  { id: "MX", name: "Mexico", regionId: "latam", base: 1_100_000 },
+  {
+    id: "US",
+    name: "United States",
+    regionId: "na",
+    base: 9_000_000,
+    position: 1.3,
+  },
+  { id: "CA", name: "Canada", regionId: "na", base: 1_600_000, position: 0.9 },
+  {
+    id: "DE",
+    name: "Germany",
+    regionId: "eu",
+    base: 4_400_000,
+    position: 1.15,
+  },
+  { id: "FR", name: "France", regionId: "eu", base: 3_200_000, position: 0.8 },
+  {
+    id: "GB",
+    name: "United Kingdom",
+    regionId: "eu",
+    base: 3_600_000,
+    position: 1,
+  },
+  { id: "IT", name: "Italy", regionId: "eu", base: 2_100_000, position: 0.7 },
+  { id: "ES", name: "Spain", regionId: "eu", base: 1_700_000, position: 0.6 },
+  { id: "JP", name: "Japan", regionId: "apac", base: 4_000_000, position: 1.4 },
+  {
+    id: "AU",
+    name: "Australia",
+    regionId: "apac",
+    base: 1_500_000,
+    position: 0.85,
+  },
+  {
+    id: "IN",
+    name: "India",
+    regionId: "apac",
+    base: 1_200_000,
+    position: 0.55,
+  },
+  {
+    id: "BR",
+    name: "Brazil",
+    regionId: "latam",
+    base: 1_400_000,
+    position: 0.75,
+  },
+  {
+    id: "MX",
+    name: "Mexico",
+    regionId: "latam",
+    base: 1_100_000,
+    position: 0.65,
+  },
 ];
 
 /** Year-on-year growth by region; `satisfies` makes a missing or mistyped region a compile error. */
@@ -209,7 +256,10 @@ function generate(): Dataset {
             units: actual / product.price,
             // From the pre-adjustment value: a story changes our sales, not the category's size,
             // so a stock-out shows up as lost share.
-            marketSize: expected / (product.share * jitter(0.04)),
+            // The jitter is drawn first, as before, so the seeded sequence (and every other
+            // figure) is unchanged by the position factor.
+            marketSize:
+              expected / (jitter(0.04) * product.share * market.position),
           });
         }
 

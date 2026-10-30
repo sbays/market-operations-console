@@ -1,5 +1,5 @@
 import { TestDataset } from "@/test/dataset";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   withNuqsTestingAdapter,
@@ -92,7 +92,7 @@ describe("Dashboard", () => {
   });
 
   it("reads the selection from the URL and goes back up from the breadcrumb", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-Q3");
 
     expect(within(breadcrumb()).getByText("Germany")).toHaveAttribute(
       "aria-current",
@@ -108,7 +108,7 @@ describe("Dashboard", () => {
     );
 
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu",
+      query: "?path=eu&period=2026-Q3",
       history: "push",
     });
   });
@@ -122,6 +122,41 @@ describe("Dashboard", () => {
     expect(kpis).toHaveTextContent(/Forecast attainment\s*82\.1%/);
     expect(within(kpis).getByText("Off track")).toBeInTheDocument();
     expect(kpis).toHaveTextContent(/16\.7%/);
+  });
+
+  it("picks a quarter or a month from the period picker", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-03");
+    const picker = screen.getByRole("combobox", { name: "Period" });
+    expect(picker).toHaveDisplayValue("Mar 2026");
+
+    await user.selectOptions(picker, "Q2 2026");
+    expect(lastUrl(onUrlUpdate)).toEqual({
+      query: "?path=eu.DE&period=2026-Q2",
+      history: "replace",
+    });
+    expect(keyFigures()).toHaveTextContent("Q2 2026");
+  });
+
+  it("pins the shown quarter into a link without a period, so a shared link never drifts", async () => {
+    const { onUrlUpdate } = renderDashboard("?path=eu.DE");
+
+    await waitFor(() =>
+      expect(lastUrl(onUrlUpdate)).toEqual({
+        query: "?path=eu.DE&period=2026-Q3",
+        history: "replace",
+      }),
+    );
+    expect(screen.getByRole("combobox", { name: "Period" })).toHaveDisplayValue(
+      "Q3 2026",
+    );
+  });
+
+  it("pins the shown quarter in place of a period the data doesn't cover", async () => {
+    const { onUrlUpdate } = renderDashboard("?path=eu.DE&period=2030-Q1");
+
+    await waitFor(() =>
+      expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.DE&period=2026-Q3"),
+    );
   });
 
   it("falls back to the portfolio for a link the data doesn't contain, and says so", async () => {
@@ -310,7 +345,7 @@ describe("Dashboard", () => {
   });
 
   it("ticks the compared rows, up to four, starting from the radar's defaults", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu&period=2026-Q3");
     const table = screen.getByRole("table", { name: /Europe by market/ });
     const box = (market: string) =>
       within(table).getByRole("checkbox", { name: `Compare ${market}` });
@@ -327,14 +362,14 @@ describe("Dashboard", () => {
     // Unticking one keeps the other three rather than collapsing to one.
     await user.click(box("Germany"));
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu&compare=eu.FR,eu.GB,eu.IT",
+      query: "?path=eu&period=2026-Q3&compare=eu.FR,eu.GB,eu.IT",
       history: "replace",
     });
     expect(box("Spain")).toBeEnabled();
 
     await user.click(box("Spain"));
     expect(lastUrl(onUrlUpdate).query).toBe(
-      "?path=eu&compare=eu.FR,eu.GB,eu.IT,eu.ES",
+      "?path=eu&period=2026-Q3&compare=eu.FR,eu.GB,eu.IT,eu.ES",
     );
   });
 
@@ -382,14 +417,14 @@ describe("Dashboard", () => {
   });
 
   it("drills to a market from the map", async () => {
-    const { user, onUrlUpdate } = renderDashboard();
+    const { user, onUrlUpdate } = renderDashboard("?period=2026-Q3");
 
     await user.click(
       await screen.findByRole("button", { name: /^Germany: attainment / }),
     );
 
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu.DE",
+      query: "?period=2026-Q3&path=eu.DE",
       history: "push",
     });
     expect(breadcrumb()).toHaveTextContent(/Portfolio.*Europe.*Germany/);
@@ -399,7 +434,7 @@ describe("Dashboard", () => {
     renderDashboard("?path=eu.DE");
 
     expect(keyFigures()).toHaveTextContent(/Units\s*141\.9K/);
-    expect(keyFigures()).toHaveTextContent(/Market share\s*17\.0%/);
+    expect(keyFigures()).toHaveTextContent(/Market share\s*19\.6%/);
     expect(
       within(trendFigure()).getByRole("list", { name: "Legend" }),
     ).toHaveTextContent("Prior year");
@@ -427,11 +462,11 @@ describe("Dashboard", () => {
   });
 
   it("switches mode from the toggle, replacing history", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-Q3");
 
     await user.click(screen.getByRole("button", { name: "Exec" }));
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu.DE&mode=exec",
+      query: "?path=eu.DE&period=2026-Q3&mode=exec",
       history: "replace",
     });
     expect(screen.getByRole("button", { name: "Exec" })).toHaveAttribute(
@@ -440,7 +475,7 @@ describe("Dashboard", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Analyst" }));
-    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.DE");
+    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.DE&period=2026-Q3");
   });
 
   it("drills from a top risk, and the other panels follow", async () => {
@@ -489,7 +524,7 @@ describe("Dashboard", () => {
   });
 
   it("ignores Escape outside the dashboard", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-Q3");
     // Stands in for the chat input beside the dashboard.
     const chatInput = document.createElement("input");
     document.body.append(chatInput);
@@ -501,7 +536,7 @@ describe("Dashboard", () => {
   });
 
   it("does nothing on Escape at the portfolio", async () => {
-    const { user, onUrlUpdate } = renderDashboard();
+    const { user, onUrlUpdate } = renderDashboard("?period=2026-Q3");
 
     act(() => screen.getByRole("button", { name: "Analyst" }).focus());
     await user.keyboard("{Escape}");
@@ -535,7 +570,7 @@ describe("Dashboard", () => {
   });
 
   it("moves focus to the key figures after Escape, so the next Escape still works", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-Q3");
     act(() =>
       within(screen.getByRole("table", { name: /Germany by product/ }))
         .getAllByRole("checkbox")[0]
@@ -545,11 +580,11 @@ describe("Dashboard", () => {
     await user.keyboard("{Escape}");
     expect(keyFigures()).toHaveFocus();
     await user.keyboard("{Escape}");
-    expect(lastUrl(onUrlUpdate).query).toBe("");
+    expect(lastUrl(onUrlUpdate).query).toBe("?period=2026-Q3");
   });
 
   it("goes up on Escape when nothing has focus, as after a click in Safari", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-Q3");
     act(() => {
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
@@ -557,7 +592,7 @@ describe("Dashboard", () => {
     });
 
     await user.keyboard("{Escape}");
-    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu");
+    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu&period=2026-Q3");
   });
 });
 

@@ -5,7 +5,14 @@ import { useEffect, useEffectEvent, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useDataset } from "@/data/useDataset";
 import { ancestorsOf, pathOf, selectionPeriod } from "@/domain/selectors";
-import { useDrill, useMode, useSelection, useUnknownPath } from "@/state/url";
+import {
+  useDrill,
+  useMapMetric,
+  useMode,
+  useSelection,
+  useSetPeriod,
+  useUnknownPath,
+} from "@/state/url";
 import { clearHighlight } from "@/state/highlight";
 import { focusDashboard } from "@/ui/dashboardFocus";
 import { ErrorBoundary } from "@/ui/ErrorBoundary";
@@ -15,6 +22,7 @@ import { CompareRadar } from "./CompareRadar";
 import { DetailTable } from "./DetailTable";
 import { KpiStrip } from "./KpiStrip";
 import { ModeToggle } from "./ModeToggle";
+import { PeriodPicker } from "./PeriodPicker";
 import { RiskMovers } from "./RiskMovers";
 import { TrendChart } from "./TrendChart";
 
@@ -34,6 +42,7 @@ export function Dashboard() {
   const dataset = useDataset();
   const { ref, period } = useSelection();
   const mode = useMode();
+  const mapMetric = useMapMetric();
   const analyst = mode === "analyst";
   const shown = selectionPeriod(dataset, period);
   const props = { dataset, selected: ref, period: shown };
@@ -51,6 +60,15 @@ export function Dashboard() {
   useEffect(() => {
     if (unknownPath.path !== null) announceUnknownPath();
   }, [unknownPath.path]);
+
+  // The period is pinned into the URL: a link without one would mean "the latest quarter
+  // when opened", so a link shared today would show other figures after new data lands.
+  // A missing or uncovered period is replaced by the one shown, without a history entry.
+  const setPeriod = useSetPeriod();
+  const pinPeriod = useEffectEvent(() => setPeriod(shown));
+  useEffect(() => {
+    if (period !== shown) pinPeriod();
+  }, [period, shown]);
 
   // Escape goes up a level from inside the dashboard, or when nothing has focus (Safari
   // doesn't focus a clicked button, so focus stays on the body). A window listener, since the
@@ -90,12 +108,16 @@ export function Dashboard() {
     <div ref={rootRef} className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Breadcrumb dataset={dataset} selected={ref} />
-        <ModeToggle />
+        <div className="flex flex-wrap items-center gap-3">
+          <PeriodPicker dataset={dataset} shown={shown} />
+          <ModeToggle />
+        </div>
       </div>
       <KpiStrip {...props} mode={mode} />
       <RiskMovers {...props} mode={mode} />
       <div className="grid gap-6 xl:grid-cols-2">
-        <Panel label="Market map" resetKey={resetKey}>
+        {/* The map also retries when it is recoloured: one metric's failure isn't another's. */}
+        <Panel label="Market map" resetKey={`${resetKey}#${mapMetric}`}>
           <MarketMap {...props} />
         </Panel>
         <Panel label="Trend chart" resetKey={resetKey}>

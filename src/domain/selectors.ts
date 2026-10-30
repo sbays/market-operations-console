@@ -17,7 +17,10 @@ import {
 import { formatPercent, formatPoints, PERCENT_DECIMALS } from "./format";
 import { monthKey, monthsOfQuarter, parsePeriod, quarterKey } from "./period";
 
-/** Attainment thresholds for status, judged over a quarter. */
+/**
+ * Attainment thresholds for status, judged over the period shown: the latest quarter by
+ * default, or the quarter or month a reader picks.
+ */
 export const ON_TRACK_FROM = 0.98;
 export const AT_RISK_FROM = 0.92;
 
@@ -178,14 +181,24 @@ export function statusCounts(
 
 /** The most recent quarter whose three months are all in the data. */
 export function latestQuarter(dataset: Dataset): Quarter | undefined {
+  return periodOptions(dataset).quarters[0];
+}
+
+/** The periods a reader can pick: every quarter the data fully covers, and every month, newest first. */
+export function periodOptions(dataset: Dataset): {
+  quarters: Quarter[];
+  months: Month[];
+} {
   // Periods are consecutive months in order (the schema guarantees it).
-  for (const month of [...dataset.periods].reverse()) {
+  const months = [...dataset.periods].reverse();
+  const quarters = months.flatMap((month) => {
     const parsed = parsePeriod(month);
-    if (parsed?.kind !== "month" || parsed.month % 3 !== 0) continue;
+    // A quarter is listed at its last month, so each appears once.
+    if (parsed?.kind !== "month" || parsed.month % 3 !== 0) return [];
     const quarter = quarterKey(parsed.year, parsed.month / 3);
-    if (expandPeriod(dataset, quarter).length > 0) return quarter;
-  }
-  return undefined;
+    return expandPeriod(dataset, quarter).length > 0 ? [quarter] : [];
+  });
+  return { quarters, months };
 }
 
 /**

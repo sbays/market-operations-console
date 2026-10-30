@@ -18,6 +18,7 @@ import {
   latestQuarter,
   monthlySeries,
   pathOf,
+  periodOptions,
   refFromPath,
   selectionPeriod,
   statusAt,
@@ -263,6 +264,28 @@ describe("latestQuarter", () => {
     expect(latestQuarter({ ...dataset, periods: months.slice(0, 5) })).toBe(
       "2026-Q1",
     );
+  });
+});
+
+describe("periodOptions", () => {
+  it("lists the quarters the data fully covers and every month, newest first", () => {
+    expect(periodOptions(dataset)).toEqual({
+      quarters: ["2026-Q2", "2026-Q1"],
+      months: [
+        "2026-06",
+        "2026-05",
+        "2026-04",
+        "2026-03",
+        "2026-02",
+        "2026-01",
+      ],
+    });
+  });
+
+  it("leaves out a quarter the data only partly covers", () => {
+    expect(
+      periodOptions({ ...dataset, periods: months.slice(1) }).quarters,
+    ).toEqual(["2026-Q2"]);
   });
 });
 

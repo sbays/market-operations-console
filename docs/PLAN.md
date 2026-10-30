@@ -100,7 +100,7 @@ The starter pack won't be provided (confirmed 30 Oct), so we author our own `dat
 Pack decisions (28 Oct, `feat/data-pack`):
 
 - The pack lives in `src/pack/` (`data.json`, `fixtures.json`, `CONTRACT.md`) and is read only through `src/data/pack.ts` (`loadDataset`, `loadFixtures`); a lint rule enforces it. `pack.ts` is `server-only`: the dataset reaches the client through `DatasetProvider` and the fixtures never leave the server.
-- The dataset stores facts only (`actual`, `units`, `forecast`, `priorYear`, `marketSize` per product, market and month). Growth, attainment, share and status are selectors, so rollups are exact. Status uses quarterly attainment: on-track from 98%, at-risk from 92%, off-track below, compared on the value as displayed (one decimal), so a badge never contradicts its number (decided 28 Oct, PR #4 review). Anomalies are stored because they carry a reason.
+- The dataset stores facts only (`actual`, `units`, `forecast`, `priorYear`, `marketSize` per product, market and month). Growth, attainment, share and status are selectors, so rollups are exact. Status uses attainment over the shown period (the latest quarter by default; a picked month is judged on that month): on-track from 98%, at-risk from 92%, off-track below, compared on the value as displayed (one decimal), so a badge never contradicts its number (decided 28 Oct, PR #4 review). Anomalies are stored because they carry a reason.
 - 24 months, Oct 2024 to Sep 2026; "this quarter" is Q3 2026. Citations may refer to a month or a quarter.
 - `scripts/generate-data.ts` (seeded, deterministic) plants the stories as named adjustments. Fixtures are templates whose `{{n}}` placeholders are filled from the data, so quoted numbers match by construction; pack tests re-check it.
 
@@ -167,7 +167,7 @@ Status is never colour alone: on-track, at-risk and off-track each get an icon a
 Gate decisions (29 Oct, `feat/dashboard-gate`):
 
 - The drill-down surface for the gate is a breakdown table of the current level's children (name, revenue, attainment, status); a row's name drills in. It grows into the analyst detail table on day 2.
-- With no `period` in the URL, panels show the latest full quarter; a URL month or quarter overrides it (`selectionPeriod`). Status badges use `statusAt` over the shown period, so a badge always matches the attainment beside it.
+- With no `period` in the URL, panels show the latest full quarter; a URL month or quarter overrides it (`selectionPeriod`). The period is **pinned** (Simon, 30 Oct): when a link has no period, or one the data doesn't cover, the dashboard writes the shown period into the URL, replacing history. A link without a period would mean "the latest quarter when opened", so a link shared today would show other figures once the next quarter's data lands. `mode` and `mapMetric` stay default-free, since their defaults don't change over time. A period picker in the dashboard header offers every fully covered quarter and every month (review fix, 30 Oct: after clicking a month nothing could select a quarter again; quarters stay because the default view, status and citations use them). Status badges use `statusAt` over the shown period, so a badge always matches the attainment beside it.
 - The chart shell (`ui/ChartFrame`) draws the static chart in `<svg role="img">` with the generated summary as its name, and puts focusable data points in an HTML overlay above it: `role="img"` makes svg children presentational, so points can't live inside it. Points use a roving tabindex (`ui/useRovingIndex`); charts have no transitions.
 - Breadcrumb and breakdown drills push history and keep the period; focusing a month from a chart replaces history (`useSetPeriod`).
 - `/console` is a partial prerender: the shell and the assistant are static, and the dashboard's Suspense hole reads the request's `searchParams`, so it is server-rendered for each URL and streamed in the same response rather than waiting for client JavaScript. Charts still draw after hydration, because they measure their container.
@@ -220,10 +220,12 @@ The URL is the selection store. Views never talk to each other; they read from a
 | Param | Example | Written by | Read by |
 | --- | --- | --- | --- |
 | `path` | `eu.DE.beacon` | Map click, table row, breadcrumb, citation chip, cmd-K | Every panel |
-| `period` | `2026-03` | Heat map cell, time-series click | Radar, time-series (highlighted point), KPI strip, map |
+| `period` | `2026-03` | Period picker, heat map cell, time-series click | Radar, time-series (highlighted point), KPI strip, map |
 | `compare` | `eu.DE,eu.FR` | Table checkboxes | Radar |
 | `mode` | `exec` or `analyst` | Mode toggle | Layout |
+| `mapMetric` | `growth` | Map "Colour map by" toggle | Map fill, marker labels, summary, legend and table (default `attainment`, no param) |
 
+- `mapMetric` (30 Oct) is named for the map, since it recolours only the map. Growth uses the diverging tokens centred on 0% (±10% is full colour); share uses a one-sided scale from 0% to the largest share shown, so differences aren't exaggerated. The generator first gave every market about 17% share, so the share map looked flat; each market now has a `position` factor on its products' typical share (30 Oct), giving 9.4% (India) to 24.0% (Japan) in Q3 2026. It scales only `marketSize`, after the seeded jitter is drawn, so revenue, forecast, units, prior year and every fixture number are unchanged. Markers keep their status icons in every mode.
 - Drill changes push history (back button goes up a level). Hover-like changes such as period replace history, so back isn't flooded.
 - Parsers are typed with nuqs and validated against the dataset; an unknown market id falls back to the portfolio with a toast, not a crash.
 - The assistant receives the parsed selection with every question, which gives us the context-aware stretch goal almost for free.

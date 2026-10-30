@@ -4,7 +4,8 @@ import { expect, test } from "@playwright/test";
 test("root redirects to the console", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page).toHaveURL(/\/console$/);
+  // The shown quarter is pinned into the URL, so a shared link never drifts.
+  await expect(page).toHaveURL(/\/console\?period=2026-Q3$/);
   await expect(
     page.getByRole("heading", { level: 1, name: "Market Operations" }),
   ).toBeVisible();
@@ -35,7 +36,7 @@ test("a cited answer drills the dashboard, and Back undoes it", async ({
     .getByRole("table", { name: /Europe by market/ })
     .getByRole("button", { name: "Germany" })
     .click();
-  await expect(page).toHaveURL(/path=eu\.DE$/);
+  await expect(page).toHaveURL(/\?period=2026-Q3&path=eu\.DE$/);
 
   await assistant
     .getByRole("button", {
@@ -53,14 +54,14 @@ test("a cited answer drills the dashboard, and Back undoes it", async ({
   );
 
   await chip.click();
-  await expect(page).toHaveURL(/path=eu\.DE&period=2026-03/);
+  await expect(page).toHaveURL(/\?period=2026-03&path=eu\.DE$/);
   // Focus lands on the figures that check the answer.
   const keyFigures = page.getByRole("region", { name: "Key figures" });
   await expect(keyFigures).toBeFocused();
   await expect(keyFigures).toContainText("Mar 2026");
 
   await page.goBack();
-  await expect(page).toHaveURL(/path=eu\.DE$/);
+  await expect(page).toHaveURL(/\?period=2026-Q3&path=eu\.DE$/);
   await expect(keyFigures).toContainText("Q3 2026");
 });
 
@@ -111,7 +112,7 @@ test("the dashboard drills through the breakdown, and Back goes up", async ({
     .getByRole("button", { name: "Germany" })
     .click();
 
-  await expect(page).toHaveURL(/\?path=eu\.DE$/);
+  await expect(page).toHaveURL(/\?period=2026-Q3&path=eu\.DE$/);
   await expect(breadcrumb).toHaveText(/Portfolio.*Europe.*Germany/);
   await expect(
     page.getByRole("img", { name: /^Germany revenue, / }),
@@ -123,7 +124,7 @@ test("the dashboard drills through the breakdown, and Back goes up", async ({
   expect(results.violations).toEqual([]);
 
   await page.goBack();
-  await expect(page).toHaveURL(/\?path=eu$/);
+  await expect(page).toHaveURL(/\?period=2026-Q3&path=eu$/);
   await expect(breadcrumb.getByText("Europe")).toHaveAttribute(
     "aria-current",
     "page",
