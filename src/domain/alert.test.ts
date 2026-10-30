@@ -4,7 +4,9 @@ import {
   AlertRuleInputSchema,
   type AlertRule,
   AlertRuleSchema,
+  alertMatches,
   describeAlert,
+  normaliseScope,
   THRESHOLD_RANGE,
   type AlertRuleInput,
 } from "./alert";
@@ -226,5 +228,128 @@ describe("describeAlert", () => {
     expect(describeAlert(rule, dataset)).toBe(
       "Forecast attainment below 90.0% in Germany",
     );
+  });
+});
+
+describe("normaliseScope", () => {
+  it("rejects paths the data doesn't contain, or that aren't a region or market", () => {
+    expect(
+      normaliseScope(dataset, ["eu.DE", "na.US", "", "eu.DE.beacon", "eu"]),
+    ).toEqual({ ok: false, invalid: ["na.US", "", "eu.DE.beacon"] });
+  });
+
+  it("drops repeats and markets their ticked region already covers, keeping the order", () => {
+    expect(normaliseScope(dataset, ["eu.DE", "eu.FR", "eu", "eu.DE"])).toEqual({
+      ok: true,
+      scope: ["eu"],
+    });
+    expect(normaliseScope(dataset, ["eu.FR", "eu.DE", "eu.FR"])).toEqual({
+      ok: true,
+      scope: ["eu.FR", "eu.DE"],
+    });
+  });
+});
+
+/**
+ * Every month the same, so a quarter's ratios equal a month's:
+ * DE attainment 90%, growth -10%; FR 100%, +25%; US 50%, 0%; IT 94.996% (shown as 95.0%), -5.0%.
+ */
+const months = ["2026-01", "2026-02", "2026-03"] as const;
+const flat = (actual: number, forecast: number, priorYear: number) =>
+  months.map((period) => ({
+    period,
+    actual,
+    units: 1,
+    forecast,
+    priorYear,
+    marketSize: 1000,
+  }));
+const matchData = DatasetSchema.parse({
+  currency: "USD",
+  periods: months,
+  regions: [
+    { id: "eu", name: "Europe" },
+    { id: "na", name: "North America" },
+  ],
+  products: [{ id: "beacon", name: "Beacon" }],
+  markets: [
+    {
+      id: "DE",
+      name: "Germany",
+      regionId: "eu",
+      series: { beacon: flat(90, 100, 100) },
+    },
+    {
+      id: "FR",
+      name: "France",
+      regionId: "eu",
+      series: { beacon: flat(100, 100, 80) },
+    },
+    {
+      id: "IT",
+      name: "Italy",
+      regionId: "eu",
+      series: { beacon: flat(94996, 100000, 100000) },
+    },
+    {
+      id: "US",
+      name: "United States",
+      regionId: "na",
+      series: { beacon: flat(50, 100, 50) },
+    },
+  ],
+  anomalies: [],
+});
+
+const rule = (overrides: Partial<AlertRule>): AlertRule => ({
+  id: "r",
+  name: "Rule",
+  scope: ["eu"],
+  metric: "attainment",
+  operator: "below",
+  threshold: 95,
+  ...overrides,
+});
+
+describe("alertMatches", () => {
+  it("flags the markets in a region scope that fall below the threshold", () => {
+    expect(alertMatches(matchData, rule({}), "2026-Q1")).toEqual([
+      { level: "market", id: "DE" },
+    ]);
+  });
+
+  it("checks a ticked market alongside a region", () => {
+    expect(
+      alertMatches(matchData, rule({ scope: ["eu", "na.US"] }), "2026-02"),
+    ).toEqual([
+      { level: "market", id: "DE" },
+      { level: "market", id: "US" },
+    ]);
+  });
+
+  it("flags growth above a threshold", () => {
+    expect(
+      alertMatches(
+        matchData,
+        rule({ metric: "growth", operator: "above", threshold: 20 }),
+        "2026-Q1",
+      ),
+    ).toEqual([{ level: "market", id: "FR" }]);
+  });
+
+  it("doesn't flag a value equal to the threshold", () => {
+    expect(alertMatches(matchData, rule({ threshold: 90 }), "2026-Q1")).toEqual(
+      [],
+    );
+  });
+
+  it("flags nothing for a period the data doesn't cover", () => {
+    expect(alertMatches(matchData, rule({}), "2025-Q4")).toEqual([]);
+  });
+
+  it("judges the value as it is shown, so 94.996% (shown as 95.0%) isn't below 95%", () => {
+    expect(
+      alertMatches(matchData, rule({ scope: ["eu.IT"] }), "2026-Q1"),
+    ).toEqual([]);
   });
 });

@@ -121,17 +121,16 @@ export function valueAt(
 }
 
 /**
- * Compares the attainment as it is displayed (rounded to PERCENT_DECIMALS), so a status
- * badge can never disagree with the percentage shown beside it.
+ * A ratio rounded as it is displayed (to PERCENT_DECIMALS of a percent). Decisions compare
+ * this, so a status badge or an alert can never disagree with the percentage shown.
  */
-/** An attainment ratio rounded as it is displayed (to PERCENT_DECIMALS of a percent). */
-function displayedAttainment(attainment: number): number {
+export function displayedRatio(ratio: number): number {
   const scale = 10 ** (PERCENT_DECIMALS + 2);
-  return Math.round(attainment * scale) / scale;
+  return Math.round(ratio * scale) / scale;
 }
 
 export function statusForAttainment(attainment: number): Status {
-  const displayed = displayedAttainment(attainment);
+  const displayed = displayedRatio(attainment);
   if (displayed >= ON_TRACK_FROM) return "on-track";
   if (displayed >= AT_RISK_FROM) return "at-risk";
   return "off-track";
@@ -469,7 +468,7 @@ function riskReason(
             months.includes(anomaly.period),
         )?.note;
   if (note !== undefined) return note;
-  const displayed = displayedAttainment(attainment);
+  const displayed = displayedRatio(attainment);
   return `Attainment ${formatPercent(displayed)}, ${formatPoints((1 - displayed) * 100)} under forecast.`;
 }
 
