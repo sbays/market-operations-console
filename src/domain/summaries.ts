@@ -33,6 +33,6 @@ export function trendSummary(
   const flagged =
     anomalyMonths.length === 0
       ? ""
-      : ` ${anomalyMonths.length === 1 ? "Anomaly" : "Anomalies"} flagged in ${formatList(anomalyMonths.map(formatPeriod))}.`;
+      : ` ${anomalyMonths.length === 1 ? "Anomaly" : "Anomalies"} flagged in ${formatList(anomalyMonths.toSorted().map(formatPeriod))}.`;
   return `${name} revenue, ${span}: ${latest}${against}.${flagged}`;
 }

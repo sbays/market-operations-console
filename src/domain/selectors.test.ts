@@ -11,6 +11,7 @@ import {
   entityLabel,
   entityName,
   expandPeriod,
+  isAncestorPath,
   latestQuarter,
   monthlySeries,
   pathOf,
@@ -822,5 +823,20 @@ describe("trendAnomalies", () => {
     expect(
       trendAnomalies(withAnomalies, { level: "market", id: "XX" }),
     ).toEqual([]);
+  });
+});
+
+describe("isAncestorPath", () => {
+  it("matches whole segments only, strictly above the path", () => {
+    expect(isAncestorPath("eu", "eu.DE")).toBe(true);
+    expect(isAncestorPath("eu", "eu.DE.beacon")).toBe(true);
+    expect(isAncestorPath("eu", "eu")).toBe(false);
+    expect(isAncestorPath("eu.D", "eu.DE")).toBe(false);
+    expect(isAncestorPath("eu.DE", "eu")).toBe(false);
+  });
+
+  it("treats the portfolio as the ancestor of everything but itself", () => {
+    expect(isAncestorPath("", "na")).toBe(true);
+    expect(isAncestorPath("", "")).toBe(false);
   });
 });
