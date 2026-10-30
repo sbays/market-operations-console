@@ -5,7 +5,13 @@ import { useEffect, useEffectEvent, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useDataset } from "@/data/useDataset";
 import { ancestorsOf, pathOf, selectionPeriod } from "@/domain/selectors";
-import { useDrill, useMode, useSelection, useUnknownPath } from "@/state/url";
+import {
+  useDrill,
+  useMode,
+  useSelection,
+  useSetPeriod,
+  useUnknownPath,
+} from "@/state/url";
 import { clearHighlight } from "@/state/highlight";
 import { focusDashboard } from "@/ui/dashboardFocus";
 import { ErrorBoundary } from "@/ui/ErrorBoundary";
@@ -53,6 +59,15 @@ export function Dashboard() {
     if (unknownPath.path !== null) announceUnknownPath();
   }, [unknownPath.path]);
 
+  // The period is pinned into the URL: a link without one would mean "the latest quarter
+  // when opened", so a link shared today would show other figures after new data lands.
+  // A missing or uncovered period is replaced by the one shown, without a history entry.
+  const setPeriod = useSetPeriod();
+  const pinPeriod = useEffectEvent(() => setPeriod(shown));
+  useEffect(() => {
+    if (period !== shown) pinPeriod();
+  }, [period, shown]);
+
   // Escape goes up a level from inside the dashboard, or when nothing has focus (Safari
   // doesn't focus a clicked button, so focus stays on the body). A window listener, since the
   // wrapper has no interactive role. Focus elsewhere (the chat, a dialog in its portal) is
@@ -92,7 +107,7 @@ export function Dashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Breadcrumb dataset={dataset} selected={ref} />
         <div className="flex flex-wrap items-center gap-3">
-          <PeriodPicker dataset={dataset} requested={period} />
+          <PeriodPicker dataset={dataset} shown={shown} />
           <ModeToggle />
         </div>
       </div>

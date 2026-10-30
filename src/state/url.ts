@@ -87,11 +87,8 @@ export function useDrill(): (ref: EntityRef, period?: PeriodRef) => void {
   };
 }
 
-/**
- * Focuses a period, or with null returns to the default (the latest quarter, no param).
- * Replaces history: stepping through periods shouldn't flood Back.
- */
-export function useSetPeriod(): (period: PeriodRef | null) => void {
+/** Focuses a period. Replaces history: stepping through periods shouldn't flood Back. */
+export function useSetPeriod(): (period: PeriodRef) => void {
   const [, setSelection] = useQueryStates(selectionParsers, {
     history: "replace",
   });
