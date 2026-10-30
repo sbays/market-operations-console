@@ -10,7 +10,12 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { loadDataset } from "@/data/pack";
 import { datasetQuery } from "@/data/queries";
-import { AlertRuleInputSchema, type AlertRule } from "@/domain/alert";
+import {
+  AlertRuleInputSchema,
+  normaliseScope,
+  type AlertRule,
+} from "@/domain/alert";
+import { DASHBOARD_FOCUS_ID } from "@/ui/dashboardFocus";
 import { server } from "@/test/msw";
 import { Toaster } from "@/ui/Toaster";
 import { AlertDialog } from "./AlertDialog";
@@ -78,7 +83,16 @@ function serveAlerts(
       if (new URL(request.url).searchParams.get("fail") === "1") {
         return HttpResponse.json({ error: "Saving failed" }, { status: 500 });
       }
-      const rule: AlertRule = { ...body, id: crypto.randomUUID() };
+      // Like the real handler, the saved scope is the normalised one.
+      const scope = normaliseScope(loadDataset(), body.scope);
+      if (!scope.ok) {
+        return HttpResponse.json({ error: "Invalid" }, { status: 400 });
+      }
+      const rule: AlertRule = {
+        ...body,
+        scope: scope.scope,
+        id: crypto.randomUUID(),
+      };
       saved = [...saved, rule];
       return HttpResponse.json(rule, { status: 201 });
     }),
@@ -125,6 +139,8 @@ function renderAlerts(
   render(
     <>
       <AlertDialog />
+      {/* Where a drill sends focus on the page: the dashboard's key figures. */}
+      <section id={DASHBOARD_FOCUS_ID} tabIndex={-1} aria-label="Key figures" />
       <AlertList />
       <Toaster />
     </>,
@@ -372,6 +388,33 @@ describe("a save before the list has loaded", () => {
   });
 });
 
+describe("a saved rule's scope", () => {
+  it("shows the scope as ticked while saving, then as the server stored it", async () => {
+    const { user, release } = renderAlerts("?path=eu.DE");
+    const dialog = await openDialog(user);
+    await fillRule(user, {
+      name: "Watch Europe",
+      scope: ["Germany", "Europe"],
+      threshold: "0",
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Save rule" }));
+
+    const rules = await rulesList();
+    expect(
+      await within(rules).findByText(
+        "Growth vs prior year below 0.0% in Germany, Europe",
+      ),
+    ).toBeInTheDocument();
+
+    release();
+    expect(
+      await within(rules).findByText(
+        "Growth vs prior year below 0.0% in Europe",
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("the markets a rule flags", () => {
   const apacRule: AlertRule = {
     id: "r1",
@@ -395,6 +438,8 @@ describe("the markets a rule flags", () => {
     expect(onUrlUpdate).toHaveBeenLastCalledWith(
       expect.objectContaining({ queryString: "?path=apac.JP" }),
     );
+    // The list sits below the dashboard: focus goes to the figures that just changed.
+    expect(screen.getByRole("region", { name: "Key figures" })).toHaveFocus();
   });
 
   it("follows the period in the URL", async () => {

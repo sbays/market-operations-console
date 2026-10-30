@@ -118,7 +118,8 @@ describe("POST /api/alerts", () => {
     });
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
-      error: "Unknown scope: eu.ZZ, eu.DE.beacon",
+      error:
+        "Scope must name regions or markets in the data, not: eu.ZZ, eu.DE.beacon",
     });
     expect(store).toEqual([]);
   });

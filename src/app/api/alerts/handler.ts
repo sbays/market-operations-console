@@ -48,7 +48,9 @@ export function createAlertsHandlers(options: AlertsHandlerOptions) {
     const scope = normaliseScope(options.dataset, parsed.data.scope);
     if (!scope.ok) {
       return Response.json(
-        { error: `Unknown scope: ${scope.invalid.join(", ")}` },
+        {
+          error: `Scope must name regions or markets in the data, not: ${scope.invalid.join(", ")}`,
+        },
         { status: 400 },
       );
     }

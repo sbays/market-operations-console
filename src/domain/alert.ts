@@ -109,8 +109,7 @@ export function normaliseScope(dataset: Dataset, scope: string[]): ScopeCheck {
 /**
  * The markets a rule flags over a period, in dataset order: every market in its scope (a
  * region scope covers each of its markets) whose metric, as displayed, is strictly past the
- * threshold.
- * A market with no value for the period is never flagged.
+ * threshold. A market with no value for the period is never flagged.
  */
 export function alertMatches(
   dataset: Dataset,
