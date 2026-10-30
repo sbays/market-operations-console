@@ -46,7 +46,7 @@ export function AttainmentHeatMap({ dataset, selected, period }: Props) {
   const highlighted = useHighlightedPath();
   const rows = heatmapRows(dataset, selected);
   const linkedRow = (row: (typeof rows)[number]) =>
-    isLinked(pathOf(dataset, row.ref) ?? "", highlighted);
+    isLinked(pathOf(dataset, row.ref), highlighted);
   const months = dataset.periods;
   const selectedColumn = isMonth(period) ? months.indexOf(period) : -1;
   // Keyboard users enter on the selected month, or the latest when a quarter is shown.

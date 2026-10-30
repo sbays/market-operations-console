@@ -1,3 +1,4 @@
+import { entityPath } from "@/test/path";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -342,7 +343,7 @@ describe("AlertList", () => {
         {
           id: "r1",
           name: "Watch Germany",
-          scope: ["eu.DE", "eu.FR"],
+          scope: [entityPath("eu.DE"), entityPath("eu.FR")],
           metric: "attainment",
           operator: "below",
           threshold: 95,
@@ -365,7 +366,7 @@ describe("a save before the list has loaded", () => {
     const existing: AlertRule = {
       id: "r1",
       name: "Existing rule",
-      scope: ["apac"],
+      scope: [entityPath("apac")],
       metric: "attainment",
       operator: "below",
       threshold: 95,
@@ -419,7 +420,7 @@ describe("the markets a rule flags", () => {
   const apacRule: AlertRule = {
     id: "r1",
     name: "APAC attainment",
-    scope: ["apac"],
+    scope: [entityPath("apac")],
     metric: "attainment",
     operator: "below",
     threshold: 95,
@@ -454,7 +455,9 @@ describe("the markets a rule flags", () => {
 
   it("says so when no market in scope crosses the threshold", async () => {
     renderAlerts("", {
-      initial: [{ ...apacRule, scope: ["eu.DE", "eu.FR"] }],
+      initial: [
+        { ...apacRule, scope: [entityPath("eu.DE"), entityPath("eu.FR")] },
+      ],
     });
     const rules = await rulesList();
     expect(

@@ -1,3 +1,4 @@
+import { entityPath } from "@/test/path";
 import { describe, expect, it } from "vitest";
 import { DatasetSchema, type Dataset, type Point } from "./schema";
 import {
@@ -13,6 +14,7 @@ import {
   expandPeriod,
   coversPath,
   isAncestorPath,
+  isPortfolioPath,
   latestQuarter,
   monthlySeries,
   pathOf,
@@ -827,27 +829,40 @@ describe("trendAnomalies", () => {
   });
 });
 
+describe("isPortfolioPath", () => {
+  it("is true only for the portfolio's own path", () => {
+    expect(isPortfolioPath(pathOf(dataset, { level: "portfolio" }))).toBe(true);
+    expect(isPortfolioPath(pathOf(dataset, germany))).toBe(false);
+  });
+
+  it("is false when the entity has no path", () => {
+    expect(isPortfolioPath(undefined)).toBe(false);
+  });
+});
+
 describe("isAncestorPath", () => {
   it("matches whole segments only, strictly above the path", () => {
-    expect(isAncestorPath("eu", "eu.DE")).toBe(true);
-    expect(isAncestorPath("eu", "eu.DE.beacon")).toBe(true);
-    expect(isAncestorPath("eu", "eu")).toBe(false);
-    expect(isAncestorPath("eu.D", "eu.DE")).toBe(false);
-    expect(isAncestorPath("eu.DE", "eu")).toBe(false);
+    expect(isAncestorPath(entityPath("eu"), entityPath("eu.DE"))).toBe(true);
+    expect(isAncestorPath(entityPath("eu"), entityPath("eu.DE.beacon"))).toBe(
+      true,
+    );
+    expect(isAncestorPath(entityPath("eu"), entityPath("eu"))).toBe(false);
+    expect(isAncestorPath(entityPath("eu.D"), entityPath("eu.DE"))).toBe(false);
+    expect(isAncestorPath(entityPath("eu.DE"), entityPath("eu"))).toBe(false);
   });
 
   it("treats the portfolio as the ancestor of everything but itself", () => {
-    expect(isAncestorPath("", "na")).toBe(true);
-    expect(isAncestorPath("", "")).toBe(false);
+    expect(isAncestorPath(entityPath(""), entityPath("na"))).toBe(true);
+    expect(isAncestorPath(entityPath(""), entityPath(""))).toBe(false);
   });
 });
 
 describe("coversPath", () => {
   it("covers the path itself and everything under it, by whole segments", () => {
-    expect(coversPath("eu.DE", "eu.DE")).toBe(true);
-    expect(coversPath("eu", "eu.DE.beacon")).toBe(true);
-    expect(coversPath("", "eu")).toBe(true);
-    expect(coversPath("eu.DE", "eu")).toBe(false);
-    expect(coversPath("eu.D", "eu.DE")).toBe(false);
+    expect(coversPath(entityPath("eu.DE"), entityPath("eu.DE"))).toBe(true);
+    expect(coversPath(entityPath("eu"), entityPath("eu.DE.beacon"))).toBe(true);
+    expect(coversPath(entityPath(""), entityPath("eu"))).toBe(true);
+    expect(coversPath(entityPath("eu.DE"), entityPath("eu"))).toBe(false);
+    expect(coversPath(entityPath("eu.D"), entityPath("eu.DE"))).toBe(false);
   });
 });

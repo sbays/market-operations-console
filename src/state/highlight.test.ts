@@ -1,3 +1,4 @@
+import { entityPath } from "@/test/path";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -12,8 +13,8 @@ afterEach(() => act(() => clearHighlight()));
 function setup() {
   const highlighted = renderHook(() => useHighlightedPath());
   return {
-    germany: { current: highlightHandlers("eu.DE") },
-    france: { current: highlightHandlers("eu.FR") },
+    germany: { current: highlightHandlers(entityPath("eu.DE")) },
+    france: { current: highlightHandlers(entityPath("eu.FR")) },
     highlighted: highlighted.result,
   };
 }
@@ -73,8 +74,8 @@ describe("highlight state", () => {
 
   it("answers per item whether it is linked, including parent and child", () => {
     const { germany } = setup();
-    const europe = renderHook(() => useIsLinked("eu"));
-    const france = renderHook(() => useIsLinked("eu.FR"));
+    const europe = renderHook(() => useIsLinked(entityPath("eu")));
+    const france = renderHook(() => useIsLinked(entityPath("eu.FR")));
 
     act(() => germany.current.onMouseEnter());
     expect(europe.result.current).toBe(true);

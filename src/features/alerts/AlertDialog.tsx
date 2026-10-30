@@ -14,8 +14,8 @@ import {
   type AlertRuleInput,
 } from "@/domain/alert";
 import { formatMetricName } from "@/domain/format";
-import type { Dataset, EntityRef } from "@/domain/schema";
-import { pathOf } from "@/domain/selectors";
+import type { Dataset, EntityPath, EntityRef } from "@/domain/schema";
+import { isPortfolioPath, pathOf } from "@/domain/selectors";
 import { useFailSaves, useSelection } from "@/state/url";
 import { Button } from "@/ui/button";
 import {
@@ -53,12 +53,34 @@ const FIELD_LABEL: Record<FieldName, string> = {
 };
 
 /** The scope a new rule starts with: the selection's region or market, nothing at the portfolio. */
-function defaultScope(dataset: Dataset, ref: EntityRef): string[] {
+function defaultScope(dataset: Dataset, ref: EntityRef): EntityPath[] {
   // A product is scoped to its market, since the rule watches markets.
   const scopeRef: EntityRef =
     ref.level === "product" ? { level: "market", id: ref.marketId } : ref;
-  const path = scopeRef.level === "portfolio" ? "" : pathOf(dataset, scopeRef);
-  return path ? [path] : [];
+  const path = pathOf(dataset, scopeRef);
+  return path === undefined || isPortfolioPath(path) ? [] : [path];
+}
+
+type ScopeOption = { path: EntityPath; label: string };
+
+/** The tickable regions in dataset order, each with its markets. */
+function scopeOptions(
+  dataset: Dataset,
+): (ScopeOption & { markets: ScopeOption[] })[] {
+  const option = (ref: EntityRef, label: string): ScopeOption[] => {
+    const path = pathOf(dataset, ref);
+    return path === undefined ? [] : [{ path, label }];
+  };
+  return dataset.regions.flatMap((region) =>
+    option({ level: "region", id: region.id }, region.name).map((entry) => ({
+      ...entry,
+      markets: dataset.markets
+        .filter((market) => market.regionId === region.id)
+        .flatMap((market) =>
+          option({ level: "market", id: market.id }, market.name),
+        ),
+    })),
+  );
 }
 
 /** The message from a react-hook-form error, if there is one. */
@@ -100,10 +122,10 @@ function ScopeCheckbox({
   invalid,
   inputRef,
 }: {
-  path: string;
+  path: EntityPath;
   label: string;
   checked: boolean;
-  onToggle: (path: string, checked: boolean) => void;
+  onToggle: (path: EntityPath, checked: boolean) => void;
   /** Set while the scope has an error; the fieldset carries the message. */
   invalid: boolean;
   inputRef?: Ref<HTMLInputElement>;
@@ -135,13 +157,13 @@ function ScopePicker({
   firstRef,
 }: {
   dataset: Dataset;
-  selected: string[];
-  onChange: (scope: string[]) => void;
+  selected: EntityPath[];
+  onChange: (scope: EntityPath[]) => void;
   error?: string;
   errorId: string;
   firstRef: Ref<HTMLInputElement>;
 }) {
-  const toggle = (path: string, checked: boolean) =>
+  const toggle = (path: EntityPath, checked: boolean) =>
     onChange(
       checked
         ? [...selected, path]
@@ -155,33 +177,28 @@ function ScopePicker({
     >
       <legend className="text-sm font-medium">Scope</legend>
       <ul className="flex flex-col gap-2">
-        {dataset.regions.map((region, index) => (
-          <li key={region.id} className="flex flex-col gap-1.5">
+        {scopeOptions(dataset).map((region, index) => (
+          <li key={region.path} className="flex flex-col gap-1.5">
             <ScopeCheckbox
-              path={region.id}
-              label={region.name}
-              checked={selected.includes(region.id)}
+              path={region.path}
+              label={region.label}
+              checked={selected.includes(region.path)}
               onToggle={toggle}
               invalid={Boolean(error)}
               inputRef={index === 0 ? firstRef : undefined}
             />
             <ul className="flex flex-col gap-1.5 pl-6">
-              {dataset.markets
-                .filter((market) => market.regionId === region.id)
-                .map((market) => {
-                  const path = `${region.id}.${market.id}`;
-                  return (
-                    <li key={market.id}>
-                      <ScopeCheckbox
-                        path={path}
-                        label={market.name}
-                        checked={selected.includes(path)}
-                        onToggle={toggle}
-                        invalid={Boolean(error)}
-                      />
-                    </li>
-                  );
-                })}
+              {region.markets.map((market) => (
+                <li key={market.path}>
+                  <ScopeCheckbox
+                    path={market.path}
+                    label={market.label}
+                    checked={selected.includes(market.path)}
+                    onToggle={toggle}
+                    invalid={Boolean(error)}
+                  />
+                </li>
+              ))}
             </ul>
           </li>
         ))}
