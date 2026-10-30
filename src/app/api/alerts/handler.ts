@@ -2,9 +2,16 @@
  * The mock alert store: lists and saves rules in memory. A mock by design (CLAUDE.md): nothing
  * persists beyond the server instance, and there is no auth or database.
  */
-import { AlertRuleInputSchema, type AlertRule } from "@/domain/alert";
+import {
+  AlertRuleInputSchema,
+  normaliseScope,
+  type AlertRule,
+} from "@/domain/alert";
+import type { Dataset } from "@/domain/schema";
 
 export type AlertsHandlerOptions = {
+  /** What scope paths are checked against: the schema alone can't see the data. */
+  dataset: Dataset;
   /** Pause before a successful save answers, so the optimistic row is visible. */
   saveDelayMs: number;
   /** Pause before a `?fail=1` save answers, so the rollback is visible. */
@@ -38,6 +45,14 @@ export function createAlertsHandlers(options: AlertsHandlerOptions) {
       return Response.json({ error: "Invalid alert rule" }, { status: 400 });
     }
 
+    const scope = normaliseScope(options.dataset, parsed.data.scope);
+    if (!scope.ok) {
+      return Response.json(
+        { error: `Unknown scope: ${scope.invalid.join(", ")}` },
+        { status: 400 },
+      );
+    }
+
     // The failure switch is how reviewers and tests reach the rollback deterministically.
     if (new URL(request.url).searchParams.get("fail") === "1") {
       await delay(options.failDelayMs);
@@ -45,7 +60,11 @@ export function createAlertsHandlers(options: AlertsHandlerOptions) {
     }
 
     await delay(options.saveDelayMs);
-    const rule: AlertRule = { ...parsed.data, id: crypto.randomUUID() };
+    const rule: AlertRule = {
+      ...parsed.data,
+      scope: scope.scope,
+      id: crypto.randomUUID(),
+    };
     store.push(rule);
     return Response.json(rule, { status: 201 });
   }

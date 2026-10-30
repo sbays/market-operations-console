@@ -1,3 +1,4 @@
+import { loadDataset } from "@/data/pack";
 import type { AlertRule } from "@/domain/alert";
 import { createAlertsHandlers } from "./handler";
 
@@ -8,6 +9,7 @@ import { createAlertsHandlers } from "./handler";
 const store: AlertRule[] = [];
 
 export const { GET, POST } = createAlertsHandlers({
+  dataset: loadDataset(),
   saveDelayMs: 400,
   failDelayMs: 600,
   store,
