@@ -124,6 +124,20 @@ export function formatMetricName(metric: Metric): string {
   return METRIC_NAMES[metric];
 }
 
+const METRIC_SHORT_NAMES: Record<Metric, string> = {
+  revenue: "Revenue",
+  units: "Units",
+  forecast: "Forecast",
+  growth: "Growth",
+  attainment: "Attainment",
+  share: "Market share",
+};
+
+/** A metric's brief name, for controls and sentences: "Growth", "Market share". */
+export function formatMetricShortName(metric: Metric): string {
+  return METRIC_SHORT_NAMES[metric];
+}
+
 /** The months a dataset covers: "Oct 2024 to Sep 2026". */
 export function formatCoverage({
   from,
