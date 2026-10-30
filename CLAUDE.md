@@ -60,7 +60,7 @@ Before saying a task is done, run typecheck, lint and the tests for the code you
 src/
   app/            routes; api/chat (mock SSE), api/alerts (mock store)
   features/       dashboard/ assistant/ alerts/ navigation/
-  data/           server-state layer: pack.ts (server-only: loadDataset, loadFixtures), query keys, TanStack Query hooks
+  data/           data layer: pack.ts (server-only: loadDataset, loadFixtures), DatasetProvider + useDataset, TanStack Query hooks
   domain/         schema.ts (Zod), selectors.ts (pure derivations), format.ts (Intl)
   state/url.ts    nuqs parsers: path, period, compare, mode
   ui/             shadcn primitives, chart shell, tokens
@@ -77,7 +77,7 @@ shared logic moves down into `data/`, `domain/` or `ui/`. Only `data/` talks to 
 - **Zod at every boundary.** Types come from `z.infer`. Validate `data.json`, every stream event and every API body. Nothing downstream re-checks shape.
 - **One `EntityRef` type** for the URL, charts and citations: a union on `level`; the product variant also carries
   `marketId` (`{ level: 'product', marketId, id }`). Don't create parallel id formats.
-- **State has one home.** If someone opening the link should see it, it goes in the URL. Data from the server goes in TanStack Query. Derived values are computed with selectors, never stored. Zustand is only for ephemeral cross-view UI state: the hover highlight (`state/highlight.ts`). The stream buffer is a ref plus `useReducer` in `useChatStream`, batched per animation frame.
+- **State has one home.** If someone opening the link should see it, it goes in the URL. Server state that can change (alert rules) goes in TanStack Query. The static dataset is validated on the server and read through `useDataset` (context); nothing fetches it, and against a real API only that hook would change. Derived values are computed with selectors, never stored. Zustand is only for ephemeral cross-view UI state: the hover highlight (`state/highlight.ts`). The stream buffer is a ref plus `useReducer` in `useChatStream`, batched per animation frame.
 - **Views don't talk to each other.** They read and write URL state; everything else is derived. The one other shared channel is the hover highlight store (`state/highlight.ts`), for emphasis only: it never changes what a view shows, only what it emphasises.
 - **Design tokens only.** No hex values or arbitrary Tailwind values in components. Chart colours come from tokens too.
   Exception: shadcn primitives vendored into `ui/` keep their upstream classes, so updates stay a re-run of the CLI rather than a hand edit.

@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TestDataset } from "@/test/dataset";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
@@ -8,8 +8,6 @@ import {
 } from "nuqs/adapters/testing";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { loadDataset } from "@/data/pack";
-import { datasetQuery } from "@/data/queries";
 import type { StreamEvent } from "@/domain/schema";
 import { encodeSseEvent } from "@/domain/sse";
 import { server, sseResponse, type TestFrame } from "@/test/msw";
@@ -47,16 +45,12 @@ function respondWith(frames: TestFrame[], options?: { delayMs?: number }) {
 
 /** The panel as the console mounts it: dataset hydrated, URL state available. */
 function renderPanel({ searchParams = "" }: { searchParams?: string } = {}) {
-  const queryClient = new QueryClient();
-  queryClient.setQueryData(datasetQuery.queryKey, loadDataset());
   const onUrlUpdate = vi.fn<OnUrlUpdateFunction>();
   const Nuqs = withNuqsTestingAdapter({ searchParams, onUrlUpdate });
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <Nuqs>
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
+        <TestDataset>{children}</TestDataset>
       </Nuqs>
     );
   }

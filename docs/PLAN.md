@@ -35,7 +35,7 @@ Next.js 16 App Router with React 19 on Vercel, with TanStack Query for server st
 | Styling and tokens | Tailwind v4 with CSS-variable tokens | CSS Modules, vanilla-extract | Tokens in one file drive both UI and chart colours; themes switch by variable |
 | Charts | visx (time-series, radar, heat map) | Recharts, ECharts, Nivo | Low-level enough for coordinated selection, custom a11y and keyboard focus; Recharts fights custom interaction |
 | Map | d3-geo + topojson-client, TopoJSON world (world-atlas) | Mapbox, deck.gl; react-simple-maps | A choropleth of ~12 countries needs no tiles or API keys, and SVG can be labelled and focused where a canvas can't. react-simple-maps (the first pick) was dropped on 29 Oct: its defaults make every country a tab stop and draw their own svg, fighting the chart shell's one-image-plus-labelled-markers pattern |
-| Server state | TanStack Query | SWR, RSC-only | Caching, optimistic mutation and rollback for the alert form |
+| Server state | TanStack Query | SWR, RSC-only | Caching, optimistic mutation and rollback for the alert form. The static dataset uses context instead (30 Oct) |
 | URL state | nuqs | Hand-rolled `useSearchParams` | Typed parsers, shallow routing, back/forward for free |
 | UI state | Zustand (small) | Redux, Context | Only for ephemeral state: chat panel open, hover, stream buffer |
 | Streaming | `fetch` + `ReadableStream` SSE parser | `EventSource`, Vercel AI SDK | POST bodies, `AbortController` for stop, no SDK hiding the contract we're graded on |
@@ -77,14 +77,14 @@ State split:
 
 | State | Lives in | Examples |
 | --- | --- | --- |
-| Server (source of truth) | RSC load + TanStack Query cache | Dataset, alert rules, chat fixtures |
+| Server (source of truth) | RSC load; `useDataset` context for the dataset, TanStack Query for alert rules | Dataset, alert rules, chat fixtures |
 | Shareable view | URL via nuqs | Drill path, period, compare set, exec/analyst mode |
 | Ephemeral UI | Zustand or local state | Hover, chat panel open, streaming message buffer (chat-open is deliberately not shareable) |
 | Derived | Memoised selectors, never stored | Rollups, rankings, at-risk counts |
 
 Rule of thumb: if a colleague opening the link should see it, it goes in the URL. If it's computed from data, it's never stored.
 
-The dataset is static, so the RSC parses and validates it once with Zod and seeds the TanStack Query cache (`staleTime: Infinity`, no client refetch). Features read it through `data/useDataset`, which is the only shared way in: features never import each other, and `domain/` stays pure. Named by responsibility like `domain/`, `state/` and `ui/`, not `hooks/` (decided 28 Oct).
+The dataset is static, so the RSC parses and validates it once with Zod and passes it to `DatasetProvider`; there is nothing to fetch, refetch or invalidate, so TanStack Query is kept for alert rules (changed 30 Oct; it previously hydrated the Query cache with a `queryFn` that could only throw). Against a real API, `useDataset` becomes a Query read and features don't change. Features read it through `data/useDataset`, which is the only shared way in: features never import each other, and `domain/` stays pure. Named by responsibility like `domain/`, `state/` and `ui/`, not `hooks/` (decided 28 Oct).
 
 ## Data layer
 
@@ -99,7 +99,7 @@ The starter pack won't be provided (confirmed 30 Oct), so we author our own `dat
 
 Pack decisions (28 Oct, `feat/data-pack`):
 
-- The pack lives in `src/pack/` (`data.json`, `fixtures.json`, `CONTRACT.md`) and is read only through `src/data/pack.ts` (`loadDataset`, `loadFixtures`); a lint rule enforces it. `pack.ts` is `server-only`: the dataset reaches the client through TanStack Query and the fixtures never leave the server.
+- The pack lives in `src/pack/` (`data.json`, `fixtures.json`, `CONTRACT.md`) and is read only through `src/data/pack.ts` (`loadDataset`, `loadFixtures`); a lint rule enforces it. `pack.ts` is `server-only`: the dataset reaches the client through `DatasetProvider` and the fixtures never leave the server.
 - The dataset stores facts only (`actual`, `units`, `forecast`, `priorYear`, `marketSize` per product, market and month). Growth, attainment, share and status are selectors, so rollups are exact. Status uses quarterly attainment: on-track from 98%, at-risk from 92%, off-track below, compared on the value as displayed (one decimal), so a badge never contradicts its number (decided 28 Oct, PR #4 review). Anomalies are stored because they carry a reason.
 - 24 months, Oct 2024 to Sep 2026; "this quarter" is Q3 2026. Citations may refer to a month or a quarter.
 - `scripts/generate-data.ts` (seeded, deterministic) plants the stories as named adjustments. Fixtures are templates whose `{{n}}` placeholders are filled from the data, so quoted numbers match by construction; pack tests re-check it.
@@ -137,7 +137,7 @@ The assistant is where we win or lose on trust, so every answer renders as a str
 
 Answer-card decisions (29 Oct, `feat/answer-card`):
 
-- The dataset reaches the client in this PR: `DatasetHydration` seeds TanStack Query from the RSC and `useDataset` reads it, so citation chips check real values from day one. The dehydrated state is built in a `"use cache"` function, because `dehydrate()` calls `Date.now()` and the static route only allows that in a cache scope.
+- The dataset reaches the client in this PR through `useDataset`, so citation chips check real values from day one. (Replaced 30 Oct: Query hydration became `DatasetProvider`, see Data layer.)
 - nuqs `path` and `period` land with the chips, so a chip click drills the URL now. The path uses the real ids, region to product (`eu.DE.beacon`); `refFromPath` rejects ids the data doesn't contain and the URL falls back to the portfolio (no toast yet).
 - Answers render per Markdown block (`splitBlocks`, which keeps a loose list in one block): settled blocks keep their props, so only the growing block is re-parsed per frame. Citations reach the chips through context, so resolving them doesn't re-parse the text.
 - `ChatState` is a union on `status`, and the reducer ignores everything but a new question once a run settles. HTTP failures read "The assistant isn't available right now."; the status goes to the console.
@@ -174,7 +174,7 @@ Gate decisions (29 Oct, `feat/dashboard-gate`):
 
 Charts decisions (29 Oct, `feat/dashboard-charts`):
 
-- `compare` holds drill paths (`eu.DE,eu.FR`), the same format as `path`, so one `EntityRef` format runs through the URL. Breakdown checkboxes toggle it (replace history), at most 4; with none ticked the radar compares the selection's first 4 children. Only paths that are children of the current selection count (deduplicated), so a drill moves the radar to the new level's children and the radar never mixes levels; Back restores the old comparison. The checkboxes show the effective set, defaults included, and a toggle writes that whole set plus or minus one (review fix, 29 Oct).
+- `compare` holds drill paths (`eu.DE,eu.FR`), the same format as `path`, so one `EntityRef` format runs through the URL. In code a path is a branded `EntityPath`, made by `pathOf`; raw URL strings pass through `refFromPath`, and the portfolio (`""`) is tested with `isPortfolioPath`, never truthiness (30 Oct). Breakdown checkboxes toggle it (replace history), at most 4; with none ticked the radar compares the selection's first 4 children. Only paths that are children of the current selection count (deduplicated), so a drill moves the radar to the new level's children and the radar never mixes levels; Back restores the old comparison. The checkboxes show the effective set, defaults included, and a toggle writes that whole set plus or minus one (review fix, 29 Oct).
 - The map draws countries with d3-geo and topojson-client inside the chart shell's `<svg role="img">`, with one focusable marker per market at the centroid of its country's largest landmass (a whole-country centroid put France in the Bay of Biscay; review fix 29 Oct) in the HTML overlay, the same pattern as the trend points. Off-track markets also get a hatch pattern. It loads with `next/dynamic` (ssr off), so the world TopoJSON stays out of the first bundle. react-simple-maps was dropped (Simon approved 29 Oct): its `ComposableMap` renders its own `<svg>` in its own coordinate space, which our marker overlay would have to convert, and by default makes every country (about 177) a tab stop. The library choice doesn't change what users get; the pattern does, and plain d3 fits it with less overriding.
 - The heat map shows the selection's children by month. Cells are filled with `color-mix(in oklch, var(--diverging-*) N%, var(--diverging-midpoint))`, so the diverging scale uses tokens only; arrow keys move in two dimensions (`useRovingIndex` with `columns`). Cells encode a quantity, not a status, so they don't take status icons: each cell's label carries the value, and the legend and table give the scale in words (review decision 29 Oct).
 - Review fixes (29 Oct): a missing radar value gets no vertex (the centre would read as the lowest value) and the roving index skips it; each panel's error boundary resets when the selection or period changes (a `resetKey`, not a React key, so focus survives); the map summary describes only the selection's markets; the four chart legends share `ui/ChartLegend`.
