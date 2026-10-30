@@ -38,7 +38,9 @@ export function PeriodPicker({ dataset, requested }: Props) {
           const picked = choices.find(
             (period) => period === event.target.value,
           );
-          setPeriod(picked ?? null);
+          // The latest quarter is the default, so picking it by name also leaves no param:
+          // one view, one URL.
+          setPeriod(picked === undefined || picked === latest ? null : picked);
         }}
         className="h-8 rounded-lg border border-input bg-background px-2.5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
       >

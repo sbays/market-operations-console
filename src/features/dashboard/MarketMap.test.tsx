@@ -9,7 +9,12 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { loadDataset } from "@/data/pack";
 import { countryOf } from "@/domain/geo";
-import type { EntityRef, PeriodRef } from "@/domain/schema";
+import {
+  DatasetSchema,
+  type Dataset,
+  type EntityRef,
+  type PeriodRef,
+} from "@/domain/schema";
 import { MarketMap } from "./MarketMap";
 
 /*
@@ -25,7 +30,13 @@ function renderMap({
   selected = PORTFOLIO,
   period = Q3,
   searchParams = "",
-}: { selected?: EntityRef; period?: PeriodRef; searchParams?: string } = {}) {
+  dataset = loadDataset(),
+}: {
+  selected?: EntityRef;
+  period?: PeriodRef;
+  searchParams?: string;
+  dataset?: Dataset;
+} = {}) {
   const onUrlUpdate = vi.fn<OnUrlUpdateFunction>();
   const Nuqs = withNuqsTestingAdapter({
     searchParams,
@@ -39,10 +50,9 @@ function renderMap({
       </Nuqs>
     );
   }
-  render(
-    <MarketMap dataset={loadDataset()} selected={selected} period={period} />,
-    { wrapper: Wrapper },
-  );
+  render(<MarketMap dataset={dataset} selected={selected} period={period} />, {
+    wrapper: Wrapper,
+  });
   return { user: userEvent.setup(), onUrlUpdate };
 }
 
@@ -268,5 +278,69 @@ describe("MarketMap: colour by another KPI", () => {
   it("falls back to attainment for a value it doesn't know", () => {
     renderMap({ searchParams: "?mapMetric=revenue" });
     expect(screen.getByRole("img", { name: SUMMARY })).toBeInTheDocument();
+  });
+});
+
+/*
+ * A tiny dataset whose answers can be worked out by hand, every Q3 2026 month the same:
+ * Germany growth +25%, on track; France has no forecast, so no attainment or status, but
+ * growth 0%; United States growth -10%, attainment 90% (off track), alone in North America.
+ */
+const q3Months = ["2026-07", "2026-08", "2026-09"] as const;
+const flat = (actual: number, forecast: number, priorYear: number) => ({
+  beacon: q3Months.map((period) => ({
+    period,
+    actual,
+    units: 1,
+    forecast,
+    priorYear,
+    marketSize: 1000,
+  })),
+});
+const tiny = DatasetSchema.parse({
+  currency: "USD",
+  periods: q3Months,
+  regions: [
+    { id: "eu", name: "Europe" },
+    { id: "na", name: "North America" },
+  ],
+  products: [{ id: "beacon", name: "Beacon" }],
+  markets: [
+    { id: "DE", name: "Germany", regionId: "eu", series: flat(100, 100, 80) },
+    { id: "FR", name: "France", regionId: "eu", series: flat(100, 0, 100) },
+    {
+      id: "US",
+      name: "United States",
+      regionId: "na",
+      series: flat(90, 100, 100),
+    },
+  ],
+  anomalies: [],
+});
+
+describe("MarketMap: markets with partial data", () => {
+  it("keeps a market with no attainment on the growth map, without a status", () => {
+    renderMap({ dataset: tiny, searchParams: "?mapMetric=growth" });
+
+    expect(marker("France")).toHaveAccessibleName("France: growth 0.0%");
+    expect(
+      screen.getByRole("img", {
+        name: "Growth in Q3 2026 runs from United States at -10.0% to Germany at +25.0%.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("names one value when the selection holds a single market", () => {
+    renderMap({
+      dataset: tiny,
+      selected: { level: "region", id: "na" },
+      searchParams: "?mapMetric=growth",
+    });
+
+    expect(
+      screen.getByRole("img", {
+        name: "Growth in North America in Q3 2026 is United States at -10.0%.",
+      }),
+    ).toBeInTheDocument();
   });
 });

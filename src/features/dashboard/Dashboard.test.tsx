@@ -141,6 +141,15 @@ describe("Dashboard", () => {
     expect(keyFigures()).toHaveTextContent("Q3 2026");
   });
 
+  it("writes no period when the latest quarter is picked by name, so one view has one URL", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-03");
+    const picker = screen.getByRole("combobox", { name: "Period" });
+
+    await user.selectOptions(picker, "Q3 2026");
+    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.DE");
+    expect(picker).toHaveDisplayValue("Latest quarter (Q3 2026)");
+  });
+
   it("falls back to the portfolio for a link the data doesn't contain, and says so", async () => {
     const { onUrlUpdate } = renderDashboard("?path=xx.YY&period=2026-03");
 
