@@ -1,13 +1,15 @@
 "use client";
 
+import { Flag } from "lucide-react";
 import { useId } from "react";
-import { useAlerts, type AlertListItem } from "@/data/alerts";
+import { useAlerts } from "@/data/alerts";
 import { useDataset } from "@/data/useDataset";
-import { alertMatches, describeAlert } from "@/domain/alert";
+import { alertMatches, describeAlert, type AlertRule } from "@/domain/alert";
 import { formatPeriod } from "@/domain/format";
 import type { Dataset, PeriodRef } from "@/domain/schema";
 import { entityLabel, pathOf, selectionPeriod } from "@/domain/selectors";
 import { useDrill, useSelection } from "@/state/url";
+import { focusDashboard } from "@/ui/dashboardFocus";
 
 /**
  * The saved alert rules, each in one line, with the markets it flags in the period the
@@ -55,14 +57,17 @@ export function AlertList() {
   );
 }
 
-/** The markets one rule flags, each a button that drills the dashboard to it. */
+/**
+ * The markets one rule flags, each a button that drills the dashboard to it. The list sits
+ * below the dashboard, so a drill moves focus up to the figures that just changed.
+ */
 function Matches({
   dataset,
   rule,
   period,
 }: {
   dataset: Dataset;
-  rule: AlertListItem;
+  rule: AlertRule;
   period: PeriodRef;
 }) {
   const drill = useDrill();
@@ -74,7 +79,8 @@ function Matches({
   }
   return (
     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
-      <p className="font-medium">
+      <p className="flex items-center gap-1.5 font-medium">
+        <Flag aria-hidden className="size-3.5" />
         Flags {matches.length} {matches.length === 1 ? "market" : "markets"} in{" "}
         {when}:
       </p>
@@ -84,7 +90,10 @@ function Matches({
             <button
               type="button"
               className="rounded-sm underline underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-              onClick={() => drill(ref)}
+              onClick={() => {
+                drill(ref);
+                focusDashboard();
+              }}
             >
               {entityLabel(dataset, ref)}
             </button>

@@ -263,6 +263,16 @@ describe("AssistantPanel", () => {
     );
   });
 
+  it("adds no caveat line when the assistant gives no reason", async () => {
+    respondWith([token("Germany fell [1]."), final({ confidence: 0.42 })]);
+    const { user } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
+
+    expect(await screen.findByText("Low confidence")).toBeInTheDocument();
+    expect(screen.queryByText(/Why it's uncertain/)).not.toBeInTheDocument();
+  });
+
   it("explains a medium-confidence answer too, not only a low one", async () => {
     respondWith([
       token("APAC grew faster [1]."),
