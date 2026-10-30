@@ -31,7 +31,7 @@ flowchart LR
   State <-->|read / write selection| URL
   Asst -->|citation chip drills| State
   Dash <-->|"hover / focus · selector per view"| Hover
-  Pack -->|"loadDataset() · 'use cache' · hydrated"| Data
+  Pack -->|"loadDataset() · DatasetProvider"| Data
   Data -->|"fetch + ReadableStream\nown SSE parser, Zod per event"| Chat
   Data -->|"optimistic save · rollback"| AlertsApi
   Chat --> Pack
