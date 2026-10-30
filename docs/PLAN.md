@@ -18,7 +18,7 @@ What the graders weigh, and how we answer each:
 
 Scope rules:
 
-1. Fake the AI. Use the starter pack's mock route; extend it only to support context-aware questions.
+1. Fake the AI. Use our own mock route; extend it only to support context-aware questions.
 2. No real backend, auth or data pipeline. The brief allows a mocked role switch to show role-based UI; it is not planned.
 3. Stretch goals are out for the 2-day build. If day 2 finishes early, the context-aware assistant is the only candidate: the URL selection makes it nearly free.
 
@@ -56,7 +56,7 @@ Folder layout (feature-first, shared primitives below):
 src/
   app/
     console/page.tsx        # RSC shell, loads dataset
-    api/chat/route.ts       # mock SSE endpoint (starter pack)
+    api/chat/route.ts       # mock SSE endpoint (our own starter pack)
     api/alerts/route.ts     # mock alert rules store, deterministic ?fail=1 flag
   features/
     dashboard/              # KPI strip, map, radar, time-series, heat map, tables
@@ -95,7 +95,7 @@ Zod schemas are the single source of types: we write the schema, infer the TypeS
 - **Selectors** — pure functions in `domain/selectors.ts`: rollup by level, growth vs prior year, attainment, top movers, at-risk count, period windows. Unit-tested hard, since every view trusts them.
 - **Formatting** — one `format.ts` over `Intl.NumberFormat` and `Intl.DateTimeFormat`: compact notation (1.2M), currency in one reporting currency (USD) with the code shown, signed percentages (+4.2%), periods as "Mar 2026". Locale is a fixed `en-US` constant for server and client (decided 28 Oct): no hydration mismatch, a static page, pure formatters, and AI text and source numbers format identically. Per-user locale goes in the README as a next step.
 
-The starter pack is not in hand, so we author our own `data.json` and fixtures following the brief's described contract (decided 28 Oct; the README says so). All data is read through a single `loadDataset()` seam, so a real pack would replace one module. Revenue is stored in one reporting currency, USD, so rollups are plain sums (decided 28 Oct).
+The starter pack won't be provided (confirmed 30 Oct), so we author our own `data.json` and fixtures following the brief's described contract (decided 28 Oct), and submit with them; the README says so. All data is read through a single `loadDataset()` seam, so a real dataset would replace one module. Revenue is stored in one reporting currency, USD, so rollups are plain sums (decided 28 Oct).
 
 Pack decisions (28 Oct, `feat/data-pack`):
 

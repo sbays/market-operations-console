@@ -90,10 +90,10 @@ shared logic moves down into `data/`, `domain/` or `ui/`. Only `data/` talks to 
 
 ## Starter pack
 
-The assignment's pack was not available, so we author our own equivalent (decided 28 Oct): `data.json` from a
+The assignment's pack won't be provided (confirmed 30 Oct), so we author and submit our own equivalent (decided 28 Oct): `data.json` from a
 seeded generator script, `fixtures.json`, `CONTRACT.md` and the mock `/api/chat` route. It follows the brief's described
 contract; `docs/PLAN.md` (Data layer, Assistant surface) holds the decided shapes. Once written, treat these files as
-the source of truth. All data goes through `loadDataset()` and the stream hook's interface, so a real pack would
+the source of truth. All data goes through `loadDataset()` and the stream hook's interface, so a real dataset would
 replace one module. Fixture text must quote numbers that match the dataset; a test enforces it.
 
 ## Assistant specifics
