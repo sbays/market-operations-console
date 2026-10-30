@@ -225,7 +225,7 @@ The URL is the selection store. Views never talk to each other; they read from a
 | `mode` | `exec` or `analyst` | Mode toggle | Layout |
 | `mapMetric` | `growth` | Map "Colour map by" toggle | Map fill, marker labels, summary, legend and table (default `attainment`, no param) |
 
-- `mapMetric` (30 Oct) is named for the map, since it recolours only the map. Growth uses the diverging tokens centred on 0% (±10% is full colour); share uses a one-sided scale from 0% to the largest share shown, so the near-uniform ~17% shares read as near-uniform rather than exaggerated. Markers keep their status icons in every mode.
+- `mapMetric` (30 Oct) is named for the map, since it recolours only the map. Growth uses the diverging tokens centred on 0% (±10% is full colour); share uses a one-sided scale from 0% to the largest share shown, so differences aren't exaggerated. The generator first gave every market about 17% share, so the share map looked flat; each market now has a `position` factor on its products' typical share (30 Oct), giving 9.4% (India) to 24.0% (Japan) in Q3 2026. It scales only `marketSize`, after the seeded jitter is drawn, so revenue, forecast, units, prior year and every fixture number are unchanged. Markers keep their status icons in every mode.
 - Drill changes push history (back button goes up a level). Hover-like changes such as period replace history, so back isn't flooded.
 - Parsers are typed with nuqs and validated against the dataset; an unknown market id falls back to the portfolio with a toast, not a crash.
 - The assistant receives the parsed selection with every question, which gives us the context-aware stretch goal almost for free.

@@ -180,7 +180,8 @@ describe("MarketMap", () => {
 
 /*
  * Q3 2026 growth, read off the data pack: Brazil -8.6% (lowest), Japan +12.5% (highest);
- * Europe from France +1.4% to Germany +2.4%. Share: Brazil 14.7%, every other market ~17%.
+ * Europe from France +1.4% to Germany +2.4%. Share: India 9.4% (lowest), Brazil 11.0%,
+ * Japan 24.0% (highest).
  */
 describe("MarketMap: colour by another KPI", () => {
   const colourBy = () => screen.getByRole("group", { name: "Colour map by" });
@@ -271,8 +272,19 @@ describe("MarketMap: colour by another KPI", () => {
   it("reads market share into the markers", () => {
     renderMap({ searchParams: "?mapMetric=share" });
     expect(marker("Brazil")).toHaveAccessibleName(
-      "Brazil: market share 14.7%, off track",
+      "Brazil: market share 11.0%, off track",
     );
+  });
+
+  it("summarises share and scales it from 0% to the highest share shown", () => {
+    renderMap({ searchParams: "?mapMetric=share" });
+    expect(
+      screen.getByRole("img", {
+        name: "Market share in Q3 2026 runs from India at 9.4% to Japan at 24.0%.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("0.0%")).toBeInTheDocument();
+    expect(screen.getByText("24.0%")).toBeInTheDocument();
   });
 
   it("falls back to attainment for a value it doesn't know", () => {

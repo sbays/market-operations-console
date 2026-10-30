@@ -425,7 +425,7 @@ describe("Dashboard", () => {
     renderDashboard("?path=eu.DE");
 
     expect(keyFigures()).toHaveTextContent(/Units\s*141\.9K/);
-    expect(keyFigures()).toHaveTextContent(/Market share\s*17\.0%/);
+    expect(keyFigures()).toHaveTextContent(/Market share\s*19\.6%/);
     expect(
       within(trendFigure()).getByRole("list", { name: "Legend" }),
     ).toHaveTextContent("Prior year");
