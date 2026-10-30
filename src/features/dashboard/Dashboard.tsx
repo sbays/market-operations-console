@@ -7,6 +7,7 @@ import { useDataset } from "@/data/useDataset";
 import { ancestorsOf, pathOf, selectionPeriod } from "@/domain/selectors";
 import {
   useDrill,
+  useMapMetric,
   useMode,
   useSelection,
   useSetPeriod,
@@ -41,6 +42,7 @@ export function Dashboard() {
   const dataset = useDataset();
   const { ref, period } = useSelection();
   const mode = useMode();
+  const mapMetric = useMapMetric();
   const analyst = mode === "analyst";
   const shown = selectionPeriod(dataset, period);
   const props = { dataset, selected: ref, period: shown };
@@ -114,7 +116,8 @@ export function Dashboard() {
       <KpiStrip {...props} mode={mode} />
       <RiskMovers {...props} mode={mode} />
       <div className="grid gap-6 xl:grid-cols-2">
-        <Panel label="Market map" resetKey={resetKey}>
+        {/* The map also retries when it is recoloured: one metric's failure isn't another's. */}
+        <Panel label="Market map" resetKey={`${resetKey}#${mapMetric}`}>
           <MarketMap {...props} />
         </Panel>
         <Panel label="Trend chart" resetKey={resetKey}>
