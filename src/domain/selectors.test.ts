@@ -11,6 +11,7 @@ import {
   entityLabel,
   entityName,
   expandPeriod,
+  coversPath,
   isAncestorPath,
   latestQuarter,
   monthlySeries,
@@ -838,5 +839,15 @@ describe("isAncestorPath", () => {
   it("treats the portfolio as the ancestor of everything but itself", () => {
     expect(isAncestorPath("", "na")).toBe(true);
     expect(isAncestorPath("", "")).toBe(false);
+  });
+});
+
+describe("coversPath", () => {
+  it("covers the path itself and everything under it, by whole segments", () => {
+    expect(coversPath("eu.DE", "eu.DE")).toBe(true);
+    expect(coversPath("eu", "eu.DE.beacon")).toBe(true);
+    expect(coversPath("", "eu")).toBe(true);
+    expect(coversPath("eu.DE", "eu")).toBe(false);
+    expect(coversPath("eu.D", "eu.DE")).toBe(false);
   });
 });

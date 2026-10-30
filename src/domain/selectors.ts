@@ -362,6 +362,11 @@ export function isAncestorPath(ancestor: string, path: string): boolean {
   return ancestor === "" ? path !== "" : path.startsWith(`${ancestor}.`);
 }
 
+/** True when `scope` is `path` itself or one of its ancestors: the scope covers it. */
+export function coversPath(scope: string, path: string): boolean {
+  return path === scope || isAncestorPath(scope, path);
+}
+
 /** A display name for any entity: "Germany", "Beacon in Germany". */
 export function entityName(
   dataset: Dataset,
@@ -526,7 +531,7 @@ export function trendAnomalies(
       return (
         anomaly.metric === "revenue" &&
         path !== undefined &&
-        (path === scope || isAncestorPath(scope, path))
+        coversPath(scope, path)
       );
     })
     .map(({ period, ref: from, note }) => ({ period, ref: from, note }))
