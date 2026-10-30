@@ -187,13 +187,15 @@ Followed TDD approach at seams, skipped snapshot testing as it adds a lot of ove
 
 Strict TS; no `any` or unsafe casts. Zod at every boundary, lint-enforced boundaries between layers, css values defined as design tokens, jsx-a11y recommended settings, and feature-branch-based PRs with passing CI required.
 
+Two standards that I missed out that I'd have liked to include if I had more time would be to include a tool like Sentry for logging, and to introduce size-limit budgets to CI to keep an eye on bundle size, and so that any new large dependencies would be caught in CI rather than being noticed in production.
+
 ## i. How I used AI tools
 
 Utilised Claude Code to implement, with a workflow that started by defining `docs/PLAN.md` and fleshing out `CLAUDE.md` for rules that were established along the way. Both are committed as evidence of what was decided and how the process looked. 
 
 Planned before each block of work, used skills to grill me on decisions and to build out functionality following TDD approach, used parallel sub-agents in worktrees for work that could be split up. Used two contrasting review skills for each PR which often found similar bugs but at times each identified unique quirks that the other had missed. Manually reviewed all PRs myself too. I pushed and merged everything myself as Claude Code is run within a sandbox environment with carefully controlled access to CLI tools.
 
-I try to keep features to a managable size, changing hundreds of files at once leads to unmanagable pull-request reviews. 
+I try to keep features to a manageable size, changing hundreds of files at once leads to unmanageable pull-request reviews. 
 
 If I'm not entirely sure why something has been suggested I'll drill into it more deeply, either asking for clarification or cited sources, or I'll research independently. 
 
