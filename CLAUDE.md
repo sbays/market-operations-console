@@ -25,7 +25,7 @@ A small, working, well-engineered build beats a large, broken one. Do not add fe
 - Pinned on purpose, don't upgrade: TypeScript 6.0 (`typescript-eslint` needs `<6.1`), ESLint 9 (`eslint-plugin-jsx-a11y`
   peers on `≤9`). Node 24 (`.nvmrc`); pnpm version comes from `packageManager` in `package.json`.
 - React Compiler is on (`reactCompiler: true`): don't hand-write `useCallback`, `useMemo` or `memo` by default. Use one only where the
-  compiler can't help (e.g. per-item values created in a loop or a render prop), and say why in a comment. Vitest does not run the
+  compiler can't help (e.g. per-item values created in a loop or a render prop), or where a test must hold the optimisation (`MarkdownBlock`), and say why in a comment. Vitest does not run the
   compiler, so code must stay correct without it.
 - `cacheComponents` is on (Next 16 default): dynamic reads such as nuqs/`useSearchParams` need a Suspense boundary.
 - Every dependency must declare React 19 support. Don't force installs with overrides or `--legacy-peer-deps`; flag the library instead.
