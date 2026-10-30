@@ -15,6 +15,7 @@ import { CompareRadar } from "./CompareRadar";
 import { DetailTable } from "./DetailTable";
 import { KpiStrip } from "./KpiStrip";
 import { ModeToggle } from "./ModeToggle";
+import { PeriodPicker } from "./PeriodPicker";
 import { RiskMovers } from "./RiskMovers";
 import { TrendChart } from "./TrendChart";
 
@@ -90,7 +91,10 @@ export function Dashboard() {
     <div ref={rootRef} className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Breadcrumb dataset={dataset} selected={ref} />
-        <ModeToggle />
+        <div className="flex flex-wrap items-center gap-3">
+          <PeriodPicker dataset={dataset} requested={period} />
+          <ModeToggle />
+        </div>
       </div>
       <KpiStrip {...props} mode={mode} />
       <RiskMovers {...props} mode={mode} />

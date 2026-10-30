@@ -124,6 +124,23 @@ describe("Dashboard", () => {
     expect(kpis).toHaveTextContent(/16\.7%/);
   });
 
+  it("picks a quarter or a month from the period picker, and goes back to the latest quarter", async () => {
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-03");
+    const picker = screen.getByRole("combobox", { name: "Period" });
+    expect(picker).toHaveDisplayValue("Mar 2026");
+
+    await user.selectOptions(picker, "Q2 2026");
+    expect(lastUrl(onUrlUpdate)).toEqual({
+      query: "?path=eu.DE&period=2026-Q2",
+      history: "replace",
+    });
+    expect(keyFigures()).toHaveTextContent("Q2 2026");
+
+    await user.selectOptions(picker, "Latest quarter (Q3 2026)");
+    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.DE");
+    expect(keyFigures()).toHaveTextContent("Q3 2026");
+  });
+
   it("falls back to the portfolio for a link the data doesn't contain, and says so", async () => {
     const { onUrlUpdate } = renderDashboard("?path=xx.YY&period=2026-03");
 
