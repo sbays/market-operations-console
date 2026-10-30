@@ -7,6 +7,7 @@ import { z } from "zod";
 import { formatMetric, formatMetricName, formatTypedPercent } from "./format";
 import type { Dataset, EntityRef, PeriodRef } from "./schema";
 import {
+  coversPath,
   displayedRatio,
   entityLabel,
   isAncestorPath,
@@ -116,15 +117,14 @@ export function alertMatches(
   rule: Pick<AlertRule, "scope" | "metric" | "operator" | "threshold">,
   period: PeriodRef,
 ): EntityRef[] {
-  const limit = rule.threshold / 100;
+  // Rounded like the value: 99.9 / 100 isn't exactly 0.999 in binary floating point.
+  const limit = displayedRatio(rule.threshold / 100);
   return dataset.markets.flatMap((market) => {
     const ref: EntityRef = { level: "market", id: market.id };
     const path = pathOf(dataset, ref);
     const inScope =
       path !== undefined &&
-      rule.scope.some(
-        (scoped) => scoped === path || isAncestorPath(scoped, path),
-      );
+      rule.scope.some((scoped) => coversPath(scoped, path));
     if (!inScope) return [];
     const raw = valueAt(dataset, ref, period, rule.metric);
     if (raw === undefined) return [];

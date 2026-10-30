@@ -252,7 +252,7 @@ describe("normaliseScope", () => {
 
 /**
  * Every month the same, so a quarter's ratios equal a month's:
- * DE attainment 90%, growth -10%; FR 100%, +25%; US 50%, 0%; IT 94.996% (shown as 95.0%), -5.0%.
+ * DE attainment 90%, growth -10%; FR 100%, +25%; US 50%, 0%; IT 94.996% (shown as 95.0%), -5.0%; CA growth exactly -99.9%.
  */
 const months = ["2026-01", "2026-02", "2026-03"] as const;
 const flat = (actual: number, forecast: number, priorYear: number) =>
@@ -290,6 +290,12 @@ const matchData = DatasetSchema.parse({
       name: "Italy",
       regionId: "eu",
       series: { beacon: flat(94996, 100000, 100000) },
+    },
+    {
+      id: "CA",
+      name: "Canada",
+      regionId: "na",
+      series: { beacon: flat(1, 1, 1000) },
     },
     {
       id: "US",
@@ -350,6 +356,21 @@ describe("alertMatches", () => {
   it("judges the value as it is shown, so 94.996% (shown as 95.0%) isn't below 95%", () => {
     expect(
       alertMatches(matchData, rule({ scope: ["eu.IT"] }), "2026-Q1"),
+    ).toEqual([]);
+  });
+
+  it("doesn't flag a value equal to a threshold that isn't exact in binary (-99.9%)", () => {
+    expect(
+      alertMatches(
+        matchData,
+        rule({
+          scope: ["na.CA"],
+          metric: "growth",
+          operator: "above",
+          threshold: -99.9,
+        }),
+        "2026-Q1",
+      ),
     ).toEqual([]);
   });
 });
