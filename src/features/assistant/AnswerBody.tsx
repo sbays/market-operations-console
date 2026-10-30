@@ -1,3 +1,4 @@
+import { memo } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { splitBlocks } from "./blocks";
 import { CitationChip } from "./CitationChip";
@@ -25,10 +26,9 @@ type Props = {
 };
 
 /**
- * The answer's Markdown, one block at a time. Settled blocks keep their props, so with the
- * React Compiler on (production builds, not Vitest) only the block still streaming is parsed
- * again each frame. Evidence arrives through context, so resolving citations re-renders the
- * chips without re-parsing the text.
+ * The answer's Markdown, one block at a time: only the block still streaming is parsed again
+ * each frame. Evidence arrives through context, so resolving citations re-renders the chips
+ * without re-parsing the text.
  */
 export function AnswerBody({ text, evidence }: Props) {
   return (
@@ -43,10 +43,15 @@ export function AnswerBody({ text, evidence }: Props) {
   );
 }
 
-function MarkdownBlock({ text }: { text: string }) {
+/**
+ * Explicit memo, unlike the rest of the app: parsing is the cost this split exists to avoid,
+ * so a settled block must stay unparsed wherever it runs, and a test can hold that here.
+ * Vitest doesn't run the React Compiler.
+ */
+const MarkdownBlock = memo(function MarkdownBlock({ text }: { text: string }) {
   return (
     <Markdown skipHtml rehypePlugins={rehypePlugins} components={components}>
       {text}
     </Markdown>
   );
-}
+});

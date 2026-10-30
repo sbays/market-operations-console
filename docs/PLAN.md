@@ -63,7 +63,7 @@ src/
     assistant/              # chat panel, stream hook, citation + confidence UI
     alerts/                 # threshold configurator form
     navigation/             # breadcrumb drill path, mode toggle, cmd-K
-  data/                     # server-state layer: query keys, fetchers, TanStack hooks (useDataset, useAlertRules)
+  data/                     # data layer: DatasetProvider + useDataset, fetchers, TanStack hooks (useAlerts)
   domain/
     schema.ts               # Zod schemas for data.json + stream events
     selectors.ts            # pure derivations: rollups, top movers, at-risk counts
@@ -139,7 +139,7 @@ Answer-card decisions (29 Oct, `feat/answer-card`):
 
 - The dataset reaches the client in this PR through `useDataset`, so citation chips check real values from day one. (Replaced 30 Oct: Query hydration became `DatasetProvider`, see Data layer.)
 - nuqs `path` and `period` land with the chips, so a chip click drills the URL now. The path uses the real ids, region to product (`eu.DE.beacon`); `refFromPath` rejects ids the data doesn't contain and the URL falls back to the portfolio (no toast yet).
-- Answers render per Markdown block (`splitBlocks`, which keeps a loose list in one block): settled blocks keep their props, so only the growing block is re-parsed per frame. Citations reach the chips through context, so resolving them doesn't re-parse the text.
+- Answers render per Markdown block (`splitBlocks`, which keeps a loose list in one block): a `memo` on `MarkdownBlock` means only the growing block is re-parsed per frame, and `AnswerBody.test.tsx` holds that (explicit since 30 Oct, because Vitest doesn't run the compiler). Citations reach the chips through context, so resolving them doesn't re-parse the text.
 - `ChatState` is a union on `status`, and the reducer ignores everything but a new question once a run settles. HTTP failures read "The assistant isn't available right now."; the status goes to the console.
 
 Fixture coverage to demo: the four example questions, low-confidence, abstention, error, long response. Suggested-question chips seed these on first open; they are the main way in, because free text only matches fixtures exactly and everything else abstains (decided 28 Oct).
