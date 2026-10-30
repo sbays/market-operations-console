@@ -167,3 +167,106 @@ describe("MarketMap", () => {
     ]);
   });
 });
+
+/*
+ * Q3 2026 growth, read off the data pack: Brazil -8.6% (lowest), Japan +12.5% (highest);
+ * Europe from France +1.4% to Germany +2.4%. Share: Brazil 14.7%, every other market ~17%.
+ */
+describe("MarketMap: colour by another KPI", () => {
+  const colourBy = () => screen.getByRole("group", { name: "Colour map by" });
+
+  it("switches to growth from its control, replacing history, and back to the default", async () => {
+    const { user, onUrlUpdate } = renderMap();
+
+    await user.click(
+      within(colourBy()).getByRole("button", { name: "Growth" }),
+    );
+    expect(lastUrl(onUrlUpdate)).toEqual({
+      query: "?mapMetric=growth",
+      history: "replace",
+    });
+    expect(
+      within(colourBy()).getByRole("button", { name: "Growth" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(
+      within(colourBy()).getByRole("button", { name: "Attainment" }),
+    );
+    expect(lastUrl(onUrlUpdate).query).toBe("");
+    expect(screen.getByRole("img", { name: SUMMARY })).toBeInTheDocument();
+  });
+
+  it("reads growth into every marker, keeping the status", () => {
+    renderMap({ searchParams: "?mapMetric=growth" });
+
+    expect(marker("Germany")).toHaveAccessibleName(
+      "Germany: growth +2.4%, at risk",
+    );
+    expect(marker("Brazil")).toHaveAccessibleName(
+      "Brazil: growth -8.6%, off track",
+    );
+  });
+
+  it("summarises the range of growth at the portfolio", () => {
+    renderMap({ searchParams: "?mapMetric=growth" });
+    expect(
+      screen.getByRole("img", {
+        name: "Growth in Q3 2026 runs from Brazil at -8.6% to Japan at +12.5%.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("names a region in the growth summary", () => {
+    renderMap({
+      selected: { level: "region", id: "eu" },
+      searchParams: "?mapMetric=growth",
+    });
+    expect(
+      screen.getByRole("img", {
+        name: "Growth in Europe in Q3 2026 runs from France at +1.4% to Germany at +2.4%.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("lists the markets by growth, lowest first, in the table", async () => {
+    const { user } = renderMap({ searchParams: "?mapMetric=growth" });
+    await user.click(screen.getByRole("button", { name: "View as table" }));
+
+    const table = screen.getByRole("table", { name: "Markets by growth" });
+    expect(
+      within(table).getByRole("columnheader", { name: "Growth vs prior year" }),
+    ).toBeInTheDocument();
+    const names = within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getByRole("rowheader").textContent);
+    expect(names.slice(0, 6)).toEqual([
+      "Brazil",
+      "France",
+      "Italy",
+      "United Kingdom",
+      "Spain",
+      "Germany",
+    ]);
+  });
+
+  it("explains the growth colours in the legend with labelled stops", () => {
+    renderMap({ searchParams: "?mapMetric=growth" });
+    for (const stop of ["-10.0% or less", "0.0%", "+10.0% or more"]) {
+      expect(screen.getByText(stop)).toBeInTheDocument();
+    }
+    expect(screen.queryByText("Hatched: off track")).not.toBeInTheDocument();
+  });
+
+  it("reads market share into the markers", () => {
+    renderMap({ searchParams: "?mapMetric=share" });
+    expect(marker("Brazil")).toHaveAccessibleName(
+      "Brazil: market share 14.7%, off track",
+    );
+  });
+
+  it("falls back to attainment for a value it doesn't know", () => {
+    renderMap({ searchParams: "?mapMetric=revenue" });
+    expect(screen.getByRole("img", { name: SUMMARY })).toBeInTheDocument();
+  });
+});
