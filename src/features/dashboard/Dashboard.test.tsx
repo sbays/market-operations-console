@@ -8,6 +8,7 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearHighlight } from "@/state/highlight";
+import { LiveRegions } from "@/ui/LiveRegions";
 import { Toaster } from "@/ui/Toaster";
 import { Dashboard } from "./Dashboard";
 
@@ -35,6 +36,7 @@ function renderDashboard(searchParams = "") {
     <>
       <Dashboard />
       <Toaster />
+      <LiveRegions />
     </>,
     { wrapper: Wrapper },
   );
@@ -165,10 +167,16 @@ describe("Dashboard", () => {
     expect(within(breadcrumb()).getAllByRole("listitem")).toHaveLength(1);
     // The portfolio's March figure; Europe's would be $15.6M.
     expect(keyFigures()).toHaveTextContent(/Revenue\s*\$40\.5M/);
+    const notice =
+      "That link points to something not in the data, so you're seeing the portfolio.";
+    // Read aloud through the polite live region, and shown as a toast (sonner's region).
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(notice),
+    );
     expect(
-      await screen.findByText(
-        "That link points to something not in the data, so you're seeing the portfolio.",
-      ),
+      await within(
+        screen.getByRole("region", { name: /Notifications/ }),
+      ).findByText(notice),
     ).toBeInTheDocument();
     // The bad path leaves the URL, so sharing the page doesn't pass the broken link on.
     expect(lastUrl(onUrlUpdate)).toEqual({

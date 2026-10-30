@@ -182,7 +182,11 @@ test("a refused save rolls the alert rule back", async ({ page }) => {
 
   // The optimistic "Saving…" row lives only until the refusal (about 600ms), too short to
   // assert reliably here (it flaked on WebKit); Alerts.test.tsx covers it with a held response.
-  await expect(page.getByText("Couldn't save the alert rule.")).toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: /Notifications/ })
+      .getByText("Couldn't save the alert rule."),
+  ).toBeVisible();
   await expect(page.getByText("Doomed")).toHaveCount(0);
 });
 

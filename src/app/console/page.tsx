@@ -5,6 +5,7 @@ import { AlertDialog } from "@/features/alerts/AlertDialog";
 import { AlertList } from "@/features/alerts/AlertList";
 import { AssistantPanel } from "@/features/assistant/AssistantPanel";
 import { Dashboard } from "@/features/dashboard/Dashboard";
+import { LiveRegions } from "@/ui/LiveRegions";
 import { Toaster } from "@/ui/Toaster";
 
 export default function ConsolePage({ searchParams }: PageProps<"/console">) {
@@ -41,6 +42,7 @@ export default function ConsolePage({ searchParams }: PageProps<"/console">) {
         </div>
       </div>
       <Toaster />
+      <LiveRegions />
     </DatasetProvider>
   );
 }

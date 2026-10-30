@@ -42,3 +42,9 @@ VoiceOver (VO = Control + Option). Record each result as ✅, ❌ or a short not
 | # | Step | Expected | Result |
 | --- | --- | --- | --- |
 | 1 | macOS Settings › Accessibility › Display › Reduce motion on; ask a question | No pulsing skeleton or caret; tooltips and the dialog appear without animation | |
+
+## Fixes awaiting a re-check
+
+| Issue | Fix | Result |
+| --- | --- | --- |
+| VoiceOver didn't read the failed-save toast (`/console?fail=1`) | Toast messages now go through always-mounted live regions (`src/ui/announce.ts`); a failed save uses `role="alert"` and names Alt+T for Retry, and sonner's own region is off | Built and covered by component tests; not yet re-checked with VoiceOver |
