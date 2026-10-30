@@ -33,7 +33,8 @@ async function fetchAlerts(): Promise<AlertListItem[]> {
 
 /**
  * Fetched once per page. The mock keeps rules in one server instance's memory, so a refetch
- * could reach an instance that never saw a save; saves update the cache directly instead.
+ * could reach an instance that never saw a save; saves update the cache directly instead
+ * (except one made before the first load landed, which needs that load).
  */
 export const alertsQuery = queryOptions({
   queryKey: ["alerts"],
@@ -71,6 +72,8 @@ export function useCreateAlert({ fail }: { fail: boolean }) {
   const mutation = useMutation({
     mutationFn: (input: AlertRuleInput) => postAlert(input, fail),
     onMutate: async (input) => {
+      const listLoaded =
+        queryClient.getQueryData(alertsQuery.queryKey) !== undefined;
       // An in-flight refetch would otherwise overwrite the optimistic row.
       await queryClient.cancelQueries({ queryKey: alertsQuery.queryKey });
       const pending: AlertListItem = {
@@ -82,7 +85,7 @@ export function useCreateAlert({ fail }: { fail: boolean }) {
         ...(rules ?? []),
         pending,
       ]);
-      return { pendingId: pending.id };
+      return { pendingId: pending.id, listLoaded };
     },
     onError: (_error, input, context) => {
       // Only this save's row goes: restoring a snapshot would also drop rows that other saves
@@ -103,6 +106,12 @@ export function useCreateAlert({ fail }: { fail: boolean }) {
         rules?.map((row) => (row.id === context.pendingId ? rule : row)),
       );
       toast.success(`Saved alert rule “${rule.name}”.`);
+    },
+    onSettled: (_rule, _error, _input, context) => {
+      // Saved before the first load finished: that load was cancelled above, so the cache
+      // holds only this save's row. Fetch once to bring back the rules saved earlier.
+      if (context?.listLoaded !== false) return;
+      return queryClient.invalidateQueries({ queryKey: alertsQuery.queryKey });
     },
   });
 

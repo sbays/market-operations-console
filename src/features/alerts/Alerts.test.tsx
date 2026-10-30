@@ -30,6 +30,8 @@ type Harness = {
   release: () => void;
   /** Lets a held refetch of the list answer (only with holdRefetch). */
   releaseRefetch: () => void;
+  /** Lets the held first load of the list answer (only with holdFirstList). */
+  releaseFirstList: () => void;
   onUrlUpdate: ReturnType<typeof vi.fn<OnUrlUpdateFunction>>;
 };
 
@@ -42,22 +44,32 @@ let listCount = 0;
  * Serves the list and the save. With `holdRefetch`, every list request after the first waits
  * for releaseRefetch, so a test can tell a rollback from the refetch that follows a save.
  */
-function serveAlerts(initial: AlertRule[], holdRefetch: boolean) {
+function serveAlerts(
+  initial: AlertRule[],
+  holdRefetch: boolean,
+  holdFirstList: boolean,
+) {
   saved = initial;
   postCount = 0;
   listCount = 0;
-  const gates = { save: () => {}, refetch: () => {} };
+  const gates = { save: () => {}, refetch: () => {}, firstList: () => {} };
   const saveGate = new Promise<void>((resolve) => {
     gates.save = resolve;
   });
   const refetchGate = new Promise<void>((resolve) => {
     gates.refetch = resolve;
   });
+  const firstListGate = new Promise<void>((resolve) => {
+    gates.firstList = resolve;
+  });
   server.use(
     http.get("*/api/alerts", async () => {
       listCount += 1;
       if (holdRefetch && listCount > 1) await refetchGate;
-      return HttpResponse.json({ rules: saved });
+      // The list as it was when the request arrived, as a real server would answer it.
+      const rules = saved;
+      if (holdFirstList && listCount === 1) await firstListGate;
+      return HttpResponse.json({ rules });
     }),
     http.post("*/api/alerts", async ({ request }) => {
       postCount += 1;
@@ -79,9 +91,18 @@ function renderAlerts(
   {
     initial = [],
     holdRefetch = false,
-  }: { initial?: AlertRule[]; holdRefetch?: boolean } = {},
+    holdFirstList = false,
+  }: {
+    initial?: AlertRule[];
+    holdRefetch?: boolean;
+    holdFirstList?: boolean;
+  } = {},
 ): Harness {
-  const { save, refetch } = serveAlerts(initial, holdRefetch);
+  const { save, refetch, firstList } = serveAlerts(
+    initial,
+    holdRefetch,
+    holdFirstList,
+  );
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -113,6 +134,7 @@ function renderAlerts(
     user: userEvent.setup(),
     release: save,
     releaseRefetch: refetch,
+    releaseFirstList: firstList,
     onUrlUpdate,
   };
 }
@@ -319,6 +341,34 @@ describe("AlertList", () => {
         "Forecast attainment below 95.0% in Germany, France",
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe("a save before the list has loaded", () => {
+  it("keeps the rules the server already had, alongside the new one", async () => {
+    const existing: AlertRule = {
+      id: "r1",
+      name: "Existing rule",
+      scope: ["apac"],
+      metric: "attainment",
+      operator: "below",
+      threshold: 95,
+    };
+    const { user, release, releaseFirstList } = renderAlerts("?path=eu.DE", {
+      initial: [existing],
+      holdFirstList: true,
+    });
+    expect(screen.getByText("Loading alert rules…")).toBeInTheDocument();
+
+    const dialog = await openDialog(user);
+    await fillRule(user, { name: "Watch Germany", threshold: "0" });
+    await user.click(within(dialog).getByRole("button", { name: "Save rule" }));
+    release();
+    releaseFirstList();
+
+    const rules = await rulesList();
+    expect(await within(rules).findByText("Existing rule")).toBeInTheDocument();
+    expect(within(rules).getByText("Watch Germany")).toBeInTheDocument();
   });
 });
 
