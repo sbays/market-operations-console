@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { loadDataset } from "@/data/pack";
 import { AlertRuleSchema, type AlertRule } from "@/domain/alert";
 import { createAlertsHandlers } from "./handler";
 
@@ -13,6 +14,7 @@ const rule = {
 function setup() {
   const store: AlertRule[] = [];
   const handlers = createAlertsHandlers({
+    dataset: loadDataset(),
     failDelayMs: 0,
     saveDelayMs: 0,
     store,
@@ -106,5 +108,28 @@ describe("POST /api/alerts", () => {
     const response = await post(POST, rule, "?fail=0");
     expect(response.status).toBe(201);
     expect(store).toHaveLength(1);
+  });
+
+  it("answers 400 naming the scope paths the data doesn't contain", async () => {
+    const { POST, store } = setup();
+    const response = await post(POST, {
+      ...rule,
+      scope: ["eu.DE", "eu.ZZ", "eu.DE.beacon"],
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "Unknown scope: eu.ZZ, eu.DE.beacon",
+    });
+    expect(store).toEqual([]);
+  });
+
+  it("saves the scope without repeats or markets its region covers", async () => {
+    const { POST, store } = setup();
+    const response = await post(POST, {
+      ...rule,
+      scope: ["eu.DE", "eu", "eu.DE", "na.US"],
+    });
+    expect(response.status).toBe(201);
+    expect(store.map((saved) => saved.scope)).toEqual([["eu", "na.US"]]);
   });
 });
