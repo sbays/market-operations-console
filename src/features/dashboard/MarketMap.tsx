@@ -1,6 +1,7 @@
 "use client";
 
 import { geoPath } from "d3-geo";
+import { Minus } from "lucide-react";
 import { useId } from "react";
 import {
   countryFeatures,
@@ -13,6 +14,7 @@ import { divergingColour, sequentialColour } from "@/domain/colour";
 import {
   formatMetric,
   formatMetricName,
+  formatMetricShortName,
   formatPercent,
   formatPeriod,
   formatStatus,
@@ -31,6 +33,7 @@ import {
 import { ChartFrame } from "@/ui/ChartFrame";
 import { ChartLegend } from "@/ui/ChartLegend";
 import { cn } from "@/ui/cn";
+import { ToggleGroup } from "@/ui/ToggleGroup";
 import { StatusBadge, StatusIcon } from "@/ui/StatusBadge";
 import { useRovingIndex } from "@/ui/useRovingIndex";
 
@@ -44,19 +47,6 @@ type Mark = {
   /** Undefined when the market has no attainment (no forecast), even if `value` exists. */
   status: Status | undefined;
   inSelection: boolean;
-};
-
-/** How the metric reads inside a sentence: "Markets by growth", "Germany: growth +2.4%". */
-const METRIC_WORD: Record<MapMetric, string> = {
-  attainment: "attainment",
-  growth: "growth",
-  share: "market share",
-};
-
-const BUTTON_LABEL: Record<MapMetric, string> = {
-  attainment: "Attainment",
-  growth: "Growth",
-  share: "Share",
 };
 
 /** Growth this far from zero (on either side) reaches the full colour of its side. */
@@ -107,7 +97,7 @@ function byValue(marks: Mark[]): Mark[] {
 
 /** "Germany: attainment 95.4%, at risk", the words a marker is read out as. */
 function markLabel(mark: Mark, metric: MapMetric): string {
-  const reading = `${mark.name}: ${METRIC_WORD[metric]} ${formatMetric(metric, mark.value)}`;
+  const reading = `${mark.name}: ${formatMetricShortName(metric).toLowerCase()} ${formatMetric(metric, mark.value)}`;
   return mark.status === undefined
     ? reading
     : `${reading}, ${formatStatus(mark.status).toLowerCase()}`;
@@ -147,8 +137,7 @@ function mapSummary(
   const where =
     selected.level === "region" ? ` in ${entityLabel(dataset, selected)}` : "";
   if (metric !== "attainment") {
-    const word = METRIC_WORD[metric];
-    const subject = `${word.charAt(0).toUpperCase()}${word.slice(1)}${where} in ${when}`;
+    const subject = `${formatMetricShortName(metric)}${where} in ${when}`;
     const at = (mark: Mark) =>
       `${mark.name} at ${formatMetric(metric, mark.value)}`;
     return lowest === highest
@@ -174,7 +163,7 @@ export function MarketMap({ dataset, selected, period }: Props) {
   const marks = marksFor(dataset, selected, period, metric);
   // Only share uses a scale top; the other metrics have fixed scales.
   const top = metric === "share" ? maxShare(marks) : 0;
-  const title = `Markets by ${METRIC_WORD[metric]}`;
+  const title = `Markets by ${formatMetricShortName(metric).toLowerCase()}`;
   const marketPath = (id: string) => pathOf(dataset, { level: "market", id });
   const hatchId = `hatch-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
 
@@ -201,7 +190,13 @@ export function MarketMap({ dataset, selected, period }: Props) {
         summary={summary}
         height={320}
         table={<MarketTable marks={marks} metric={metric} title={title} />}
-        legend={<MapLegend metric={metric} top={top} />}
+        legend={
+          <MapLegend
+            metric={metric}
+            top={top}
+            anyWithoutStatus={marks.some((m) => m.status === undefined)}
+          />
+        }
         drawing={(size) => {
           const path = geoPath(worldProjection(size));
           return (
@@ -294,7 +289,11 @@ export function MarketMap({ dataset, selected, period }: Props) {
                   link["data-linked"] && "ring-2 ring-foreground",
                 )}
               >
-                {mark.status ? <StatusIcon status={mark.status} /> : null}
+                {mark.status ? (
+                  <StatusIcon status={mark.status} />
+                ) : (
+                  <NoStatusIcon />
+                )}
               </button>
             );
           });
@@ -304,32 +303,16 @@ export function MarketMap({ dataset, selected, period }: Props) {
   );
 }
 
-/** What the map colours by: a pair of toggle buttons, like the view mode. */
+/** What the map colours by. */
 function MetricToggle({ metric }: { metric: MapMetric }) {
-  const setMetric = useSetMapMetric();
   return (
-    <div
-      role="group"
-      aria-label="Colour map by"
-      className="inline-flex self-start rounded-lg border p-0.5 text-sm"
-    >
-      {MAP_METRICS.map((option) => (
-        <button
-          key={option}
-          type="button"
-          aria-pressed={option === metric}
-          onClick={() => setMetric(option)}
-          className={cn(
-            "rounded-md px-3 py-1 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-            option === metric
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-accent",
-          )}
-        >
-          {BUTTON_LABEL[option]}
-        </button>
-      ))}
-    </div>
+    <ToggleGroup
+      label="Colour map by"
+      options={MAP_METRICS}
+      value={metric}
+      onChange={useSetMapMetric()}
+      labelOf={formatMetricShortName}
+    />
   );
 }
 
@@ -338,11 +321,25 @@ function MetricToggle({ metric }: { metric: MapMetric }) {
  * the off-track hatch, for growth and share labelled stops of the scale. Muted is outside
  * the selection.
  */
-function MapLegend({ metric, top }: { metric: MapMetric; top: number }) {
-  const statuses = STATUS_ORDER.map((status) => ({
-    label: formatStatus(status),
-    swatch: <StatusIcon status={status} />,
-  }));
+function MapLegend({
+  metric,
+  top,
+  anyWithoutStatus,
+}: {
+  metric: MapMetric;
+  top: number;
+  /** Adds the "no status" mark only when a market shows it. */
+  anyWithoutStatus: boolean;
+}) {
+  const statuses = [
+    ...STATUS_ORDER.map((status) => ({
+      label: formatStatus(status),
+      swatch: <StatusIcon status={status} />,
+    })),
+    ...(anyWithoutStatus
+      ? [{ label: "No status: no forecast", swatch: <NoStatusIcon /> }]
+      : []),
+  ];
   const swatch = (colour: string) => (
     <span className="size-3 rounded-sm" style={{ background: colour }} />
   );
@@ -455,4 +452,9 @@ function MarketTable({
       </tbody>
     </table>
   );
+}
+
+/** The marker for a market with a value but no status (no forecast to attain). */
+function NoStatusIcon() {
+  return <Minus aria-hidden className="size-3.5 text-muted-foreground" />;
 }

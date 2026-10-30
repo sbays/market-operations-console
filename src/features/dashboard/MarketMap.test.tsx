@@ -263,6 +263,9 @@ describe("MarketMap: colour by another KPI", () => {
 
   it("explains the growth colours in the legend with labelled stops", () => {
     renderMap({ searchParams: "?mapMetric=growth" });
+    expect(
+      screen.queryByText("No status: no forecast"),
+    ).not.toBeInTheDocument();
     for (const stop of ["-10.0% or less", "0.0%", "+10.0% or more"]) {
       expect(screen.getByText(stop)).toBeInTheDocument();
     }
@@ -335,6 +338,9 @@ describe("MarketMap: markets with partial data", () => {
     renderMap({ dataset: tiny, searchParams: "?mapMetric=growth" });
 
     expect(marker("France")).toHaveAccessibleName("France: growth 0.0%");
+    // Not a blank circle: a "no status" mark, explained in the legend.
+    expect(marker("France").querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("No status: no forecast")).toBeInTheDocument();
     expect(
       screen.getByRole("img", {
         name: "Growth in Q3 2026 runs from United States at -10.0% to Germany at +25.0%.",
