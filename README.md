@@ -167,6 +167,8 @@ If we used the user's locale we'd face hydration issues or immediately lose the 
 
 Used `eslint-plugin-jsx-a11y` for linting and Axe as part of e2e tests in CI. Charts all have a toggle to "View as table", text summaries and everything is navigable by keyboard using a roving tabindex. Status is always represented by text as well as an icon. Focus moves to the `Key figures` component after drilling into the dashboard and Esc jumps up a level. 
 
+Added `prefers-reduced-motion` media query to remove animations.
+
 ## f. Testing
 
 - **Unit:** all selectors, formatters, parsers and schemas.
@@ -183,13 +185,19 @@ Followed TDD approach at seams, skipped snapshot testing as it adds a lot of ove
 
 ## h. Engineering standards
 
-Strict TS; no `any` or flaky casts. Zod at every boundary, lint-enforced boundaries between layers, css values defined as design tokens, jsx-a11y recommended settings, and feature-branch-based PRs with passing CI required.
+Strict TS; no `any` or unsafe casts. Zod at every boundary, lint-enforced boundaries between layers, css values defined as design tokens, jsx-a11y recommended settings, and feature-branch-based PRs with passing CI required.
 
 ## i. How I used AI tools
 
 Utilised Claude Code to implement, with a workflow that started by defining `docs/PLAN.md` and fleshing out `CLAUDE.md` for rules that were established along the way. Both are committed as evidence of what was decided and how the process looked. 
 
 Planned before each block of work, used skills to grill me on decisions and to build out functionality following TDD approach, used parallel sub-agents in worktrees for work that could be split up. Used two contrasting review skills for each PR which often found similar bugs but at times each identified unique quirks that the other had missed. Manually reviewed all PRs myself too. I pushed and merged everything myself as Claude Code is run within a sandbox environment with carefully controlled access to CLI tools.
+
+I try to keep features to a managable size, changing hundreds of files at once leads to unmanagable pull-request reviews. 
+
+If I'm not entirely sure why something has been suggested I'll drill into it more deeply, either asking for clarification or cited sources, or I'll research independently. 
+
+I also try to avoid compounding dependency issues, which agents can lean on fairly readily, like pnpm filling `overrides` with overly specific version numbers.
 
 ## j. What I'd do differently with more time
 
