@@ -1,11 +1,19 @@
 /**
  * Alert rules: what the configurator collects, and the rules that make a threshold meaningful.
- * Pure: the schema cannot see the dataset, so scope paths are checked by the form's options.
+ * Pure. The schema cannot see the dataset, so normaliseScope checks scope paths against it
+ * on the server, where the form's options can't be trusted.
  */
 import { z } from "zod";
 import { formatMetric, formatMetricName, formatTypedPercent } from "./format";
-import type { Dataset } from "./schema";
-import { entityLabel, refFromPath } from "./selectors";
+import type { Dataset, EntityRef, PeriodRef } from "./schema";
+import {
+  displayedRatio,
+  entityLabel,
+  isAncestorPath,
+  pathOf,
+  refFromPath,
+  valueAt,
+} from "./selectors";
 
 export const AlertMetricSchema = z.enum(["growth", "attainment"]);
 export type AlertMetric = z.infer<typeof AlertMetricSchema>;
@@ -73,6 +81,58 @@ export const AlertRuleSchema = RuleFieldsSchema.extend({
   id: z.string().min(1),
 }).superRefine(checkThresholdRange);
 export type AlertRule = z.infer<typeof AlertRuleSchema>;
+
+export type ScopeCheck =
+  { ok: true; scope: string[] } | { ok: false; invalid: string[] };
+
+/**
+ * The scope as a rule stores it, checked against the data. Only regions and markets the data
+ * contains are valid scope. Each path is kept once, and a market is dropped when its region is
+ * also ticked, so a rule never watches a market twice.
+ */
+export function normaliseScope(dataset: Dataset, scope: string[]): ScopeCheck {
+  const invalid = scope.filter((path) => {
+    const ref = refFromPath(dataset, path);
+    return ref?.level !== "region" && ref?.level !== "market";
+  });
+  if (invalid.length > 0) return { ok: false, invalid };
+  const unique = [...new Set(scope)];
+  return {
+    ok: true,
+    scope: unique.filter(
+      (path) => !unique.some((other) => isAncestorPath(other, path)),
+    ),
+  };
+}
+
+/**
+ * The markets a rule flags over a period, in dataset order: every market in its scope (a
+ * region scope covers each of its markets) whose metric, as displayed, is strictly past the
+ * threshold.
+ * A market with no value for the period is never flagged.
+ */
+export function alertMatches(
+  dataset: Dataset,
+  rule: Pick<AlertRule, "scope" | "metric" | "operator" | "threshold">,
+  period: PeriodRef,
+): EntityRef[] {
+  const limit = rule.threshold / 100;
+  return dataset.markets.flatMap((market) => {
+    const ref: EntityRef = { level: "market", id: market.id };
+    const path = pathOf(dataset, ref);
+    const inScope =
+      path !== undefined &&
+      rule.scope.some(
+        (scoped) => scoped === path || isAncestorPath(scoped, path),
+      );
+    if (!inScope) return [];
+    const raw = valueAt(dataset, ref, period, rule.metric);
+    if (raw === undefined) return [];
+    const value = displayedRatio(raw);
+    const crossed = rule.operator === "below" ? value < limit : value > limit;
+    return crossed ? [ref] : [];
+  });
+}
 
 /**
  * One line for the rule list: "Forecast attainment below 95.0% in Germany, France". The
