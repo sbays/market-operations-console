@@ -160,3 +160,27 @@ export function useFailSaves(): boolean {
   const [fail] = useQueryState("fail", parseAsInteger);
   return fail === 1;
 }
+
+export const MAP_METRICS = ["attainment", "growth", "share"] as const;
+export type MapMetric = (typeof MAP_METRICS)[number];
+
+/** What the map colours by. A bare link is attainment, the status the markers show. */
+const mapMetricParser =
+  parseAsStringLiteral(MAP_METRICS).withDefault("attainment");
+
+export function useMapMetric(): MapMetric {
+  const [metric] = useQueryState("mapMetric", mapMetricParser);
+  return metric;
+}
+
+/** Recolours the map. Replaces history: it's a view of the same selection, not a navigation. */
+export function useSetMapMetric(): (metric: MapMetric) => void {
+  const [, setMetric] = useQueryState(
+    "mapMetric",
+    mapMetricParser.withOptions({ history: "replace" }),
+  );
+  return (metric) => {
+    // The default leaves no param, so attainment links stay short.
+    void setMetric(metric === "attainment" ? null : metric);
+  };
+}
