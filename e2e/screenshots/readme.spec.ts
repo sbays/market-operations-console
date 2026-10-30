@@ -12,20 +12,37 @@ async function ask(page: Page, question: string) {
   return assistant;
 }
 
+/**
+ * Waits until the page has finished drawing: the map loads after the rest of the dashboard,
+ * each chart draws only once it has measured its container, and alert rules load from the API.
+ */
+async function settled(page: Page) {
+  await expect(
+    page.getByRole("figure", { name: "Markets by attainment" }),
+  ).toBeVisible();
+  for (const figure of await page.getByRole("figure").all()) {
+    await expect(figure.locator('svg[role="img"]')).toBeVisible();
+  }
+  await expect(page.getByText("Loading alert rules…")).toHaveCount(0);
+}
+
 test("exec view", async ({ page }) => {
   await page.goto("/console?path=eu&mode=exec");
   await expect(page.getByRole("region", { name: "Top risks" })).toBeVisible();
+  await settled(page);
   await page.screenshot({ path: `${OUT}/exec-view.png`, fullPage: true });
 });
 
 test("analyst view", async ({ page }) => {
   await page.goto("/console?path=eu");
   await expect(page.getByRole("figure", { name: "Compare" })).toBeVisible();
+  await settled(page);
   await page.screenshot({ path: `${OUT}/analyst-view.png`, fullPage: true });
 });
 
 test("chat with citations", async ({ page }) => {
   await page.goto("/console?path=eu.DE");
+  await settled(page);
   const assistant = await ask(
     page,
     "Why did Germany's revenue dip in March 2026?",
@@ -40,6 +57,7 @@ test("chat with citations", async ({ page }) => {
 
 test("low confidence", async ({ page }) => {
   await page.goto("/console");
+  await settled(page);
   const assistant = await ask(
     page,
     "Is Cirrus underperforming everywhere or just in some markets?",
@@ -50,6 +68,7 @@ test("low confidence", async ({ page }) => {
 
 test("abstention", async ({ page }) => {
   await page.goto("/console");
+  await settled(page);
   const assistant = await ask(page, "What will revenue be in Q1 2027?");
   await expect(assistant.getByText("This isn't in the data")).toBeVisible();
   await page.screenshot({ path: `${OUT}/abstention.png` });
@@ -57,6 +76,7 @@ test("abstention", async ({ page }) => {
 
 test("alert form", async ({ page }) => {
   await page.goto("/console?path=eu.DE");
+  await settled(page);
   await page.getByRole("button", { name: "New alert" }).click();
   const dialog = page.getByRole("dialog", { name: "New alert rule" });
   await dialog.getByRole("button", { name: "Save rule" }).click();
