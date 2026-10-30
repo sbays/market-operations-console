@@ -263,6 +263,24 @@ describe("AssistantPanel", () => {
     );
   });
 
+  it("explains a medium-confidence answer too, not only a low one", async () => {
+    respondWith([
+      token("APAC grew faster [1]."),
+      final({
+        confidence: 0.66,
+        uncertainty: "APAC forecasts were set more aggressively.",
+      }),
+    ]);
+    const { user } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
+
+    expect(await screen.findByText("Medium confidence")).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Answer" })).toHaveTextContent(
+      "Why it's uncertain: APAC forecasts were set more aggressively.",
+    );
+  });
+
   it("announces the start and the outcome, not every token", async () => {
     respondWith([token("Germany "), token("fell [1]."), final()], {
       delayMs: 50,

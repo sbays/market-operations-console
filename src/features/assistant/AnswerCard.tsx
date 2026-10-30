@@ -1,5 +1,4 @@
 import { CircleAlert, CircleStop, RotateCw } from "lucide-react";
-import { confidenceBand } from "@/domain/selectors";
 import { Button } from "@/ui/button";
 import { AiLabel } from "./AiLabel";
 import { AnswerBody } from "./AnswerBody";
@@ -69,12 +68,12 @@ function AnswerFooter({ state, onStop, onRetry }: Props) {
       return (
         <div className="space-y-1.5">
           <ConfidenceBadge confidence={state.final.confidence} />
-          {state.final.uncertainty &&
-            confidenceBand(state.final.confidence) === "low" && (
-              <p className="text-xs">
-                Why it&apos;s uncertain: {state.final.uncertainty}
-              </p>
-            )}
+          {/* Any stated caveat shows, whatever the band: hiding it would overstate certainty. */}
+          {state.final.uncertainty && (
+            <p className="text-xs">
+              Why it&apos;s uncertain: {state.final.uncertainty}
+            </p>
+          )}
         </div>
       );
     case "error":
