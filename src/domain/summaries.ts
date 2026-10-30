@@ -2,11 +2,24 @@
  * Plain-language sentences about a selection, built from the same formatters as every other
  * number on screen so a sentence never shows a figure the chart doesn't.
  */
-import { formatCurrency, formatPercent, formatPeriod } from "./format";
+import {
+  formatCurrency,
+  formatList,
+  formatPercent,
+  formatPeriod,
+} from "./format";
+import type { Month } from "./schema";
 import type { TrendPoint } from "./selectors";
 
-/** "Germany revenue, Jan 2026 to Jun 2026: $150 in Jun 2026, 75.0% of forecast." */
-export function trendSummary(points: TrendPoint[], name: string): string {
+/**
+ * "Germany revenue, Jan 2026 to Jun 2026: $150 in Jun 2026, 75.0% of forecast.", plus the
+ * months with a flagged anomaly when the chart marks any.
+ */
+export function trendSummary(
+  points: TrendPoint[],
+  name: string,
+  anomalyMonths: Month[] = [],
+): string {
   const first = points[0];
   const last = points.at(-1);
   if (!first || !last) return `${name}: no data for this selection.`;
@@ -17,5 +30,9 @@ export function trendSummary(points: TrendPoint[], name: string): string {
     last.forecast === 0
       ? ""
       : `, ${formatPercent(last.actual / last.forecast)} of forecast`;
-  return `${name} revenue, ${span}: ${latest}${against}.`;
+  const flagged =
+    anomalyMonths.length === 0
+      ? ""
+      : ` ${anomalyMonths.length === 1 ? "Anomaly" : "Anomalies"} flagged in ${formatList(anomalyMonths.map(formatPeriod))}.`;
+  return `${name} revenue, ${span}: ${latest}${against}.${flagged}`;
 }

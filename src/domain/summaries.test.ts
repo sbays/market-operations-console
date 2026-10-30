@@ -29,4 +29,18 @@ describe("trendSummary", () => {
       "Germany revenue, Jan 2026 to Jun 2026: $150 in Jun 2026.",
     );
   });
+
+  it("names the month an anomaly is flagged in", () => {
+    expect(trendSummary(trend, "Germany", ["2026-03"])).toBe(
+      "Germany revenue, Jan 2026 to Jun 2026: $150 in Jun 2026, 75.0% of forecast. Anomaly flagged in Mar 2026.",
+    );
+  });
+
+  it("lists several anomaly months in order, joined in plain English", () => {
+    expect(
+      trendSummary(trend, "Portfolio", ["2026-02", "2026-03", "2026-04"]),
+    ).toBe(
+      "Portfolio revenue, Jan 2026 to Jun 2026: $150 in Jun 2026, 75.0% of forecast. Anomalies flagged in Feb 2026, Mar 2026, and Apr 2026.",
+    );
+  });
 });

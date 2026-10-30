@@ -88,6 +88,13 @@ export function formatPeriod(period: PeriodRef): string {
   return month.format(Date.UTC(parsed.year, parsed.month - 1));
 }
 
+const list = new Intl.ListFormat(LOCALE, { type: "conjunction" });
+
+/** ["Mar 2026", "Apr 2026"] → "Mar 2026 and Apr 2026". */
+export function formatList(items: string[]): string {
+  return list.format(items);
+}
+
 /** The single place that decides how each metric reads, for charts, tables and AI text alike. */
 export function formatMetric(metric: Metric, value: number): string {
   switch (metric) {

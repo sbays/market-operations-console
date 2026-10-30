@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatCoverage,
   formatCurrency,
+  formatList,
   formatMetric,
   formatMetricName,
   formatMetricOrMissing,
@@ -149,6 +150,16 @@ describe("formatWebVital", () => {
   it("shows layout shift as a unitless score", () => {
     expect(formatWebVital({ name: "CLS", value: 0.0812, rating: "good" })).toBe(
       "CLS 0.081 (good)",
+    );
+  });
+});
+
+describe("formatList", () => {
+  it("joins items in plain English", () => {
+    expect(formatList(["Mar 2026"])).toBe("Mar 2026");
+    expect(formatList(["Mar 2026", "Apr 2026"])).toBe("Mar 2026 and Apr 2026");
+    expect(formatList(["Feb 2026", "Mar 2026", "Apr 2026"])).toBe(
+      "Feb 2026, Mar 2026, and Apr 2026",
     );
   });
 });

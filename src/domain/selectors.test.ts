@@ -22,6 +22,7 @@ import {
   statusOf,
   topMovers,
   topRisks,
+  trendAnomalies,
   valueAt,
 } from "./selectors";
 
@@ -736,5 +737,90 @@ describe("childStatusCounts", () => {
     expect(
       childStatusCounts(noUsForecast, { level: "portfolio" }, "2026-01"),
     ).toEqual({ "on-track": 0, "at-risk": 0, "off-track": 1 });
+  });
+});
+
+describe("trendAnomalies", () => {
+  const beaconInGermany = {
+    level: "product",
+    marketId: "DE",
+    id: "beacon",
+  } as const;
+  const stockOut = {
+    ref: beaconInGermany,
+    period: "2026-03",
+    metric: "revenue",
+    note: "Beacon stock-out.",
+  } as const;
+  const usDip = {
+    ref: unitedStates,
+    period: "2026-02",
+    metric: "revenue",
+    note: "US dip.",
+  } as const;
+  const germanyMay = {
+    ref: germany,
+    period: "2026-05",
+    metric: "revenue",
+    note: "Germany in May.",
+  } as const;
+  const germanyUnits = {
+    ref: germany,
+    period: "2026-01",
+    metric: "units",
+    note: "A units note.",
+  } as const;
+  const withAnomalies = {
+    ...dataset,
+    // Out of period order, so the result has to sort.
+    anomalies: [germanyMay, usDip, germanyUnits, stockOut],
+  };
+
+  it("includes an anomaly recorded against the selection itself", () => {
+    expect(trendAnomalies(withAnomalies, unitedStates)).toEqual([
+      { period: "2026-02", ref: unitedStates, note: "US dip." },
+    ]);
+  });
+
+  it("rolls a product's anomaly up to its market, region and the portfolio", () => {
+    const fromBeacon = {
+      period: "2026-03",
+      ref: beaconInGermany,
+      note: "Beacon stock-out.",
+    };
+    expect(trendAnomalies(withAnomalies, europe)).toEqual([
+      fromBeacon,
+      { period: "2026-05", ref: germany, note: "Germany in May." },
+    ]);
+    expect(trendAnomalies(withAnomalies, { level: "portfolio" })).toEqual([
+      { period: "2026-02", ref: unitedStates, note: "US dip." },
+      fromBeacon,
+      { period: "2026-05", ref: germany, note: "Germany in May." },
+    ]);
+  });
+
+  it("leaves out a parent's anomaly at the child, and a sibling's", () => {
+    expect(trendAnomalies(withAnomalies, beaconInGermany)).toEqual([
+      { period: "2026-03", ref: beaconInGermany, note: "Beacon stock-out." },
+    ]);
+    expect(
+      trendAnomalies(withAnomalies, {
+        level: "product",
+        marketId: "DE",
+        id: "atlas",
+      }),
+    ).toEqual([]);
+  });
+
+  it("only includes revenue anomalies, because the trend plots revenue", () => {
+    expect(
+      trendAnomalies(withAnomalies, germany).map((a) => a.note),
+    ).not.toContain("A units note.");
+  });
+
+  it("is empty for an entity outside the data", () => {
+    expect(
+      trendAnomalies(withAnomalies, { level: "market", id: "XX" }),
+    ).toEqual([]);
   });
 });
