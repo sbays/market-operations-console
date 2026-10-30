@@ -41,7 +41,8 @@ type Mark = {
   name: string;
   /** The metric the map colours by. */
   value: number;
-  status: Status;
+  /** Undefined when the market has no attainment (no forecast), even if `value` exists. */
+  status: Status | undefined;
   inSelection: boolean;
 };
 
@@ -71,7 +72,10 @@ const STATUS_ORDER: Status[] = ["on-track", "at-risk", "off-track"];
 
 const HATCH_SPACING = 6;
 
-/** One metric per dataset market over a period. Markets the data doesn't cover are left out. */
+/**
+ * One metric per dataset market over a period. A market without that metric is left out; one
+ * with the metric but no attainment stays, without a status.
+ */
 function marksFor(
   dataset: Dataset,
   selected: EntityRef,
@@ -83,7 +87,7 @@ function marksFor(
     const ref: EntityRef = { level: "market", id: market.id };
     const value = valueAt(dataset, ref, period, metric);
     const status = statusAt(dataset, ref, period);
-    if (value === undefined || status === undefined) return [];
+    if (value === undefined) return [];
     return [
       {
         id: market.id,
@@ -103,7 +107,10 @@ function byValue(marks: Mark[]): Mark[] {
 
 /** "Germany: attainment 95.4%, at risk", the words a marker is read out as. */
 function markLabel(mark: Mark, metric: MapMetric): string {
-  return `${mark.name}: ${METRIC_WORD[metric]} ${formatMetric(metric, mark.value)}, ${formatStatus(mark.status).toLowerCase()}`;
+  const reading = `${mark.name}: ${METRIC_WORD[metric]} ${formatMetric(metric, mark.value)}`;
+  return mark.status === undefined
+    ? reading
+    : `${reading}, ${formatStatus(mark.status).toLowerCase()}`;
 }
 
 /** The largest share among the markets in the selection: the top of the share scale. */
@@ -137,19 +144,21 @@ function mapSummary(
   if (selected.level === "market" || selected.level === "product") {
     return `${markLabel(lowest, metric)}, in ${when}.`;
   }
-  if (metric !== "attainment") {
-    const where =
-      selected.level === "region"
-        ? ` in ${entityLabel(dataset, selected)}`
-        : "";
-    const word = METRIC_WORD[metric];
-    const sentenceWord = word.charAt(0).toUpperCase() + word.slice(1);
-    return `${sentenceWord}${where} in ${when} runs from ${lowest.name} at ${formatMetric(metric, lowest.value)} to ${highest.name} at ${formatMetric(metric, highest.value)}.`;
-  }
-  const flagged = shown.filter((m) => m.status !== "on-track").length;
-  const verb = flagged === 1 ? "is" : "are";
   const where =
     selected.level === "region" ? ` in ${entityLabel(dataset, selected)}` : "";
+  if (metric !== "attainment") {
+    const word = METRIC_WORD[metric];
+    const subject = `${word.charAt(0).toUpperCase()}${word.slice(1)}${where} in ${when}`;
+    const at = (mark: Mark) =>
+      `${mark.name} at ${formatMetric(metric, mark.value)}`;
+    return lowest === highest
+      ? `${subject} is ${at(lowest)}.`
+      : `${subject} runs from ${at(lowest)} to ${at(highest)}.`;
+  }
+  const flagged = shown.filter(
+    (m) => m.status === "at-risk" || m.status === "off-track",
+  ).length;
+  const verb = flagged === 1 ? "is" : "are";
   return `${flagged} of ${shown.length} markets${where} ${verb} off track or at risk in ${when}; the lowest is ${lowest.name} at ${formatMetric("attainment", lowest.value)}.`;
 }
 
@@ -163,7 +172,8 @@ export function MarketMap({ dataset, selected, period }: Props) {
   const highlighted = useHighlightedPath();
   const metric = useMapMetric();
   const marks = marksFor(dataset, selected, period, metric);
-  const top = maxShare(marks);
+  // Only share uses a scale top; the other metrics have fixed scales.
+  const top = metric === "share" ? maxShare(marks) : 0;
   const title = `Markets by ${METRIC_WORD[metric]}`;
   const marketPath = (id: string) => pathOf(dataset, { level: "market", id });
   const hatchId = `hatch-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -225,7 +235,7 @@ export function MarketMap({ dataset, selected, period }: Props) {
                     : !mark.inSelection
                       ? "fill-muted stroke-border"
                       : metric === "attainment"
-                        ? `${STATUS_FILL[mark.status]} stroke-background`
+                        ? `${mark.status ? STATUS_FILL[mark.status] : "fill-muted"} stroke-background`
                         : "stroke-background";
                 const fill =
                   mark?.inSelection && metric !== "attainment"
@@ -284,7 +294,7 @@ export function MarketMap({ dataset, selected, period }: Props) {
                   link["data-linked"] && "ring-2 ring-foreground",
                 )}
               >
-                <StatusIcon status={mark.status} />
+                {mark.status ? <StatusIcon status={mark.status} /> : null}
               </button>
             );
           });
@@ -434,7 +444,11 @@ function MarketTable({
               {formatMetric(metric, mark.value)}
             </td>
             <td className="py-1.5">
-              <StatusBadge status={mark.status} className="font-normal" />
+              {mark.status ? (
+                <StatusBadge status={mark.status} className="font-normal" />
+              ) : (
+                <span className="text-muted-foreground">No data</span>
+              )}
             </td>
           </tr>
         ))}
