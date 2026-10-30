@@ -501,3 +501,35 @@ export function topRisks(
       reason: riskReason(dataset, ref, period, attainment),
     }));
 }
+
+export type TrendAnomaly = { period: Month; ref: EntityRef; note: string };
+
+/** Whether `path` is `scope` or below it. The portfolio's "" contains everything. */
+function isWithin(path: string, scope: string): boolean {
+  return scope === "" || path === scope || path.startsWith(`${scope}.`);
+}
+
+/**
+ * The revenue anomalies behind a selection's trend, in period order. A child's anomaly shows
+ * on every ancestor, because the parent's line is the sum of its children: the Beacon
+ * stock-out is Germany's March dip too. A parent's or a sibling's never shows. Unlike a risk's
+ * reason, each anomaly keeps its own ref, so a label can name where it comes from.
+ */
+export function trendAnomalies(
+  dataset: Dataset,
+  ref: EntityRef,
+): TrendAnomaly[] {
+  const scope = pathOf(dataset, ref);
+  if (scope === undefined) return [];
+  return dataset.anomalies
+    .filter((anomaly) => {
+      const path = pathOf(dataset, anomaly.ref);
+      return (
+        anomaly.metric === "revenue" &&
+        path !== undefined &&
+        isWithin(path, scope)
+      );
+    })
+    .map(({ period, ref: from, note }) => ({ period, ref: from, note }))
+    .sort((a, b) => a.period.localeCompare(b.period));
+}
