@@ -209,8 +209,67 @@ describe("Dashboard", () => {
     expect(
       screen.getByRole("button", { name: /^Mar 2026: revenue / }),
     ).toHaveAccessibleName(
-      /^Mar 2026: revenue \$4M, forecast \$[\d.]+M, prior year \$[\d.]+M$/,
+      /^Mar 2026: revenue \$4M, forecast \$[\d.]+M, prior year \$[\d.]+M\./,
     );
+  });
+
+  it("flags an anomaly from a product on its market's trend, naming where it comes from", async () => {
+    const { user } = renderDashboard("?path=eu.DE");
+
+    expect(
+      screen.getByRole("button", { name: /^Mar 2026: revenue / }),
+    ).toHaveAccessibleName(
+      /prior year \$[\d.]+M\. Anomaly in Beacon in Germany: A distributor stock-out in Germany held back most Beacon shipments in March\.$/,
+    );
+    expect(
+      screen.getByRole("button", { name: /^Feb 2026: revenue / }),
+    ).not.toHaveAccessibleName(/Anomaly/);
+    expect(
+      screen.getByRole("img", { name: /^Germany revenue, / }),
+    ).toHaveAccessibleName(/\. Anomaly flagged in Mar 2026\.$/);
+    expect(
+      within(trendFigure()).getByRole("list", { name: "Legend" }),
+    ).toHaveTextContent(/Prior year.*Anomaly/);
+
+    await user.click(
+      within(trendFigure()).getByRole("button", { name: "View as table" }),
+    );
+    const table = screen.getByRole("table", {
+      name: /Germany revenue by month/,
+    });
+    expect(
+      within(table).getByRole("columnheader", { name: "Anomaly" }),
+    ).toBeInTheDocument();
+    expect(
+      within(table).getByRole("row", { name: /Mar 2026/ }),
+    ).toHaveTextContent("Beacon in Germany: A distributor stock-out");
+    expect(
+      within(table).getByRole("row", { name: /Apr 2026/ }),
+    ).not.toHaveTextContent("stock-out");
+  });
+
+  it("flags an anomaly on the entity it belongs to without repeating its name", () => {
+    renderDashboard("?path=eu.DE.beacon");
+
+    expect(
+      screen.getByRole("button", { name: /^Mar 2026: revenue / }),
+    ).toHaveAccessibleName(
+      /prior year \$[\d.]+M\. Anomaly: A distributor stock-out in Germany/,
+    );
+  });
+
+  it("keeps anomaly markers out of the executive view", () => {
+    renderDashboard("?path=eu.DE&mode=exec");
+
+    expect(
+      screen.getByRole("button", { name: /^Mar 2026: revenue / }),
+    ).not.toHaveAccessibleName(/Anomaly/);
+    expect(
+      screen.getByRole("img", { name: /^Germany revenue, / }),
+    ).not.toHaveAccessibleName(/Anomaly/);
+    expect(
+      within(trendFigure()).getByRole("list", { name: "Legend" }),
+    ).not.toHaveTextContent("Anomaly");
   });
 
   it("names each line in a legend, and reads the summary once", async () => {

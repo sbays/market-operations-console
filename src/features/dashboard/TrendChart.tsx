@@ -1,12 +1,16 @@
 import { AxisBottom, AxisLeft } from "@visx/axis";
 import { Group } from "@visx/group";
 import { scaleLinear } from "@visx/scale";
-import { LinePath } from "@visx/shape";
+import { Line, LinePath } from "@visx/shape";
+import { Flag } from "lucide-react";
 import { formatCurrency, formatPeriod } from "@/domain/format";
-import type { Dataset, EntityRef, PeriodRef } from "@/domain/schema";
+import type { Dataset, EntityRef, Month, PeriodRef } from "@/domain/schema";
 import {
   entityLabel,
+  entityName,
   monthlySeries,
+  pathOf,
+  trendAnomalies,
   type TrendPoint,
 } from "@/domain/selectors";
 import { trendSummary } from "@/domain/summaries";
@@ -20,9 +24,12 @@ type Props = {
   dataset: Dataset;
   selected: EntityRef;
   period: PeriodRef;
-  /** Exec shows actual against forecast; analyst adds the prior year. */
+  /** Exec shows actual against forecast; analyst adds the prior year and anomaly markers. */
   mode: Mode;
 };
+
+/** An anomaly as the chart shows it: `source` names a descendant it rolled up from. */
+type MonthAnomaly = { period: Month; source: string | undefined; note: string };
 
 const MARGIN = { top: 12, right: 16, bottom: 28, left: 64 };
 /** Label every third month, so the axis stays readable at any width. */
@@ -30,9 +37,43 @@ const TICK_EVERY = 3;
 const AXIS_COLOUR = "var(--border)";
 const LABEL_COLOUR = "var(--muted-foreground)";
 
+/**
+ * The anomalies to mark, analyst view only. One recorded against a descendant (Beacon in
+ * Germany, on Germany's trend) names it, so the note is never read as the selection's own.
+ */
+function monthAnomalies(
+  dataset: Dataset,
+  selected: EntityRef,
+  mode: Mode,
+): MonthAnomaly[] {
+  if (mode !== "analyst") return [];
+  const own = pathOf(dataset, selected);
+  return trendAnomalies(dataset, selected).map(({ period, ref, note }) => ({
+    period,
+    source: pathOf(dataset, ref) === own ? undefined : entityName(dataset, ref),
+    note,
+  }));
+}
+
+/** "Anomaly in Beacon in Germany: …" for a point's label. */
+function anomalySentence({ source, note }: MonthAnomaly): string {
+  return source === undefined
+    ? `Anomaly: ${note}`
+    : `Anomaly in ${source}: ${note}`;
+}
+
+/** "Beacon in Germany: …" for the table, where the column already says "Anomaly". */
+function anomalyCell({ source, note }: MonthAnomaly): string {
+  return source === undefined ? note : `${source}: ${note}`;
+}
+
 /** Revenue against forecast (and prior year, for analysts) by month; a point focuses its month. */
 export function TrendChart({ dataset, selected, period, mode }: Props) {
   const showPriorYear = mode === "analyst";
+  const anomalies = monthAnomalies(dataset, selected, mode);
+  const anomaliesIn = (month: Month) =>
+    anomalies.filter((anomaly) => anomaly.period === month);
+  const flaggedMonths = [...new Set(anomalies.map((a) => a.period))];
   const setPeriod = useSetPeriod();
   const series = monthlySeries(dataset, selected);
   const selectedIndex = series.findIndex((point) => point.period === period);
@@ -68,11 +109,22 @@ export function TrendChart({ dataset, selected, period, mode }: Props) {
   return (
     <ChartFrame
       title={`${name} revenue`}
-      summary={trendSummary(series, name)}
+      summary={trendSummary(series, name, flaggedMonths)}
       table={
-        <TrendTable name={name} series={series} showPriorYear={showPriorYear} />
+        <TrendTable
+          name={name}
+          series={series}
+          showPriorYear={showPriorYear}
+          showAnomalies={mode === "analyst"}
+          anomaliesIn={anomaliesIn}
+        />
       }
-      legend={<TrendLegend showPriorYear={showPriorYear} />}
+      legend={
+        <TrendLegend
+          showPriorYear={showPriorYear}
+          showAnomalies={anomalies.length > 0}
+        />
+      }
       drawing={(size) => {
         const { x, y } = scales(size);
         const line = (pick: (p: TrendPoint) => number) => ({
@@ -107,6 +159,17 @@ export function TrendChart({ dataset, selected, period, mode }: Props) {
               tickStroke={AXIS_COLOUR}
               tickLabelProps={{ fill: LABEL_COLOUR, fontSize: 11 }}
             />
+            {series.map((point, i) =>
+              anomaliesIn(point.period).length > 0 ? (
+                <Line
+                  key={point.period}
+                  from={{ x: x(i), y: MARGIN.top }}
+                  to={{ x: x(i), y: size.height - MARGIN.bottom }}
+                  className="stroke-muted-foreground"
+                  strokeDasharray="2 3"
+                />
+              ) : null,
+            )}
             {showPriorYear && (
               <LinePath
                 {...line((p) => p.priorYear)}
@@ -123,12 +186,14 @@ export function TrendChart({ dataset, selected, period, mode }: Props) {
         const { x, y } = scales(size);
         return series.map((point, index) => {
           const selectedMonth = point.period === period;
+          const flagged = anomaliesIn(point.period);
+          const label = `${formatPeriod(point.period)}: revenue ${formatCurrency(point.actual)}, forecast ${formatCurrency(point.forecast)}${showPriorYear ? `, prior year ${formatCurrency(point.priorYear)}` : ""}.`;
           return (
             <button
               key={point.period}
               type="button"
               {...roving.itemProps(index)}
-              aria-label={`${formatPeriod(point.period)}: revenue ${formatCurrency(point.actual)}, forecast ${formatCurrency(point.forecast)}${showPriorYear ? `, prior year ${formatCurrency(point.priorYear)}` : ""}`}
+              aria-label={[label, ...flagged.map(anomalySentence)].join(" ")}
               aria-current={selectedMonth ? "date" : undefined}
               onClick={() => setPeriod(point.period)}
               style={{ left: x(index), top: y(point.actual) }}
@@ -136,7 +201,14 @@ export function TrendChart({ dataset, selected, period, mode }: Props) {
                 "pointer-events-auto absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-chart-1 bg-background focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
                 selectedMonth && "size-4 bg-chart-1",
               )}
-            />
+            >
+              {flagged.length > 0 && (
+                <Flag
+                  aria-hidden
+                  className="absolute bottom-full left-1/2 mb-1 size-3.5 -translate-x-1/2 text-foreground"
+                />
+              )}
+            </button>
           );
         });
       }}
@@ -145,7 +217,13 @@ export function TrendChart({ dataset, selected, period, mode }: Props) {
 }
 
 /** Each line by colour and by style, so the dashed line isn't explained by colour alone. */
-function TrendLegend({ showPriorYear }: { showPriorYear: boolean }) {
+function TrendLegend({
+  showPriorYear,
+  showAnomalies,
+}: {
+  showPriorYear: boolean;
+  showAnomalies: boolean;
+}) {
   const items = [
     { label: "Actual", line: "border-chart-1" },
     { label: "Forecast", line: "border-chart-2" },
@@ -155,10 +233,20 @@ function TrendLegend({ showPriorYear }: { showPriorYear: boolean }) {
   ];
   return (
     <ChartLegend
-      items={items.map(({ label, line }) => ({
-        label,
-        swatch: <span className={cn("w-5 border-t-2", line)} />,
-      }))}
+      items={[
+        ...items.map(({ label, line }) => ({
+          label,
+          swatch: <span className={cn("w-5 border-t-2", line)} />,
+        })),
+        ...(showAnomalies
+          ? [
+              {
+                label: "Anomaly",
+                swatch: <Flag aria-hidden className="size-3.5" />,
+              },
+            ]
+          : []),
+      ]}
     />
   );
 }
@@ -167,10 +255,14 @@ function TrendTable({
   name,
   series,
   showPriorYear,
+  showAnomalies,
+  anomaliesIn,
 }: {
   name: string;
   series: TrendPoint[];
   showPriorYear: boolean;
+  showAnomalies: boolean;
+  anomaliesIn: (month: Month) => MonthAnomaly[];
 }) {
   return (
     <table className="w-full text-sm">
@@ -193,6 +285,11 @@ function TrendTable({
               Prior year
             </th>
           )}
+          {showAnomalies && (
+            <th scope="col" className="py-1.5 pl-4 text-left font-medium">
+              Anomaly
+            </th>
+          )}
         </tr>
       </thead>
       <tbody className="tabular-nums">
@@ -210,6 +307,11 @@ function TrendTable({
             {showPriorYear && (
               <td className="py-1.5 text-right">
                 {formatCurrency(point.priorYear)}
+              </td>
+            )}
+            {showAnomalies && (
+              <td className="py-1.5 pl-4 text-left">
+                {anomaliesIn(point.period).map(anomalyCell).join(" ")}
               </td>
             )}
           </tr>
