@@ -2,7 +2,7 @@
  * Which entities the radar compares. The URL's `compare` paths are a request; this decides
  * what is shown, so the radar, the checkboxes and the next toggle all agree.
  */
-import type { Dataset, EntityRef } from "./schema";
+import type { Dataset, EntityPath, EntityRef } from "./schema";
 import { childrenOf, pathOf } from "./selectors";
 
 /** The most entities the radar compares at once. */
@@ -19,8 +19,8 @@ export function comparedRefs(
   paths: string[],
 ): EntityRef[] {
   const children = childrenOf(dataset, selected);
-  const byPath = new Map(
-    children.map((ref) => [pathOf(dataset, ref), ref] as const),
+  const byPath = new Map<string | undefined, EntityRef>(
+    children.map((ref) => [pathOf(dataset, ref), ref]),
   );
   const named = [...new Set(paths)].flatMap((path) => {
     const ref = byPath.get(path);
@@ -38,7 +38,7 @@ export function toggleCompared(
   dataset: Dataset,
   compared: EntityRef[],
   ref: EntityRef,
-): string[] {
+): EntityPath[] {
   const paths = compared.flatMap((r) => pathOf(dataset, r) ?? []);
   const path = pathOf(dataset, ref);
   if (path === undefined) return paths;

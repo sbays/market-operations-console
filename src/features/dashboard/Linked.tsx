@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
+import type { EntityPath } from "@/domain/schema";
 import { linkedProps, useIsLinked } from "@/state/highlight";
 import { cn } from "@/ui/cn";
 
 type Props = {
-  path: string | undefined;
+  path: EntityPath | undefined;
   className?: string;
   children: ReactNode;
 };

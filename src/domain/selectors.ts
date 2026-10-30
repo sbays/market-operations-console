@@ -2,15 +2,17 @@
  * Pure derivations over the dataset. Every number the UI shows, and every number a citation
  * chip checks against, comes from here.
  */
-import type {
-  Dataset,
-  EntityRef,
-  Metric,
-  Month,
-  PeriodRef,
-  Point,
-  Quarter,
-  Status,
+import {
+  EntityPathSchema,
+  type Dataset,
+  type EntityPath,
+  type EntityRef,
+  type Metric,
+  type Month,
+  type PeriodRef,
+  type Point,
+  type Quarter,
+  type Status,
 } from "./schema";
 import { formatPercent, formatPoints, PERCENT_DECIMALS } from "./format";
 import { monthKey, monthsOfQuarter, parsePeriod, quarterKey } from "./period";
@@ -315,12 +317,19 @@ export function coverageOf(dataset: Dataset): { from: Month; to: Month } {
   return { from, to };
 }
 
-/** The URL form of a drill path: "eu.DE.beacon" is region, market, product; "" is the portfolio. */
+export const PORTFOLIO_PATH = EntityPathSchema.parse("");
+
+/** "" is falsy, so test for the portfolio with this rather than a path's truthiness. */
+export function isPortfolioPath(path: EntityPath | undefined): boolean {
+  return path === PORTFOLIO_PATH;
+}
+
+/** The ref a URL's drill path names, or undefined when the data doesn't contain it. */
 export function refFromPath(
   dataset: Dataset,
   path: string,
 ): EntityRef | undefined {
-  if (path === "") return { level: "portfolio" };
+  if (path === PORTFOLIO_PATH) return { level: "portfolio" };
   const [regionId, marketId, productId, ...rest] = path.split(".");
   if (rest.length > 0) return undefined;
 
@@ -340,30 +349,40 @@ export function refFromPath(
 }
 
 /** The inverse of refFromPath; undefined when the ref's market isn't in the data. */
-export function pathOf(dataset: Dataset, ref: EntityRef): string | undefined {
+export function pathOf(
+  dataset: Dataset,
+  ref: EntityRef,
+): EntityPath | undefined {
   switch (ref.level) {
     case "portfolio":
-      return "";
+      return PORTFOLIO_PATH;
     case "region":
-      return ref.id;
+      return EntityPathSchema.parse(ref.id);
     case "market":
     case "product": {
       const marketId = ref.level === "market" ? ref.id : ref.marketId;
       const market = dataset.markets.find((m) => m.id === marketId);
       if (!market) return undefined;
       const marketPath = `${market.regionId}.${market.id}`;
-      return ref.level === "market" ? marketPath : `${marketPath}.${ref.id}`;
+      return EntityPathSchema.parse(
+        ref.level === "market" ? marketPath : `${marketPath}.${ref.id}`,
+      );
     }
   }
 }
 
 /** True when `ancestor` is a strict ancestor of `path` by whole segments ("eu" of "eu.DE"). */
-export function isAncestorPath(ancestor: string, path: string): boolean {
-  return ancestor === "" ? path !== "" : path.startsWith(`${ancestor}.`);
+export function isAncestorPath(
+  ancestor: EntityPath,
+  path: EntityPath,
+): boolean {
+  return isPortfolioPath(ancestor)
+    ? !isPortfolioPath(path)
+    : path.startsWith(`${ancestor}.`);
 }
 
 /** True when `scope` is `path` itself or one of its ancestors: the scope covers it. */
-export function coversPath(scope: string, path: string): boolean {
+export function coversPath(scope: EntityPath, path: EntityPath): boolean {
   return path === scope || isAncestorPath(scope, path);
 }
 

@@ -5,7 +5,13 @@
  */
 import { z } from "zod";
 import { formatMetric, formatMetricName, formatTypedPercent } from "./format";
-import type { Dataset, EntityRef, PeriodRef } from "./schema";
+import {
+  EntityPathSchema,
+  type Dataset,
+  type EntityPath,
+  type EntityRef,
+  type PeriodRef,
+} from "./schema";
 import {
   coversPath,
   displayedRatio,
@@ -46,7 +52,7 @@ const RuleFieldsSchema = z.object({
     .min(1, "Give the rule a name.")
     .max(60, "Keep the rule name to 60 characters or fewer."),
   scope: z
-    .array(z.string().min(1))
+    .array(EntityPathSchema.min(1))
     .min(1, "Pick at least one region or market."),
   metric: AlertMetricSchema,
   operator: AlertOperatorSchema,
@@ -84,14 +90,17 @@ export const AlertRuleSchema = RuleFieldsSchema.extend({
 export type AlertRule = z.infer<typeof AlertRuleSchema>;
 
 export type ScopeCheck =
-  { ok: true; scope: string[] } | { ok: false; invalid: string[] };
+  { ok: true; scope: EntityPath[] } | { ok: false; invalid: EntityPath[] };
 
 /**
  * The scope as a rule stores it, checked against the data. Only regions and markets the data
  * contains are valid scope. Each path is kept once, and a market is dropped when its region is
  * also ticked, so a rule never watches a market twice.
  */
-export function normaliseScope(dataset: Dataset, scope: string[]): ScopeCheck {
+export function normaliseScope(
+  dataset: Dataset,
+  scope: EntityPath[],
+): ScopeCheck {
   const invalid = scope.filter((path) => {
     const ref = refFromPath(dataset, path);
     return ref?.level !== "region" && ref?.level !== "market";

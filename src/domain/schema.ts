@@ -30,6 +30,13 @@ export const EntityRefSchema = z.discriminatedUnion("level", [
 ]);
 export type EntityRef = z.infer<typeof EntityRefSchema>;
 
+/**
+ * An entity as a string, for URLs and keys: "eu.DE.beacon" is region, market, product, and ""
+ * is the portfolio. Comes from pathOf; a raw string from a URL goes through refFromPath.
+ */
+export const EntityPathSchema = z.string().brand<"EntityPath", "inout">();
+export type EntityPath = z.infer<typeof EntityPathSchema>;
+
 // Dataset ------------------------------------------------------------------
 
 export const MetricSchema = z.enum([

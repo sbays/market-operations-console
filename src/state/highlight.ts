@@ -11,12 +11,16 @@
  */
 import { create } from "zustand";
 import { isLinked } from "@/domain/highlight";
+import type { EntityPath } from "@/domain/schema";
 
 /**
  * Pointer and focus are tracked apart, so a mouse passing over one item can't wipe the
  * highlight a keyboard user has on another. The pointer wins while it's over an item.
  */
-type HighlightState = { pointer: string | null; focus: string | null };
+type HighlightState = {
+  pointer: EntityPath | null;
+  focus: EntityPath | null;
+};
 
 const useHighlightStore = create<HighlightState>(() => ({
   pointer: null,
@@ -26,7 +30,7 @@ const useHighlightStore = create<HighlightState>(() => ({
 const shown = (state: HighlightState) => state.pointer ?? state.focus;
 
 /** The drill path being hovered or focused, or null. */
-export function useHighlightedPath(): string | null {
+export function useHighlightedPath(): EntityPath | null {
   return useHighlightStore(shown);
 }
 
@@ -35,10 +39,8 @@ export function useHighlightedPath(): string | null {
  * component using it re-renders only when its own emphasis turns on or off, not on every
  * hover elsewhere.
  */
-export function useIsLinked(path: string | undefined): boolean {
-  return useHighlightStore(
-    (state) => path !== undefined && isLinked(path, shown(state)),
-  );
+export function useIsLinked(path: EntityPath | undefined): boolean {
+  return useHighlightStore((state) => isLinked(path, shown(state)));
 }
 
 /**
@@ -63,7 +65,7 @@ export type HighlightHandlers = {
  * Leaving or blurring only clears its own slot, and only if it still holds this item:
  * moving quickly can fire the next item's enter before this one's leave.
  */
-export function highlightHandlers(path: string): HighlightHandlers {
+export function highlightHandlers(path: EntityPath): HighlightHandlers {
   const release = (slot: keyof HighlightState) => () =>
     useHighlightStore.setState((state) =>
       state[slot] === path ? { [slot]: null } : state,
@@ -86,7 +88,7 @@ export type LinkedProps = Partial<HighlightHandlers> & {
  * point's roving tabindex) working alongside the highlight. Items with no path don't link.
  */
 export function linkedProps(
-  path: string | undefined,
+  path: EntityPath | undefined,
   linked: boolean,
   own: { onFocus?: () => void } = {},
 ): LinkedProps {

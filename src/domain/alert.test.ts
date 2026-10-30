@@ -1,3 +1,4 @@
+import { entityPath } from "@/test/path";
 import { describe, expect, it } from "vitest";
 import { DatasetSchema } from "./schema";
 import {
@@ -44,7 +45,7 @@ const dataset = DatasetSchema.parse({
 
 const valid: AlertRuleInput = {
   name: "Europe attainment",
-  scope: ["eu.DE"],
+  scope: [entityPath("eu.DE")],
   metric: "attainment",
   operator: "below",
   threshold: 95,
@@ -192,7 +193,7 @@ describe("describeAlert", () => {
     const rule: AlertRule = {
       id: "r1",
       name: "Watch Germany",
-      scope: ["eu.DE", "eu.FR"],
+      scope: [entityPath("eu.DE"), entityPath("eu.FR")],
       metric: "attainment",
       operator: "below",
       threshold: 95,
@@ -206,7 +207,7 @@ describe("describeAlert", () => {
     const rule: AlertRule = {
       id: "r2",
       name: "Big growth",
-      scope: ["eu"],
+      scope: [entityPath("eu")],
       metric: "growth",
       operator: "above",
       threshold: 300,
@@ -220,7 +221,7 @@ describe("describeAlert", () => {
     const rule: AlertRule = {
       id: "r3",
       name: "Stale",
-      scope: ["eu.DE", "na.US"],
+      scope: [entityPath("eu.DE"), entityPath("na.US")],
       metric: "attainment",
       operator: "below",
       threshold: 90,
@@ -234,16 +235,35 @@ describe("describeAlert", () => {
 describe("normaliseScope", () => {
   it("rejects paths the data doesn't contain, or that aren't a region or market", () => {
     expect(
-      normaliseScope(dataset, ["eu.DE", "na.US", "", "eu.DE.beacon", "eu"]),
+      normaliseScope(dataset, [
+        entityPath("eu.DE"),
+        entityPath("na.US"),
+        entityPath(""),
+        entityPath("eu.DE.beacon"),
+        entityPath("eu"),
+      ]),
     ).toEqual({ ok: false, invalid: ["na.US", "", "eu.DE.beacon"] });
   });
 
   it("drops repeats and markets their ticked region already covers, keeping the order", () => {
-    expect(normaliseScope(dataset, ["eu.DE", "eu.FR", "eu", "eu.DE"])).toEqual({
+    expect(
+      normaliseScope(dataset, [
+        entityPath("eu.DE"),
+        entityPath("eu.FR"),
+        entityPath("eu"),
+        entityPath("eu.DE"),
+      ]),
+    ).toEqual({
       ok: true,
       scope: ["eu"],
     });
-    expect(normaliseScope(dataset, ["eu.FR", "eu.DE", "eu.FR"])).toEqual({
+    expect(
+      normaliseScope(dataset, [
+        entityPath("eu.FR"),
+        entityPath("eu.DE"),
+        entityPath("eu.FR"),
+      ]),
+    ).toEqual({
       ok: true,
       scope: ["eu.FR", "eu.DE"],
     });
@@ -310,7 +330,7 @@ const matchData = DatasetSchema.parse({
 const rule = (overrides: Partial<AlertRule>): AlertRule => ({
   id: "r",
   name: "Rule",
-  scope: ["eu"],
+  scope: [entityPath("eu")],
   metric: "attainment",
   operator: "below",
   threshold: 95,
@@ -326,7 +346,11 @@ describe("alertMatches", () => {
 
   it("checks a ticked market alongside a region", () => {
     expect(
-      alertMatches(matchData, rule({ scope: ["eu", "na.US"] }), "2026-02"),
+      alertMatches(
+        matchData,
+        rule({ scope: [entityPath("eu"), entityPath("na.US")] }),
+        "2026-02",
+      ),
     ).toEqual([
       { level: "market", id: "DE" },
       { level: "market", id: "US" },
@@ -355,7 +379,11 @@ describe("alertMatches", () => {
 
   it("judges the value as it is shown, so 94.996% (shown as 95.0%) isn't below 95%", () => {
     expect(
-      alertMatches(matchData, rule({ scope: ["eu.IT"] }), "2026-Q1"),
+      alertMatches(
+        matchData,
+        rule({ scope: [entityPath("eu.IT")] }),
+        "2026-Q1",
+      ),
     ).toEqual([]);
   });
 
@@ -364,7 +392,7 @@ describe("alertMatches", () => {
       alertMatches(
         matchData,
         rule({
-          scope: ["na.CA"],
+          scope: [entityPath("na.CA")],
           metric: "growth",
           operator: "above",
           threshold: -99.9,

@@ -53,7 +53,7 @@ export function CompareRadar({ dataset, selected, period }: Props) {
   const seriesPath = (entry: RadarSeries) => pathOf(dataset, entry.ref);
   // While one compared entity is highlighted, the others step back.
   const linkedSeries = series.map((entry) =>
-    isLinked(seriesPath(entry) ?? "", highlighted),
+    isLinked(seriesPath(entry), highlighted),
   );
   const anyLinked = linkedSeries.includes(true);
   // Hooks run before the early return; the grid is one row per series, one column per axis.

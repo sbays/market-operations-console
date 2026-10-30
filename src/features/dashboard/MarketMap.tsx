@@ -168,7 +168,7 @@ export function MarketMap({ dataset, selected, period }: Props) {
               // A linked market's country gets a heavier outline, on top of its fill.
               const linked =
                 mark !== undefined &&
-                isLinked(marketPath(mark.id) ?? "", highlighted);
+                isLinked(marketPath(mark.id), highlighted);
               return (
                 <g key={String(country.id ?? index)}>
                   <path
@@ -198,7 +198,7 @@ export function MarketMap({ dataset, selected, period }: Props) {
           const item = roving.itemProps(index);
           const link = linkedProps(
             marketPath(mark.id),
-            isLinked(marketPath(mark.id) ?? "", highlighted),
+            isLinked(marketPath(mark.id), highlighted),
             item,
           );
           return (

@@ -20,7 +20,12 @@ import {
   type EntityRef,
   type PeriodRef,
 } from "@/domain/schema";
-import { pathOf, refFromPath } from "@/domain/selectors";
+import {
+  isPortfolioPath,
+  pathOf,
+  PORTFOLIO_PATH,
+  refFromPath,
+} from "@/domain/selectors";
 
 const parseAsPeriod = createParser<PeriodRef>({
   parse: (value) => PeriodRefSchema.safeParse(value).data ?? null,
@@ -29,7 +34,7 @@ const parseAsPeriod = createParser<PeriodRef>({
 
 export const selectionParsers = {
   /** Drill path, e.g. "eu.DE.beacon" (see refFromPath). Absent means the portfolio. */
-  path: parseAsString.withDefault(""),
+  path: parseAsString.withDefault(PORTFOLIO_PATH),
   /** Focused period, a month ("2026-03") or a quarter ("2026-Q3"). */
   period: parseAsPeriod,
 };
@@ -54,7 +59,7 @@ export function useUnknownPath(): { path: string | null; clear: () => void } {
     selectionParsers.path.withOptions({ history: "replace" }),
   );
   return {
-    path: path !== "" && refFromPath(dataset, path) === undefined ? path : null,
+    path: refFromPath(dataset, path) === undefined ? path : null,
     clear: () => {
       void setPath(null);
     },
@@ -75,10 +80,9 @@ export function useDrill(): (ref: EntityRef, period?: PeriodRef) => void {
     const path = pathOf(dataset, ref);
     if (path === undefined) return;
     // The portfolio is the default, so it leaves no path in the URL.
+    const pathParam = isPortfolioPath(path) ? null : path;
     void setSelection(
-      period === undefined
-        ? { path: path || null }
-        : { path: path || null, period },
+      period === undefined ? { path: pathParam } : { path: pathParam, period },
     );
   };
 }
