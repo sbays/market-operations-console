@@ -6,6 +6,7 @@ import { QueryProvider } from "@/data/QueryProvider";
 import { cn } from "@/ui/cn";
 import { WebVitals } from "./WebVitals";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "Market Operations",
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col">
         <WebVitals />
+        <Analytics />
         <NuqsAdapter>
           <QueryProvider>{children}</QueryProvider>
         </NuqsAdapter>
