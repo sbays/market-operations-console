@@ -21,14 +21,17 @@ export function heatmapRows(dataset: Dataset, ref: EntityRef): HeatmapRow[] {
   }));
 }
 
-/** Attainment this far from 100% (on either side) reaches the full colour of its side. */
-const FULL_COLOUR_SPREAD = 0.2;
+/**
+ * Attainment this far from 100% (on either side) reaches the full colour of its side. The
+ * pack's months run from about 90% to 105%, so a wider spread would leave the grid pale.
+ */
+export const HEAT_SPREAD = 0.1;
 
-/** The heat map's diverging scale: 100% is the midpoint, 80% and 120% the full colours. */
+/** The heat map's diverging scale: 100% is the midpoint, 90% and 110% the full colours. */
 export function heatColour(attainment: number | undefined): string {
   return divergingColour(attainment, {
     midpoint: 1,
-    spread: FULL_COLOUR_SPREAD,
+    spread: HEAT_SPREAD,
   });
 }
 
