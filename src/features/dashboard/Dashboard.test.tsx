@@ -472,6 +472,17 @@ describe("Dashboard", () => {
     );
   });
 
+  it("shows market share only where the pack states it", () => {
+    renderDashboard("?path=eu.de&period=2026-04");
+    expect(keyFigures()).toHaveTextContent(/Units/);
+    expect(keyFigures()).not.toHaveTextContent("Market share");
+  });
+
+  it("gives a product no market share, which the pack never states", () => {
+    renderDashboard("?path=eu.de.veltrix");
+    expect(keyFigures()).not.toHaveTextContent("Market share");
+  });
+
   it("hides the dense panels in exec mode", () => {
     renderDashboard("?path=eu.de&mode=exec");
 

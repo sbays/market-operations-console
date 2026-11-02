@@ -292,14 +292,29 @@ describe("MarketMap: colour by another KPI", () => {
     expect(screen.getByText("37.2%")).toBeInTheDocument();
   });
 
-  it("has no share to show outside the month the pack states it for", () => {
+  it("can't colour by share outside the month the pack states it for, and says why", () => {
     renderMap({ period: "2026-04", searchParams: "?mapMetric=share" });
+
+    const share = within(colourBy()).getByRole("button", {
+      name: "Market share",
+    });
+    expect(share).toBeDisabled();
+    expect(share).toHaveAccessibleDescription(
+      "Market share is only in the data for May 2026.",
+    );
+    // The link asked for share; the map shows attainment instead of an empty map.
     expect(
-      screen.getByRole("img", { name: "No market share data for Apr 2026." }),
-    ).toBeInTheDocument();
+      within(colourBy()).getByRole("button", { name: "Attainment" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(marker("Germany")).toHaveAccessibleName(/^Germany: attainment /);
+  });
+
+  it("offers share in May 2026, with no note", () => {
+    renderMap();
     expect(
-      screen.queryByRole("button", { name: /market share/ }),
-    ).not.toBeInTheDocument();
+      within(colourBy()).getByRole("button", { name: "Market share" }),
+    ).toBeEnabled();
+    expect(screen.queryByText(/only in the data/)).not.toBeInTheDocument();
   });
 
   it("falls back to attainment for a value it doesn't know", () => {

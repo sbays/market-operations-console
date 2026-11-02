@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tinyDataset } from "@/test/tinyDataset";
-import { radarAxes, radarSummary, RADAR_METRICS } from "./radar";
+import { radarAxes, radarMetrics, radarSummary, RADAR_METRICS } from "./radar";
 
 /*
  * The same tiny dataset as selectors.test.ts, so the expected values can be worked out by hand.
@@ -177,6 +177,33 @@ describe("radarAxes", () => {
       raw: undefined,
       scaled: undefined,
     });
+  });
+});
+
+describe("radarMetrics", () => {
+  it("keeps every axis some compared entity has a value for", () => {
+    const series = radarAxes(dataset, [germany, unitedStates], "2026-Q1");
+    expect(radarMetrics(series)).toEqual([...RADAR_METRICS]);
+  });
+
+  it("drops share where nobody compared has one, as for products", () => {
+    const products = radarAxes(
+      dataset,
+      [
+        { level: "product", marketId: "de", id: "veltrix" },
+        { level: "product", marketId: "de", id: "nuvora" },
+      ],
+      "2026-Q1",
+    );
+    expect(radarMetrics(products)).toEqual([
+      "revenue",
+      "units",
+      "growth",
+      "attainment",
+    ]);
+    expect(radarSummary(dataset, products, "2026-Q1")).toContain(
+      "on revenue, units, growth vs prior year and forecast attainment.",
+    );
   });
 });
 

@@ -111,6 +111,19 @@ describe("CompareRadar", () => {
     ).toBeInTheDocument();
   });
 
+  it("draws no share axis outside the month the pack states share for", () => {
+    renderRadar("?path=eu&compare=eu.de,eu.es&period=2026-04");
+
+    expect(
+      screen.getByRole("img", { name: /^Comparing Spain|^Comparing Germany/ }),
+    ).toHaveAccessibleName(
+      /on revenue, units, growth vs prior year and forecast attainment\./,
+    );
+    expect(
+      screen.queryByRole("button", { name: /Market share/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("moves focus between vertices with the arrow keys", async () => {
     const { user } = renderRadar("?path=eu&compare=eu.de,eu.es");
     const germanyRevenue = screen.getByRole("button", {

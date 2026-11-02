@@ -159,6 +159,20 @@ describe("DetailTable", () => {
     expect(rowNames()[0]).toBe("United Kingdom");
   });
 
+  it("leaves out the share column where no child has a share", () => {
+    renderTable("?path=eu&period=2026-04");
+    expect(
+      within(table()).queryByRole("columnheader", { name: /Market share/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the share column in May 2026", () => {
+    renderTable();
+    expect(
+      within(table()).getByRole("columnheader", { name: /Market share/ }),
+    ).toBeInTheDocument();
+  });
+
   it("drills to a child when its name is pressed, pushing history", async () => {
     const { user, onUrlUpdate } = renderTable();
 

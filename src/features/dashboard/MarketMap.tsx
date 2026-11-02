@@ -12,6 +12,7 @@ import {
 } from "@/domain/geo";
 import { divergingColour, sequentialColour } from "@/domain/colour";
 import {
+  formatList,
   formatMetric,
   formatMetricName,
   formatMetricShortName,
@@ -21,7 +22,14 @@ import {
 } from "@/domain/format";
 import type { Dataset, EntityRef, PeriodRef, Status } from "@/domain/schema";
 import { isLinked } from "@/domain/highlight";
-import { entityLabel, pathOf, statusAt, valueAt } from "@/domain/selectors";
+import {
+  entityLabel,
+  hasShare,
+  pathOf,
+  shareMonths,
+  statusAt,
+  valueAt,
+} from "@/domain/selectors";
 import { linkedProps, useHighlightedPath } from "@/state/highlight";
 import {
   MAP_METRICS,
@@ -166,7 +174,15 @@ function mapSummary(
 export function MarketMap({ dataset, selected, period }: Props) {
   const drill = useDrill();
   const highlighted = useHighlightedPath();
-  const metric = useMapMetric();
+  // Share exists only in the pack's latest month; elsewhere the map shows attainment and the
+  // share toggle says why it can't be chosen. The URL keeps what was asked for.
+  const requested = useMapMetric();
+  const shareShown = hasShare(dataset, period);
+  const metric =
+    requested === "share" && !shareShown ? "attainment" : requested;
+  const shareReason = shareShown
+    ? undefined
+    : `Market share is only in the data for ${formatList(shareMonths(dataset).map(formatPeriod))}.`;
   const marks = marksFor(dataset, selected, period, metric);
   // Only share uses a scale top; the other metrics have fixed scales.
   const top = metric === "share" ? maxShare(marks) : 0;
@@ -191,7 +207,7 @@ export function MarketMap({ dataset, selected, period }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <MetricToggle metric={metric} />
+      <MetricToggle metric={metric} shareReason={shareReason} />
       <ChartFrame
         title={title}
         summary={summary}
@@ -311,7 +327,13 @@ export function MarketMap({ dataset, selected, period }: Props) {
 }
 
 /** What the map colours by. */
-function MetricToggle({ metric }: { metric: MapMetric }) {
+function MetricToggle({
+  metric,
+  shareReason,
+}: {
+  metric: MapMetric;
+  shareReason: string | undefined;
+}) {
   return (
     <ToggleGroup
       label="Colour map by"
@@ -319,6 +341,7 @@ function MetricToggle({ metric }: { metric: MapMetric }) {
       value={metric}
       onChange={useSetMapMetric()}
       labelOf={formatMetricShortName}
+      unavailable={shareReason === undefined ? {} : { share: shareReason }}
     />
   );
 }

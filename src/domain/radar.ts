@@ -99,6 +99,17 @@ function scaled(
   return { raw, scaled: position };
 }
 
+/**
+ * The axes worth drawing: every radar metric some compared entity has a value for. Share is
+ * the usual one left out, since the starter pack states it for its latest month only; an axis
+ * nobody can be placed on would read as an empty spoke.
+ */
+export function radarMetrics(series: RadarSeries[]): RadarMetric[] {
+  return RADAR_METRICS.filter((metric) =>
+    series.some((entry) => entry.values[metric].raw !== undefined),
+  );
+}
+
 /** Joins words the way a sentence does: "A, B and C". */
 function joinWords(words: string[]): string {
   if (words.length <= 1) return words.join("");
@@ -112,7 +123,7 @@ export function radarSummary(
   period: PeriodRef,
 ): string {
   const names = series.map((s) => entityLabel(dataset, s.ref));
-  const metrics = RADAR_METRICS.map((metric) =>
+  const metrics = radarMetrics(series).map((metric) =>
     formatMetricName(metric).toLowerCase(),
   );
   const head = `Comparing ${joinWords(names)} in ${formatPeriod(period)} on ${joinWords(metrics)}.`;

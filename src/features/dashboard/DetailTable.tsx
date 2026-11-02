@@ -54,6 +54,11 @@ export function DetailTable({ dataset, selected, period }: Props) {
   const children = childrenOf(dataset, selected);
   if (!childLevel || children.length === 0) return null;
 
+  // A figure no child has a value for is left out, not shown as a column of "No data":
+  // share exists for markets and regions in the pack's latest month only.
+  const columns = FIGURE_COLUMNS.filter((metric) =>
+    children.some((ref) => valueAt(dataset, ref, period, metric) !== undefined),
+  );
   const name = (ref: EntityRef) => entityLabel(dataset, ref);
   const sortValue = (ref: EntityRef, key: SortKey): SortValue =>
     key === "name" ? name(ref) : valueAt(dataset, ref, period, key);
@@ -102,7 +107,7 @@ export function DetailTable({ dataset, selected, period }: Props) {
                 onSort={() => sortBy("name")}
                 align="left"
               />
-              {FIGURE_COLUMNS.map((metric) => (
+              {columns.map((metric) => (
                 <SortableHeader
                   key={metric}
                   label={formatMetricName(metric)}
@@ -139,7 +144,7 @@ export function DetailTable({ dataset, selected, period }: Props) {
                       {name(ref)}
                     </button>
                   </th>
-                  {FIGURE_COLUMNS.map((metric) => (
+                  {columns.map((metric) => (
                     <td
                       key={metric}
                       className="py-2 pl-4 text-right tabular-nums"

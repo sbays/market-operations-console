@@ -82,13 +82,15 @@ function seriesUnder(dataset: Dataset, ref: EntityRef): Point[][] | undefined {
 /**
  * Share over some months: revenue over the category revenue of the markets it is earned in.
  * Undefined unless every one of those markets states a market size for every month, so a
- * share is never computed from part of its market.
+ * share is never computed from part of its market. A product has none: the starter pack
+ * states share per market only, and the app doesn't invent one.
  */
 function shareOver(
   dataset: Dataset,
   ref: EntityRef,
   months: Month[],
 ): number | undefined {
+  if (ref.level === "product") return undefined;
   const markets = marketsUnder(dataset, ref);
   if (!markets) return undefined;
   let actual = 0;
@@ -205,6 +207,20 @@ export function statusAt(
 ): Status | undefined {
   const inputs = statusInputs(dataset, ref, period);
   return inputs && statusFor(inputs);
+}
+
+/** The months every market states a market size for, so share exists: the pack's latest. */
+export function shareMonths(dataset: Dataset): Month[] {
+  return dataset.periods.filter((month) =>
+    dataset.markets.every((market) => market.marketSize[month] !== undefined),
+  );
+}
+
+/** True when share exists for every month of a period. */
+export function hasShare(dataset: Dataset, period: PeriodRef): boolean {
+  const months = expandPeriod(dataset, period);
+  const available = shareMonths(dataset);
+  return months.length > 0 && months.every((m) => available.includes(m));
 }
 
 /** The periods a reader can pick: every quarter the data fully covers, and every month, newest first. */

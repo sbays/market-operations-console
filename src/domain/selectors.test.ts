@@ -12,6 +12,7 @@ import {
   entityLabel,
   entityName,
   expandPeriod,
+  hasShare,
   coversPath,
   isAncestorPath,
   isPortfolioPath,
@@ -20,6 +21,7 @@ import {
   periodOptions,
   refFromPath,
   selectionPeriod,
+  shareMonths,
   statusAt,
   statusFor,
   topMovers,
@@ -218,8 +220,7 @@ describe("valueAt: derived metrics", () => {
     );
   });
 
-  it("gives a product its part of its market's category", () => {
-    // 100 / 1500
+  it("has no share for a product: the pack states share per market only", () => {
     expect(
       valueAt(
         dataset,
@@ -227,7 +228,7 @@ describe("valueAt: derived metrics", () => {
         "2026-01",
         "share",
       ),
-    ).toBeCloseTo(1 / 15);
+    ).toBeUndefined();
   });
 
   it("has no share where a market under the entity states no market size", () => {
@@ -251,6 +252,39 @@ describe("valueAt: derived metrics", () => {
     expect(
       valueAt(usWithout, { level: "portfolio" }, "2026-06", "share"),
     ).toBeUndefined();
+  });
+});
+
+describe("shareMonths and hasShare", () => {
+  const latestOnly: Dataset = {
+    ...dataset,
+    markets: dataset.markets.map((market) => ({
+      ...market,
+      marketSize: { "2026-06": 1500 },
+    })),
+  };
+
+  it("lists the months every market states a market size for", () => {
+    expect(shareMonths(latestOnly)).toEqual(["2026-06"]);
+    expect(shareMonths(dataset)).toEqual([...months]);
+  });
+
+  it("is true only for a period wholly inside those months", () => {
+    expect(hasShare(latestOnly, "2026-06")).toBe(true);
+    expect(hasShare(latestOnly, "2026-05")).toBe(false);
+    expect(hasShare(latestOnly, "2026-Q2")).toBe(false);
+    expect(hasShare(dataset, "2026-Q2")).toBe(true);
+    expect(hasShare(dataset, "2027-01")).toBe(false);
+  });
+
+  it("is false when one market lacks the month", () => {
+    const usWithout: Dataset = {
+      ...latestOnly,
+      markets: latestOnly.markets.map((market) =>
+        market.id === "us" ? { ...market, marketSize: {} } : market,
+      ),
+    };
+    expect(shareMonths(usWithout)).toEqual([]);
   });
 });
 
