@@ -4,8 +4,8 @@ import {
   formatPercent,
 } from "@/domain/format";
 import {
-  RADAR_METRICS,
   radarAxes,
+  radarMetrics,
   radarSummary,
   type RadarMetric,
   type RadarSeries,
@@ -44,11 +44,12 @@ const SERIES_STYLES = [
 ] as const;
 
 /**
- * The compared entities on five axes (see comparedRefs). Nothing is compared below a product,
+ * The compared entities on up to five axes (see comparedRefs, radarMetrics). Nothing is compared below a product,
  * so the radar renders nothing there.
  */
 export function CompareRadar({ dataset, selected, period }: Props) {
   const series = radarAxes(dataset, useCompare(selected), period);
+  const metrics = radarMetrics(series);
   const highlighted = useHighlightedPath();
   const seriesPath = (entry: RadarSeries) => pathOf(dataset, entry.ref);
   // While one compared entity is highlighted, the others step back.
@@ -59,12 +60,12 @@ export function CompareRadar({ dataset, selected, period }: Props) {
   // Hooks run before the early return; the grid is one row per series, one column per axis.
   // Missing values have no point, so the tab stop is the first point that exists.
   const firstPoint = series
-    .flatMap((entry) => RADAR_METRICS.map((m) => entry.values[m].scaled))
+    .flatMap((entry) => metrics.map((m) => entry.values[m].scaled))
     .findIndex((scaled) => scaled !== undefined);
   const roving = useRovingIndex(
-    series.length * RADAR_METRICS.length,
+    series.length * metrics.length,
     Math.max(0, firstPoint),
-    RADAR_METRICS.length,
+    metrics.length,
   );
 
   if (series.length === 0) return null;
@@ -74,10 +75,10 @@ export function CompareRadar({ dataset, selected, period }: Props) {
       title="Compare"
       summary={radarSummary(dataset, series, period)}
       height={HEIGHT}
-      table={<RadarTable dataset={dataset} series={series} />}
+      table={<RadarTable dataset={dataset} series={series} metrics={metrics} />}
       legend={<RadarLegend dataset={dataset} series={series} />}
       drawing={(size) => {
-        const geometry = radarGeometry(size.width, size.height);
+        const geometry = radarGeometry(size.width, size.height, metrics.length);
         return (
           <g>
             {RINGS.map((level) => (
@@ -85,13 +86,13 @@ export function CompareRadar({ dataset, selected, period }: Props) {
                 key={level}
                 points={polygonPoints(
                   geometry,
-                  RADAR_METRICS.map((_, axis) => ({ axis, scaled: level })),
+                  metrics.map((_, axis) => ({ axis, scaled: level })),
                 )}
                 fill="none"
                 stroke={AXIS_COLOUR}
               />
             ))}
-            {RADAR_METRICS.map((metric, axis) => {
+            {metrics.map((metric, axis) => {
               const spoke = vertex(geometry, axis, 1);
               const label = vertex(geometry, axis, 1, LABEL_GAP);
               return (
@@ -121,7 +122,7 @@ export function CompareRadar({ dataset, selected, period }: Props) {
               return (
                 <polygon
                   key={row}
-                  points={polygonPoints(geometry, plotted(entry))}
+                  points={polygonPoints(geometry, plotted(entry, metrics))}
                   fill="none"
                   strokeWidth={linkedSeries[row] ? 3 : 2}
                   strokeDasharray={style.dash}
@@ -136,16 +137,16 @@ export function CompareRadar({ dataset, selected, period }: Props) {
         );
       }}
       points={(size) => {
-        const geometry = radarGeometry(size.width, size.height);
+        const geometry = radarGeometry(size.width, size.height, metrics.length);
         return series.flatMap((entry, row) => {
           const style = styleFor(row);
           const name = entityLabel(dataset, entry.ref);
-          return RADAR_METRICS.flatMap((metric, axis) => {
+          return metrics.flatMap((metric, axis) => {
             // No data, no point: the table and the summary say what is missing.
             const { raw, scaled } = entry.values[metric];
             if (scaled === undefined) return [];
             const { x, y } = vertex(geometry, axis, scaled);
-            const item = roving.itemProps(row * RADAR_METRICS.length + axis);
+            const item = roving.itemProps(row * metrics.length + axis);
             return (
               <button
                 key={`${row}-${metric}`}
@@ -171,13 +172,15 @@ export function CompareRadar({ dataset, selected, period }: Props) {
   );
 }
 
-type Geometry = { cx: number; cy: number; radius: number };
+/** `axes` is how many spokes the radar draws, spaced evenly. */
+type Geometry = { cx: number; cy: number; radius: number; axes: number };
 
-function radarGeometry(width: number, height: number): Geometry {
+function radarGeometry(width: number, height: number, axes: number): Geometry {
   return {
     cx: width / 2,
     cy: height / 2,
     radius: Math.max(0, Math.min(width, height) / 2 - LABEL_ROOM),
+    axes,
   };
 }
 
@@ -188,7 +191,7 @@ function vertex(
   scaled: number,
   outset = 0,
 ): { x: number; y: number } {
-  const angle = -Math.PI / 2 + (axis * 2 * Math.PI) / RADAR_METRICS.length;
+  const angle = -Math.PI / 2 + (axis * 2 * Math.PI) / geometry.axes;
   const distance = geometry.radius * scaled + outset;
   return {
     x: geometry.cx + distance * Math.cos(angle),
@@ -199,8 +202,8 @@ function vertex(
 type Plotted = { axis: number; scaled: number };
 
 /** A series' vertices, leaving out axes with no data. */
-function plotted(entry: RadarSeries): Plotted[] {
-  return RADAR_METRICS.flatMap((metric, axis) => {
+function plotted(entry: RadarSeries, metrics: RadarMetric[]): Plotted[] {
+  return metrics.flatMap((metric, axis) => {
     const { scaled } = entry.values[metric];
     return scaled === undefined ? [] : [{ axis, scaled }];
   });
@@ -267,9 +270,11 @@ function RadarLegend({
 function RadarTable({
   dataset,
   series,
+  metrics,
 }: {
   dataset: Dataset;
   series: RadarSeries[];
+  metrics: RadarMetric[];
 }) {
   return (
     <table className="w-full text-sm">
@@ -281,7 +286,7 @@ function RadarTable({
           <th scope="col" className="py-1.5 text-left font-medium">
             Entity
           </th>
-          {RADAR_METRICS.map((metric) => (
+          {metrics.map((metric) => (
             <th
               key={metric}
               scope="col"
@@ -298,7 +303,7 @@ function RadarTable({
             <th scope="row" className="py-1.5 text-left font-normal">
               {entityLabel(dataset, entry.ref)}
             </th>
-            {RADAR_METRICS.map((metric) => (
+            {metrics.map((metric) => (
               <RadarCell
                 key={metric}
                 metric={metric}

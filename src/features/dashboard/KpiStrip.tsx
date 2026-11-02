@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
-import { formatMetricOrMissing, formatPeriod } from "@/domain/format";
+import {
+  formatMetric,
+  formatMetricOrMissing,
+  formatPeriod,
+} from "@/domain/format";
 import type { Dataset, EntityRef, Metric, PeriodRef } from "@/domain/schema";
 import { childStatusCounts, statusAt, valueAt } from "@/domain/selectors";
 import type { Mode } from "@/state/url";
@@ -10,7 +14,7 @@ type Props = {
   dataset: Dataset;
   selected: EntityRef;
   period: PeriodRef;
-  /** Analysts also see units and market share. */
+  /** Analysts also see units, and market share where the data has it. */
   mode: Mode;
 };
 
@@ -18,6 +22,9 @@ type Props = {
 export function KpiStrip({ dataset, selected, period, mode }: Props) {
   const figure = (metric: Metric) =>
     formatMetricOrMissing(metric, valueAt(dataset, selected, period, metric));
+  // Share exists for markets and regions in the pack's latest month only; elsewhere the tile
+  // would only ever say "No data".
+  const share = valueAt(dataset, selected, period, "share");
   const status = statusAt(dataset, selected, period);
   const counts = childStatusCounts(dataset, selected, period);
   const flagged = counts["at-risk"] + counts["off-track"];
@@ -46,7 +53,9 @@ export function KpiStrip({ dataset, selected, period, mode }: Props) {
         {mode === "analyst" && (
           <>
             <Tile label="Units">{figure("units")}</Tile>
-            <Tile label="Market share">{figure("share")}</Tile>
+            {share !== undefined && (
+              <Tile label="Market share">{formatMetric("share", share)}</Tile>
+            )}
           </>
         )}
         {judged > 0 && (
