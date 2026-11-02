@@ -8,12 +8,12 @@ flowchart LR
     end
     subgraph features["features/ (never import each other)"]
       Dash["dashboard/\nKPIs · risks · map · trend\nheat map · radar · detail table"]
-      Asst["assistant/\nstream · answer card · citation chips"]
+      Asst["assistant/\nstream · answer card · source chips"]
       Alerts["alerts/\nrule dialog · rule list"]
     end
     subgraph lower["shared layers"]
       Data["data/\nTanStack Query · useDataset\nchatStream · alerts"]
-      Domain["domain/\nZod schemas · selectors · format"]
+      Domain["domain/\nZod schemas · pack → Dataset\nselectors · format"]
       State["state/url.ts\nnuqs parsers"]
       UI["ui/\nChartFrame · tokens · shadcn"]
       Hover[("Zustand\nhover highlight")]
@@ -29,9 +29,9 @@ flowchart LR
   Page --> Dash & Asst & Alerts
   Dash & Asst & Alerts --> Data & Domain & State & UI
   State <-->|read / write selection| URL
-  Asst -->|citation chip drills| State
+  Asst -->|source chip drills| State
   Dash <-->|"hover / focus · selector per view"| Hover
-  Pack -->|"loadDataset() · DatasetProvider"| Data
+  Pack -->|"loadDataset() · datasetFromPack\nDatasetProvider"| Data
   Data -->|"fetch + ReadableStream\nown SSE parser, Zod per event"| Chat
   Data -->|"optimistic save · rollback"| AlertsApi
   Chat --> Pack
