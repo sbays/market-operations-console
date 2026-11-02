@@ -5,7 +5,7 @@ import {
   formatPeriod,
 } from "@/domain/format";
 import type { Dataset, EntityRef, Metric, PeriodRef } from "@/domain/schema";
-import { childStatusCounts, statusAt, valueAt } from "@/domain/selectors";
+import { statusAt, statusCountsUnder, valueAt } from "@/domain/selectors";
 import type { Mode } from "@/state/url";
 import { DASHBOARD_FOCUS_ID } from "@/ui/dashboardFocus";
 import { StatusBadge } from "@/ui/StatusBadge";
@@ -26,9 +26,12 @@ export function KpiStrip({ dataset, selected, period, mode }: Props) {
   // would only ever say "No data".
   const share = valueAt(dataset, selected, period, "share");
   const status = statusAt(dataset, selected, period);
-  const counts = childStatusCounts(dataset, selected, period);
-  const flagged = counts["at-risk"] + counts["off-track"];
-  const judged = flagged + counts["on-track"];
+  const under = statusCountsUnder(dataset, selected, period);
+  const flagged = under
+    ? under.counts["at-risk"] + under.counts["off-track"]
+    : 0;
+  const judged = under ? flagged + under.counts["on-track"] : 0;
+  const counted = under?.level === "product" ? "products" : "markets";
 
   return (
     // A citation drill focuses this, so the figures that check the answer are read first.
@@ -60,7 +63,7 @@ export function KpiStrip({ dataset, selected, period, mode }: Props) {
         )}
         {judged > 0 && (
           <Tile label="Off track or at risk">
-            {flagged} of {judged}
+            {flagged} of {judged} {counted}
           </Tile>
         )}
       </dl>

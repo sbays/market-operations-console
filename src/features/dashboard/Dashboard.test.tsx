@@ -68,8 +68,8 @@ describe("Dashboard", () => {
     expect(kpis).toHaveTextContent(/Forecast attainment\s*100\.4%/);
     expect(within(kpis).getAllByText("On track").length).toBeGreaterThan(0);
     expect(kpis).toHaveTextContent(/Growth vs prior year\s*\+7\.3%/);
-    // Europe is the one region at risk.
-    expect(kpis).toHaveTextContent(/Off track or at risk\s*1 of 4/);
+    // Markets, not regions, as the brief asks; the map's summary says the same.
+    expect(kpis).toHaveTextContent(/Off track or at risk\s*6 of 13 markets/);
   });
 
   it("drills down through the breakdown, pushing history and keeping the period", async () => {
@@ -105,7 +105,7 @@ describe("Dashboard", () => {
     const kpis = keyFigures();
     expect(kpis).toHaveTextContent(/Revenue\s*\$4\.6M/);
     expect(kpis).toHaveTextContent(/Forecast attainment\s*91\.9%/);
-    expect(kpis).toHaveTextContent(/Off track or at risk\s*5 of 5/);
+    expect(kpis).toHaveTextContent(/Off track or at risk\s*5 of 5 products/);
 
     await user.click(
       within(breadcrumb()).getByRole("button", { name: "Europe" }),
