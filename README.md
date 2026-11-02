@@ -65,7 +65,13 @@ As it later turned out that no starter pack would be provided, this is the solut
 
 All data is served through `loadDataset()`, so swapping out the existing mock data with either a provided JSON object or a functioning backend should be a relatively trivial change.
 
-<!-- Source: docs/architecture.mmd. Keep the two in sync. -->
+## _Update 2nd November_ ##
+A Starter Pack was provided a few days after the initial submission, so I've refactored the application to use the provided data.
+
+One quirk in the data worth noting is that forecastAttainmentPct differes from the data in the monthly rows by up to 1.1 points e.g. India 103.1%, 104.2% from the row data.
+
+To keep consistency and ensure the data remained aligned with regions, products & other periods, the console uses the values calculated from the row data. This didn't impact any market's status and pack.test.ts covers this and holds the limit for divergance at 1.2 points.
+
 
 ```mermaid
 flowchart LR
@@ -76,12 +82,12 @@ flowchart LR
     end
     subgraph features["features/ (never import each other)"]
       Dash["dashboard/\nKPIs · risks · map · trend\nheat map · radar · detail table"]
-      Asst["assistant/\nstream · answer card · citation chips"]
+      Asst["assistant/\nstream · answer card · source chips"]
       Alerts["alerts/\nrule dialog · rule list"]
     end
     subgraph lower["shared layers"]
       Data["data/\nTanStack Query · useDataset\nchatStream · alerts"]
-      Domain["domain/\nZod schemas · selectors · format"]
+      Domain["domain/\nZod schemas · pack → Dataset\nselectors · format"]
       State["state/url.ts\nnuqs parsers"]
       UI["ui/\nChartFrame · tokens · shadcn"]
       Hover[("Zustand\nhover highlight")]
@@ -97,9 +103,9 @@ flowchart LR
   Page --> Dash & Asst & Alerts
   Dash & Asst & Alerts --> Data & Domain & State & UI
   State <-->|read / write selection| URL
-  Asst -->|citation chip drills| State
+  Asst -->|source chip drills| State
   Dash <-->|"hover / focus · selector per view"| Hover
-  Pack -->|"loadDataset() · DatasetProvider"| Data
+  Pack -->|"loadDataset() · datasetFromPack\nDatasetProvider"| Data
   Data -->|"fetch + ReadableStream\nown SSE parser, Zod per event"| Chat
   Data -->|"optimistic save · rollback"| AlertsApi
   Chat --> Pack
