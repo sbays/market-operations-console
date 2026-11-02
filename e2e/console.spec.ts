@@ -108,6 +108,10 @@ test("the dashboard drills through the breakdown, and Back goes up", async ({
     .getByRole("table", { name: /Portfolio by region/ })
     .getByRole("button", { name: "Europe" })
     .click();
+  // nuqs batches URL writes (50ms, but 120ms in Safari, which rate-limits the history API)
+  // while the view updates at once, so a second click inside that window shares the first's
+  // history entry. Wait for Europe's own entry, as a reader's next click would.
+  await expect(page).toHaveURL(/\?period=2026-05&path=eu$/);
   await page
     .getByRole("table", { name: /Europe by market/ })
     .getByRole("button", { name: "Germany" })
