@@ -40,7 +40,7 @@ test("a cited answer drills the dashboard, and Back undoes it", async ({
 
   await assistant
     .getByRole("button", {
-      name: "Why did Germany's revenue dip in March?",
+      name: "Why did Germany's revenue dip in March 2026?",
     })
     .click();
   await expect(assistant.getByText("High confidence")).toBeVisible();
@@ -86,7 +86,7 @@ test("console with an answer on screen has no axe violations", async ({
   const assistant = page.getByRole("complementary", { name: "Assistant" });
   await assistant
     .getByRole("button", {
-      name: "Why did Germany's revenue dip in March?",
+      name: "Why did Germany's revenue dip in March 2026?",
     })
     .click();
   await expect(assistant.getByText("High confidence")).toBeVisible();
