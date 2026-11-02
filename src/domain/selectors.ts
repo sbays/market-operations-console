@@ -177,15 +177,15 @@ export function displayedRatio(ratio: number): number {
 /** What a status is judged on. Growth is undefined when there is no prior year to compare. */
 export type StatusInputs = { attainment: number; growth: number | undefined };
 
-/**
- * Off track when far under forecast or shrinking against the prior year, at risk when somewhat
- * under forecast. Judged on the values as displayed, so a badge never contradicts its numbers.
- */
 /** Shrinking as displayed: a decline that rounds to 0.0% isn't one. */
 function isShrinking(growth: number | undefined): boolean {
   return growth !== undefined && displayedRatio(growth) < 0;
 }
 
+/**
+ * Off track when far under forecast or shrinking against the prior year, at risk when somewhat
+ * under forecast. Judged on the values as displayed, so a badge never contradicts its numbers.
+ */
 export function statusFor({ attainment, growth }: StatusInputs): Status {
   const displayed = displayedRatio(attainment);
   if (displayed < AT_RISK_FROM || isShrinking(growth)) return "off-track";
@@ -213,18 +213,25 @@ export function statusAt(
   return inputs && statusFor(inputs);
 }
 
-/** The months every market states a market size for, so share exists: the pack's latest. */
+/** The months some market states a market size for, so share exists there: the pack's latest. */
 export function shareMonths(dataset: Dataset): Month[] {
   return dataset.periods.filter((month) =>
-    dataset.markets.every((market) => market.marketSize[month] !== undefined),
+    dataset.markets.some((market) => market.marketSize[month] !== undefined),
   );
 }
 
-/** True when share exists for every month of a period. */
+/**
+ * True when some market has a share over the whole period, so the map can shade by it. A
+ * market without one is left off, as for any metric it has no value for.
+ */
 export function hasShare(dataset: Dataset, period: PeriodRef): boolean {
   const months = expandPeriod(dataset, period);
-  const available = shareMonths(dataset);
-  return months.length > 0 && months.every((m) => available.includes(m));
+  return (
+    months.length > 0 &&
+    dataset.markets.some((market) =>
+      months.every((month) => market.marketSize[month] !== undefined),
+    )
+  );
 }
 
 /** The periods a reader can pick: every quarter the data fully covers, and every month, newest first. */

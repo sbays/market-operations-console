@@ -119,6 +119,15 @@ describe("datasetFromPack", () => {
     ).toThrow(/unknown market xx/);
   });
 
+  it("rejects a row for a month meta.periods doesn't list, naming the month", () => {
+    expect(() =>
+      datasetFromPack({
+        ...pack,
+        series: [...pack.series, row("de", "veltrix", "2026-06", 1)],
+      }),
+    ).toThrow(/unknown month 2026-06/);
+  });
+
   it("gives a market with no latest revenue no share, rather than failing", () => {
     const dataset = datasetFromPack({
       ...pack,

@@ -264,7 +264,7 @@ describe("shareMonths and hasShare", () => {
     })),
   };
 
-  it("lists the months every market states a market size for", () => {
+  it("lists the months any market states a market size for", () => {
     expect(shareMonths(latestOnly)).toEqual(["2026-06"]);
     expect(shareMonths(dataset)).toEqual([...months]);
   });
@@ -277,14 +277,32 @@ describe("shareMonths and hasShare", () => {
     expect(hasShare(dataset, "2027-01")).toBe(false);
   });
 
-  it("is false when one market lacks the month", () => {
+  it("keeps a month one market lacks, as long as another market states it", () => {
+    // A market with no revenue that month has no size; the others still have a share, and
+    // valueAt leaves out only the totals that would include it.
     const usWithout: Dataset = {
       ...latestOnly,
       markets: latestOnly.markets.map((market) =>
         market.id === "us" ? { ...market, marketSize: {} } : market,
       ),
     };
-    expect(shareMonths(usWithout)).toEqual([]);
+    expect(shareMonths(usWithout)).toEqual(["2026-06"]);
+    expect(hasShare(usWithout, "2026-06")).toBe(true);
+    expect(
+      valueAt(usWithout, { level: "market", id: "de" }, "2026-06", "share"),
+    ).toBeDefined();
+    expect(
+      valueAt(usWithout, { level: "market", id: "us" }, "2026-06", "share"),
+    ).toBeUndefined();
+  });
+
+  it("is empty when no market states a market size", () => {
+    const none: Dataset = {
+      ...dataset,
+      markets: dataset.markets.map((market) => ({ ...market, marketSize: {} })),
+    };
+    expect(shareMonths(none)).toEqual([]);
+    expect(hasShare(none, "2026-06")).toBe(false);
   });
 });
 
@@ -950,18 +968,18 @@ describe("trendAnomalies", () => {
   });
 
   it("rolls a product's anomaly up to its market, region and the portfolio", () => {
-    const fromBeacon = {
+    const fromNuvora = {
       period: "2026-03",
       ref: beaconInGermany,
       note: "Nuvora stock-out.",
     };
     expect(trendAnomalies(withAnomalies, europe)).toEqual([
-      fromBeacon,
+      fromNuvora,
       { period: "2026-05", ref: germany, note: "Germany in May." },
     ]);
     expect(trendAnomalies(withAnomalies, { level: "portfolio" })).toEqual([
       { period: "2026-02", ref: unitedStates, note: "US dip." },
-      fromBeacon,
+      fromNuvora,
       { period: "2026-05", ref: germany, note: "Germany in May." },
     ]);
   });

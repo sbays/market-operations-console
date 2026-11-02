@@ -75,11 +75,18 @@ export const StarterPackSchema = z
     "meta.latestPeriod must be the last of meta.periods",
   )
   .superRefine((pack, ctx) => {
-    // A row for a market or product the pack doesn't list would silently drop out of every
-    // total, so it fails here instead.
+    // A row for a market, product or month the pack doesn't list would silently drop out of
+    // every total (or sort out of place), so it fails here instead.
     const marketIds = new Set(pack.markets.map((m) => m.id));
     const productIds = new Set(pack.products.map((p) => p.id));
+    const periods = new Set(pack.meta.periods);
     for (const row of pack.series) {
+      if (!periods.has(row.period)) {
+        ctx.addIssue({
+          code: "custom",
+          message: `A series row is for unknown month ${row.period}`,
+        });
+      }
       if (!marketIds.has(row.marketId)) {
         ctx.addIssue({
           code: "custom",
@@ -119,6 +126,7 @@ export function datasetFromPack(raw: unknown): Dataset {
     const series = Object.fromEntries(
       [...byProduct].map(([productId, points]) => [
         productId,
+        // Every row's month is in meta.periods (checked above), so each has a position.
         points.toSorted(
           (a, b) =>
             (position.get(a.period) ?? 0) - (position.get(b.period) ?? 0),
