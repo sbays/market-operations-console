@@ -309,6 +309,21 @@ describe("MarketMap: colour by another KPI", () => {
     expect(marker("Germany")).toHaveAccessibleName(/^Germany: attainment /);
   });
 
+  it("says share isn't in the data at all when no month has it", () => {
+    const noShare = {
+      ...tiny,
+      markets: tiny.markets.map((market) => ({ ...market, marketSize: {} })),
+    };
+    renderMap({
+      dataset: noShare,
+      period: "2026-Q3",
+      searchParams: "?mapMetric=share",
+    });
+    expect(
+      within(colourBy()).getByRole("button", { name: "Market share" }),
+    ).toHaveAccessibleDescription("Market share isn't in the data.");
+  });
+
   it("offers share in May 2026, with no note", () => {
     renderMap();
     expect(

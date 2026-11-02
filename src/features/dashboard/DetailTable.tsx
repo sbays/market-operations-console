@@ -62,8 +62,15 @@ export function DetailTable({ dataset, selected, period }: Props) {
   const name = (ref: EntityRef) => entityLabel(dataset, ref);
   const sortValue = (ref: EntityRef, key: SortKey): SortValue =>
     key === "name" ? name(ref) : valueAt(dataset, ref, period, key);
-  const rows = sort
-    ? sortRows(children, (ref) => sortValue(ref, sort.key), sort.direction)
+  // A sort on a column now hidden (share, after the period changes) no longer applies.
+  const activeSort =
+    sort && (sort.key === "name" || columns.includes(sort.key)) ? sort : null;
+  const rows = activeSort
+    ? sortRows(
+        children,
+        (ref) => sortValue(ref, activeSort.key),
+        activeSort.direction,
+      )
     : children;
 
   // Name starts ascending and figures start descending, the order a reader expects of each.
@@ -80,7 +87,7 @@ export function DetailTable({ dataset, selected, period }: Props) {
       return { key, direction: key === "name" ? "ascending" : "descending" };
     });
   const directionOf = (key: SortKey) =>
-    sort?.key === key ? sort.direction : undefined;
+    activeSort?.key === key ? activeSort.direction : undefined;
 
   return (
     <div className="flex flex-col gap-2">

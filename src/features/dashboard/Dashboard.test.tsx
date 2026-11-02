@@ -472,6 +472,36 @@ describe("Dashboard", () => {
     );
   });
 
+  it("drops a sort on share when a new period hides the share column", async () => {
+    const { user } = renderDashboard("?path=eu&period=2026-05");
+    const table = () => screen.getByRole("table", { name: /Europe by market/ });
+
+    await user.click(
+      within(table()).getByRole("button", { name: "Market share" }),
+    );
+    expect(
+      within(table()).getByRole("columnheader", { name: /Market share/ }),
+    ).toHaveAttribute("aria-sort", "descending");
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Period" }),
+      "Apr 2026",
+    );
+    const names = within(table())
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getByRole("rowheader").textContent);
+    // Back in data order, with no column marked as sorted.
+    expect(names).toEqual([
+      "Germany",
+      "United Kingdom",
+      "France",
+      "Italy",
+      "Spain",
+    ]);
+    expect(table().querySelector("[aria-sort]")).toBeNull();
+  });
+
   it("shows market share only where the pack states it", () => {
     renderDashboard("?path=eu.de&period=2026-04");
     expect(keyFigures()).toHaveTextContent(/Units/);

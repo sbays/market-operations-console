@@ -106,6 +106,27 @@ describe("datasetFromPack", () => {
     ).toThrow(/unknown product nuvora/);
   });
 
+  it("rejects a row for a market the pack doesn't list, instead of dropping its revenue", () => {
+    expect(() =>
+      datasetFromPack({
+        ...pack,
+        series: [
+          ...pack.series,
+          row("xx", "veltrix", "2026-04", 1),
+          row("xx", "veltrix", "2026-05", 1),
+        ],
+      }),
+    ).toThrow(/unknown market xx/);
+  });
+
+  it("gives a market with no latest revenue no share, rather than failing", () => {
+    const dataset = datasetFromPack({
+      ...pack,
+      series: [row("de", "veltrix", "2026-05", 0), pack.series[1]],
+    });
+    expect(dataset.markets[0]?.marketSize).toEqual({});
+  });
+
   it("rejects a latest period that isn't the last month", () => {
     expect(() =>
       datasetFromPack({

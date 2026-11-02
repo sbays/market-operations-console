@@ -180,9 +180,12 @@ export function MarketMap({ dataset, selected, period }: Props) {
   const shareShown = hasShare(dataset, period);
   const metric =
     requested === "share" && !shareShown ? "attainment" : requested;
+  const months = shareMonths(dataset);
   const shareReason = shareShown
     ? undefined
-    : `Market share is only in the data for ${formatList(shareMonths(dataset).map(formatPeriod))}.`;
+    : months.length === 0
+      ? "Market share isn't in the data."
+      : `Market share is only in the data for ${formatList(months.map(formatPeriod))}.`;
   const marks = marksFor(dataset, selected, period, metric);
   // Only share uses a scale top; the other metrics have fixed scales.
   const top = metric === "share" ? maxShare(marks) : 0;

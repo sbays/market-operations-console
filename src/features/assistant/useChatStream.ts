@@ -68,17 +68,16 @@ const UNREACHABLE = "Couldn't reach the assistant.";
 const UNAVAILABLE = "The assistant isn't available right now.";
 const FAILED = "The assistant couldn't answer.";
 
+function isAnswer(event: DoneEvent): event is AnswerEvent {
+  return event.kind === "normal" || event.kind === "low_confidence";
+}
+
 /** What a `done` event ends the run as. */
 function doneAction(event: DoneEvent): Action {
-  switch (event.kind) {
-    case "normal":
-    case "low_confidence":
-      return { type: "complete", event: { ...event, kind: event.kind } };
-    case "abstain":
-      return { type: "abstain" };
-    case "error":
-      return { type: "error", message: FAILED };
-  }
+  if (isAnswer(event)) return { type: "complete", event };
+  return event.kind === "abstain"
+    ? { type: "abstain" }
+    : { type: "error", message: FAILED };
 }
 
 export function useChatStream() {
