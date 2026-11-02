@@ -8,12 +8,16 @@ const MIDPOINT = "var(--diverging-midpoint)";
 const NEGATIVE = "var(--diverging-negative)";
 const POSITIVE = "var(--diverging-positive)";
 
-/** `side` mixed into the midpoint by `share` (0..1), as a whole percentage. */
+/**
+ * `side` mixed into the midpoint by `share` (0..1), as a whole percentage. In OKLab, not OKLCH:
+ * the midpoint is nearly grey, and browsers disagree on whether its hue counts (Firefox takes
+ * it and swings red through magenta; Chrome drops it), while OKLab has no hue to disagree on.
+ */
 function mix(side: string, share: number): string {
   const percent = Math.round(Math.min(1, Math.max(0, share)) * 100);
   if (percent === 0) return MIDPOINT;
   if (percent === 100) return side;
-  return `color-mix(in oklch, ${side} ${percent}%, ${MIDPOINT})`;
+  return `color-mix(in oklab, ${side} ${percent}%, ${MIDPOINT})`;
 }
 
 /**

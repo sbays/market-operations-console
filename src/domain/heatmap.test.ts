@@ -167,10 +167,10 @@ describe("heatColour", () => {
 
   it("mixes halfway at 90% and 110%", () => {
     expect(heatColour(0.9)).toBe(
-      "color-mix(in oklch, var(--diverging-negative) 50%, var(--diverging-midpoint))",
+      "color-mix(in oklab, var(--diverging-negative) 50%, var(--diverging-midpoint))",
     );
     expect(heatColour(1.1)).toBe(
-      "color-mix(in oklch, var(--diverging-positive) 50%, var(--diverging-midpoint))",
+      "color-mix(in oklab, var(--diverging-positive) 50%, var(--diverging-midpoint))",
     );
   });
 

@@ -17,7 +17,7 @@ describe("divergingColour", () => {
 
   it("mixes in proportion between the midpoint and a side", () => {
     expect(divergingColour(0.025, growth)).toBe(
-      "color-mix(in oklch, var(--diverging-positive) 25%, var(--diverging-midpoint))",
+      "color-mix(in oklab, var(--diverging-positive) 25%, var(--diverging-midpoint))",
     );
   });
 });
@@ -27,7 +27,7 @@ describe("sequentialColour", () => {
     expect(sequentialColour(0, 0.2)).toBe("var(--diverging-midpoint)");
     expect(sequentialColour(0.2, 0.2)).toBe("var(--diverging-positive)");
     expect(sequentialColour(0.05, 0.2)).toBe(
-      "color-mix(in oklch, var(--diverging-positive) 25%, var(--diverging-midpoint))",
+      "color-mix(in oklab, var(--diverging-positive) 25%, var(--diverging-midpoint))",
     );
   });
 
