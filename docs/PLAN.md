@@ -186,7 +186,7 @@ Charts decisions (29 Oct, `feat/dashboard-charts`):
 Anomaly markers (30 Oct, `feat/anomaly-markers`):
 
 - The analyst trend flags each month with a revenue anomaly: a dashed rule in the chart, a flag icon above the point, the note in the point's label, an "Anomaly" table column and legend item, and the months in the summary. The exec view stays minimal and shows none.
-- A child's anomaly rolls up to every ancestor's trend (`trendAnomalies`), because the parent's line is the sum of its children: the Beacon stock-out is also Germany's and Europe's March dip. A parent's or sibling's never shows. When it rolled up, the label names its source ("Anomaly in Beacon in Germany: …"). Top risks keep the exact-match rule, because a risk row explains one child and must not borrow a sibling's note.
+- A child's anomaly rolls up to every ancestor's trend (`trendAnomalies`), because the parent's line is the sum of its children: the Nuvora stock-out is also Germany's and Europe's March dip. A parent's or sibling's never shows. When it rolled up, the label names its source ("Anomaly in Nuvora in Germany: …"). Top risks keep the exact-match rule, because a risk row explains one child and must not borrow a sibling's note.
 - The heat map is unchanged: its cells encode a quantity, not a status (29 Oct decision). Clicking a cell sets the period, and the trend shows the flag.
 
 Midday decisions (29 Oct, `feat/modes-and-alerts`):
