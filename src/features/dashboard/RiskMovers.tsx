@@ -64,7 +64,7 @@ export function RiskMovers({ dataset, selected, period, mode }: Props) {
                   path={pathOf(dataset, risk.ref)}
                   className="flex flex-col gap-1 py-1"
                 >
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <DrillButton
                       name={entityLabel(dataset, risk.ref)}
                       onDrill={() => drill(risk.ref)}
