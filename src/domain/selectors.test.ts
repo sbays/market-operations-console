@@ -6,7 +6,6 @@ import {
   ancestorsOf,
   childLevelOf,
   childrenOf,
-  childStatusCounts,
   coverageOf,
   entityCode,
   entityLabel,
@@ -23,6 +22,7 @@ import {
   selectionPeriod,
   shareMonths,
   statusAt,
+  statusCountsUnder,
   statusFor,
   topMovers,
   topRisks,
@@ -850,15 +850,40 @@ describe("childLevelOf", () => {
   });
 });
 
-describe("childStatusCounts", () => {
-  it("counts the children's statuses over a period", () => {
-    // Jan 2026: Europe (DE) is 150 of 200 = 75%, North America (US) is 300 of 300.
+describe("statusCountsUnder", () => {
+  it("counts markets at the portfolio, not regions", () => {
+    // Jan 2026: DE is 150 of 200 = 75% (off track), US is 300 of 300 (on track).
     expect(
-      childStatusCounts(dataset, { level: "portfolio" }, "2026-01"),
-    ).toEqual({ "on-track": 1, "at-risk": 0, "off-track": 1 });
+      statusCountsUnder(dataset, { level: "portfolio" }, "2026-01"),
+    ).toEqual({
+      level: "market",
+      counts: { "on-track": 1, "at-risk": 0, "off-track": 1 },
+    });
   });
 
-  it("leaves out a child with no status rather than counting it as flagged", () => {
+  it("counts a region's own markets", () => {
+    expect(statusCountsUnder(dataset, europe, "2026-01")).toEqual({
+      level: "market",
+      counts: { "on-track": 0, "at-risk": 0, "off-track": 1 },
+    });
+  });
+
+  it("counts a market's products, and nothing under a product", () => {
+    // DE/veltrix 100% (on track), DE/nuvora 50% (off track).
+    expect(statusCountsUnder(dataset, germany, "2026-01")).toEqual({
+      level: "product",
+      counts: { "on-track": 1, "at-risk": 0, "off-track": 1 },
+    });
+    expect(
+      statusCountsUnder(
+        dataset,
+        { level: "product", marketId: "de", id: "veltrix" },
+        "2026-01",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("leaves out a market with no status rather than counting it as flagged", () => {
     const noUsForecast = {
       ...dataset,
       markets: dataset.markets.map((market) =>
@@ -876,7 +901,8 @@ describe("childStatusCounts", () => {
       ),
     };
     expect(
-      childStatusCounts(noUsForecast, { level: "portfolio" }, "2026-01"),
+      statusCountsUnder(noUsForecast, { level: "portfolio" }, "2026-01")
+        ?.counts,
     ).toEqual({ "on-track": 0, "at-risk": 0, "off-track": 1 });
   });
 });

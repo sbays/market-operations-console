@@ -491,22 +491,49 @@ export function childLevelOf(ref: EntityRef): EntityRef["level"] | undefined {
   return CHILD_LEVEL[ref.level];
 }
 
-/** How many of `ref`'s children are in each status over a period; children with no status are left out. */
-export function childStatusCounts(
+export type StatusCounts = {
+  /** What was counted: markets under a portfolio or region, products within a market. */
+  level: "market" | "product";
+  counts: Record<Status, number>;
+};
+
+/**
+ * How many markets under `ref` are in each status over a period (the brief's "how many
+ * markets are at risk"), or a market's products. A product has nothing under it. Entities
+ * with no status are left out.
+ */
+export function statusCountsUnder(
   dataset: Dataset,
   ref: EntityRef,
   period: PeriodRef,
-): Record<Status, number> {
+): StatusCounts | undefined {
+  let level: StatusCounts["level"];
+  let refs: EntityRef[];
+  switch (ref.level) {
+    case "portfolio":
+    case "region":
+      level = "market";
+      refs = dataset.markets
+        .filter((m) => ref.level === "portfolio" || m.regionId === ref.id)
+        .map((m) => ({ level: "market", id: m.id }));
+      break;
+    case "market":
+      level = "product";
+      refs = childrenOf(dataset, ref);
+      break;
+    case "product":
+      return undefined;
+  }
   const counts: Record<Status, number> = {
     "on-track": 0,
     "at-risk": 0,
     "off-track": 0,
   };
-  for (const child of childrenOf(dataset, ref)) {
-    const status = statusAt(dataset, child, period);
+  for (const entity of refs) {
+    const status = statusAt(dataset, entity, period);
     if (status) counts[status] += 1;
   }
-  return counts;
+  return { level, counts };
 }
 
 export type Risk = {
