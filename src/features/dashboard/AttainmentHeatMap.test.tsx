@@ -114,6 +114,17 @@ describe("AttainmentHeatMap", () => {
     });
   });
 
+  it("keys the colours as one scale from 90% to 110%, with no data apart", () => {
+    renderHeatMap("?path=eu.de");
+    const legend = screen.getByRole("list", { name: "Legend" });
+    const items = within(legend).getAllByRole("listitem");
+
+    expect(items.map((item) => item.textContent)).toEqual([
+      "90.0% or less100.0%110.0% or more",
+      "No data",
+    ]);
+  });
+
   it("renders nothing at a product, which has no children", () => {
     const { container } = renderHeatMap("?path=eu.de.veltrix");
 

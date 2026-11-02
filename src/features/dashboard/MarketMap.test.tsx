@@ -64,6 +64,12 @@ const SUMMARY =
 const marker = (name: string) =>
   screen.getByRole("button", { name: new RegExp(`^${name}:`) });
 
+/** The legend's colour scale: its first item, a bar with its reference values. */
+const scaleKey = () =>
+  within(screen.getByRole("list", { name: "Legend" })).getAllByRole(
+    "listitem",
+  )[0];
+
 describe("MarketMap", () => {
   it("draws every market in the dataset as a country on the map", () => {
     for (const market of loadDataset().markets) {
@@ -268,9 +274,9 @@ describe("MarketMap: colour by another KPI", () => {
     expect(
       screen.queryByText("No status: no forecast"),
     ).not.toBeInTheDocument();
-    for (const stop of ["-10.0% or less", "0.0%", "+10.0% or more"]) {
-      expect(screen.getByText(stop)).toBeInTheDocument();
-    }
+    expect(scaleKey()).toHaveTextContent(
+      /^-10\.0% or less0\.0%\+10\.0% or more$/,
+    );
     expect(screen.queryByText("Hatched: off track")).not.toBeInTheDocument();
   });
 
@@ -288,8 +294,7 @@ describe("MarketMap: colour by another KPI", () => {
         name: "Market share in May 2026 runs from United States at 8.8% to China at 37.2%.",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText("0.0%")).toBeInTheDocument();
-    expect(screen.getByText("37.2%")).toBeInTheDocument();
+    expect(scaleKey()).toHaveTextContent(/^0\.0%37\.2%$/);
   });
 
   it("can't colour by share outside the month the pack states it for, and says why", () => {
