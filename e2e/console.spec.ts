@@ -1,5 +1,15 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * Opens the console once it has hydrated. The page is prerendered, so its buttons show (and
+ * take clicks) before React handles them; a click then is lost (seen on WebKit). The dashboard
+ * pins the period into the URL from an effect, so the pinned URL means React is running.
+ */
+async function open(page: Page, url: string) {
+  await page.goto(url);
+  await expect(page).toHaveURL(/[?&]period=\d{4}-\d{2}/);
+}
 
 test("root redirects to the console", async ({ page }) => {
   await page.goto("/");
@@ -12,7 +22,7 @@ test("root redirects to the console", async ({ page }) => {
 });
 
 test("console has no axe violations", async ({ page }) => {
-  await page.goto("/console");
+  await open(page, "/console");
 
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -24,7 +34,7 @@ test("console has no axe violations", async ({ page }) => {
 test("a cited answer drills the dashboard, and Back undoes it", async ({
   page,
 }) => {
-  await page.goto("/console");
+  await open(page, "/console");
   const assistant = page.getByRole("complementary", { name: "Assistant" });
 
   // Drill Europe › Germany first, as an analyst would before asking.
@@ -67,7 +77,7 @@ test("a cited answer drills the dashboard, and Back undoes it", async ({
 });
 
 test("exec mode has no axe violations", async ({ page }) => {
-  await page.goto("/console?path=eu&mode=exec");
+  await open(page, "/console?path=eu&mode=exec");
   await expect(
     page.getByRole("button", { name: "Exec", pressed: true }),
   ).toBeVisible();
@@ -82,7 +92,7 @@ test("exec mode has no axe violations", async ({ page }) => {
 test("console with an answer on screen has no axe violations", async ({
   page,
 }) => {
-  await page.goto("/console");
+  await open(page, "/console");
   const assistant = page.getByRole("complementary", { name: "Assistant" });
   await assistant
     .getByRole("button", {
@@ -101,7 +111,7 @@ test("console with an answer on screen has no axe violations", async ({
 test("the dashboard drills through the breakdown, and Back goes up", async ({
   page,
 }) => {
-  await page.goto("/console");
+  await open(page, "/console");
   const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
 
   await page
@@ -139,7 +149,7 @@ test("the dashboard drills through the breakdown, and Back goes up", async ({
 test("a comparison survives a reload, because it lives in the URL", async ({
   page,
 }) => {
-  await page.goto("/console?path=eu");
+  await open(page, "/console?path=eu");
   const table = page.getByRole("table", { name: /Europe by market/ });
 
   // The radar starts on the first four markets; swap three of them for Spain.
@@ -160,7 +170,7 @@ test("a comparison survives a reload, because it lives in the URL", async ({
 });
 
 test("the alert dialog has no axe violations", async ({ page }) => {
-  await page.goto("/console?path=eu.de");
+  await open(page, "/console?path=eu.de");
   await page.getByRole("button", { name: "New alert" }).click();
   const dialog = page.getByRole("dialog", { name: "New alert rule" });
   await expect(dialog.getByRole("checkbox", { name: "Germany" })).toBeChecked();
@@ -178,7 +188,7 @@ test("the alert dialog has no axe violations", async ({ page }) => {
 });
 
 test("a refused save rolls the alert rule back", async ({ page }) => {
-  await page.goto("/console?path=eu.de&fail=1");
+  await open(page, "/console?path=eu.de&fail=1");
   await page.getByRole("button", { name: "New alert" }).click();
   const dialog = page.getByRole("dialog", { name: "New alert rule" });
   await dialog.getByRole("textbox", { name: "Rule name" }).fill("Doomed");
@@ -197,7 +207,7 @@ test("a refused save rolls the alert rule back", async ({ page }) => {
 
 test("the alert dialog scrolls to Save on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
-  await page.goto("/console");
+  await open(page, "/console");
   await page.getByRole("button", { name: "New alert" }).click();
   const dialog = page.getByRole("dialog", { name: "New alert rule" });
 
