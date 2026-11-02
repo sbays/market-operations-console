@@ -5,7 +5,9 @@ import {
   formatPercent,
   formatPeriod,
 } from "@/domain/format";
+import { gradient } from "@/domain/colour";
 import {
+  HEAT_SPREAD,
   heatColour,
   heatmapRows,
   heatmapSummary,
@@ -29,13 +31,6 @@ const MARGIN = { top: 8, right: 8, bottom: 28 };
 /** Label every third month, counting back from the latest, as the trend chart does. */
 const TICK_EVERY = 3;
 const LABEL_COLOUR = "var(--muted-foreground)";
-
-/** The legend's three reference points: the ends of the scale and its midpoint. */
-const SCALE_STOPS = [
-  { label: "80% or less", attainment: 0.8 },
-  { label: "100%", attainment: 1 },
-  { label: "120% or more", attainment: 1.2 },
-] as const;
 
 /**
  * Attainment by child entity (rows) and month (columns). Renders nothing when the selection
@@ -193,26 +188,31 @@ function rowKey(dataset: Dataset, row: HeatmapRow, index: number): string {
   return pathOf(dataset, row.ref) ?? `row-${index}`;
 }
 
-/** The scale in words and swatches, so the colours are never the only key. */
+/** The scale as one bar labelled in words, so the colours are never the only key. */
 function HeatMapLegend() {
-  const items = [
-    ...SCALE_STOPS.map((stop) => ({
-      label: stop.label,
-      colour: heatColour(stop.attainment),
-    })),
-    { label: "No data", colour: heatColour(undefined) },
-  ];
+  const low = 1 - HEAT_SPREAD;
+  const high = 1 + HEAT_SPREAD;
   return (
     <ChartLegend
-      items={items.map(({ label, colour }) => ({
-        label,
-        swatch: (
-          <span
-            className="size-3 rounded-sm"
-            style={{ backgroundColor: colour }}
-          />
-        ),
-      }))}
+      scale={{
+        background: gradient(heatColour, low, high),
+        ticks: [
+          `${formatPercent(low)} or less`,
+          formatPercent(1),
+          `${formatPercent(high)} or more`,
+        ],
+      }}
+      items={[
+        {
+          label: "No data",
+          swatch: (
+            <span
+              className="size-3 rounded-sm"
+              style={{ backgroundColor: heatColour(undefined) }}
+            />
+          ),
+        },
+      ]}
     />
   );
 }

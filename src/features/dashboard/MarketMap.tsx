@@ -10,7 +10,7 @@ import {
   marketsInSelection,
   worldProjection,
 } from "@/domain/geo";
-import { divergingColour, sequentialColour } from "@/domain/colour";
+import { divergingColour, gradient, sequentialColour } from "@/domain/colour";
 import {
   formatList,
   formatMetric,
@@ -39,7 +39,7 @@ import {
   type MapMetric,
 } from "@/state/url";
 import { ChartFrame } from "@/ui/ChartFrame";
-import { ChartLegend } from "@/ui/ChartLegend";
+import { ChartLegend, type LegendScale } from "@/ui/ChartLegend";
 import { cn } from "@/ui/cn";
 import { ToggleGroup } from "@/ui/ToggleGroup";
 import { StatusBadge, StatusIcon } from "@/ui/StatusBadge";
@@ -373,10 +373,25 @@ function MapLegend({
       ? [{ label: "No status: no forecast", swatch: <NoStatusIcon /> }]
       : []),
   ];
-  const swatch = (colour: string) => (
-    <span className="size-3 rounded-sm" style={{ background: colour }} />
-  );
-  const fill =
+  // Attainment colours by status, so it has no scale; growth and share shade continuously.
+  const colourAt = (value: number) => scaleFill(metric, value, top);
+  const scale: LegendScale | undefined =
+    metric === "growth"
+      ? {
+          background: gradient(colourAt, -GROWTH_SPREAD, GROWTH_SPREAD),
+          ticks: [
+            `${formatPercent(-GROWTH_SPREAD, { signed: true })} or less`,
+            formatPercent(0, { signed: true }),
+            `${formatPercent(GROWTH_SPREAD, { signed: true })} or more`,
+          ],
+        }
+      : metric === "share"
+        ? {
+            background: gradient(colourAt, 0, top),
+            ticks: [formatPercent(0), formatPercent(top)],
+          }
+        : undefined;
+  const hatched =
     metric === "attainment"
       ? [
           {
@@ -398,36 +413,13 @@ function MapLegend({
             ),
           },
         ]
-      : metric === "growth"
-        ? [
-            {
-              label: `${formatPercent(-GROWTH_SPREAD, { signed: true })} or less`,
-              swatch: swatch(scaleFill(metric, -GROWTH_SPREAD, top)),
-            },
-            {
-              label: formatPercent(0, { signed: true }),
-              swatch: swatch(scaleFill(metric, 0, top)),
-            },
-            {
-              label: `${formatPercent(GROWTH_SPREAD, { signed: true })} or more`,
-              swatch: swatch(scaleFill(metric, GROWTH_SPREAD, top)),
-            },
-          ]
-        : [
-            {
-              label: formatPercent(0),
-              swatch: swatch(scaleFill(metric, 0, top)),
-            },
-            {
-              label: formatPercent(top),
-              swatch: swatch(scaleFill(metric, top, top)),
-            },
-          ];
+      : [];
   return (
     <ChartLegend
+      scale={scale}
       items={[
         ...statuses,
-        ...fill,
+        ...hatched,
         {
           label: "Muted: outside the selection",
           swatch: <span className="size-3 rounded-sm bg-muted" />,

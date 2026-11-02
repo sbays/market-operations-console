@@ -155,21 +155,21 @@ describe("heatColour", () => {
     expect(heatColour(1)).toBe("var(--diverging-midpoint)");
   });
 
-  it("is the full negative token at 80% and below", () => {
-    expect(heatColour(0.8)).toBe("var(--diverging-negative)");
+  it("is the full negative token at 90% and below", () => {
+    expect(heatColour(0.9)).toBe("var(--diverging-negative)");
     expect(heatColour(0.2)).toBe("var(--diverging-negative)");
   });
 
-  it("is the full positive token at 120% and above", () => {
-    expect(heatColour(1.2)).toBe("var(--diverging-positive)");
+  it("is the full positive token at 110% and above", () => {
+    expect(heatColour(1.1)).toBe("var(--diverging-positive)");
     expect(heatColour(3)).toBe("var(--diverging-positive)");
   });
 
-  it("mixes halfway at 90% and 110%", () => {
-    expect(heatColour(0.9)).toBe(
+  it("mixes halfway at 95% and 105%", () => {
+    expect(heatColour(0.95)).toBe(
       "color-mix(in oklab, var(--diverging-negative) 50%, var(--diverging-midpoint))",
     );
-    expect(heatColour(1.1)).toBe(
+    expect(heatColour(1.05)).toBe(
       "color-mix(in oklab, var(--diverging-positive) 50%, var(--diverging-midpoint))",
     );
   });

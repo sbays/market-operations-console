@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { divergingColour, sequentialColour } from "./colour";
+import { divergingColour, gradient, sequentialColour } from "./colour";
 
 describe("divergingColour", () => {
   const growth = { midpoint: 0, spread: 0.1 };
@@ -34,5 +34,20 @@ describe("sequentialColour", () => {
   it("is muted with no data, and the midpoint when the maximum is zero", () => {
     expect(sequentialColour(undefined, 0.2)).toBe("var(--muted)");
     expect(sequentialColour(0, 0)).toBe("var(--diverging-midpoint)");
+  });
+});
+
+describe("gradient", () => {
+  const growth = (value: number) =>
+    divergingColour(value, { midpoint: 0, spread: 0.1 });
+
+  it("samples the scale evenly from low to high, as a CSS gradient", () => {
+    expect(gradient(growth, -0.1, 0.1, 5)).toBe(
+      "linear-gradient(to right in oklab, var(--diverging-negative), " +
+        "color-mix(in oklab, var(--diverging-negative) 50%, var(--diverging-midpoint)), " +
+        "var(--diverging-midpoint), " +
+        "color-mix(in oklab, var(--diverging-positive) 50%, var(--diverging-midpoint)), " +
+        "var(--diverging-positive))",
+    );
   });
 });

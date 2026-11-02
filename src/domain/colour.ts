@@ -41,3 +41,19 @@ export function sequentialColour(
   if (value === undefined) return NO_DATA;
   return max > 0 ? mix(POSITIVE, value / max) : MIDPOINT;
 }
+
+/**
+ * A scale drawn as a left-to-right CSS gradient, for a legend: `count` colours sampled evenly
+ * from `low` to `high`, blended in OKLab like the cells (see `mix`).
+ */
+export function gradient(
+  colourAt: (value: number) => string,
+  low: number,
+  high: number,
+  count = 9,
+): string {
+  const stops = Array.from({ length: count }, (_, i) =>
+    colourAt(low + ((high - low) * i) / (count - 1)),
+  );
+  return `linear-gradient(to right in oklab, ${stops.join(", ")})`;
+}
