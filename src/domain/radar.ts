@@ -121,11 +121,10 @@ export function radarSummary(
   dataset: Dataset,
   series: RadarSeries[],
   period: PeriodRef,
+  axes: RadarMetric[] = radarMetrics(series),
 ): string {
   const names = series.map((s) => entityLabel(dataset, s.ref));
-  const metrics = radarMetrics(series).map((metric) =>
-    formatMetricName(metric).toLowerCase(),
-  );
+  const metrics = axes.map((metric) => formatMetricName(metric).toLowerCase());
   const head = `Comparing ${joinWords(names)} in ${formatPeriod(period)} on ${joinWords(metrics)}.`;
 
   const withRevenue = series.flatMap((s) => {

@@ -73,7 +73,27 @@ export const StarterPackSchema = z
   .refine(
     (pack) => pack.meta.periods.at(-1) === pack.meta.latestPeriod,
     "meta.latestPeriod must be the last of meta.periods",
-  );
+  )
+  .superRefine((pack, ctx) => {
+    // A row for a market or product the pack doesn't list would silently drop out of every
+    // total, so it fails here instead.
+    const marketIds = new Set(pack.markets.map((m) => m.id));
+    const productIds = new Set(pack.products.map((p) => p.id));
+    for (const row of pack.series) {
+      if (!marketIds.has(row.marketId)) {
+        ctx.addIssue({
+          code: "custom",
+          message: `A series row is for unknown market ${row.marketId}`,
+        });
+      }
+      if (!productIds.has(row.productId)) {
+        ctx.addIssue({
+          code: "custom",
+          message: `A series row is for unknown product ${row.productId}`,
+        });
+      }
+    }
+  });
 export type StarterPack = z.infer<typeof StarterPackSchema>;
 
 /**
@@ -115,9 +135,11 @@ export function datasetFromPack(raw: unknown): Dataset {
       name: market.name,
       regionId: market.regionId,
       series,
-      marketSize: {
-        [latestPeriod]: latestRevenue / (market.kpis.sharePct / 100),
-      },
+      // No revenue gives no market size to derive, so that market has no share.
+      marketSize:
+        latestRevenue > 0
+          ? { [latestPeriod]: latestRevenue / (market.kpis.sharePct / 100) }
+          : {},
     };
   });
 

@@ -64,9 +64,15 @@ describe("tokenize", () => {
     ]);
   });
 
-  it("joins back into the text, from its first word", () => {
-    const text = "A  long\nanswer, with  spacing. ";
-    expect(tokenize(text).join("")).toBe(text);
+  it("joins back into the text exactly, leading whitespace included", () => {
+    for (const text of [
+      "A  long\nanswer, with  spacing. ",
+      "\n  Starts with a blank line.",
+      "   ",
+    ]) {
+      expect(tokenize(text).join(""), JSON.stringify(text)).toBe(text);
+    }
+    expect(tokenize("")).toEqual([]);
   });
 });
 

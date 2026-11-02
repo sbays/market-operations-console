@@ -576,6 +576,35 @@ describe("topRisks", () => {
     ]);
   });
 
+  it("doesn't call a decline that rounds to 0.0% a decline", () => {
+    // 95% of forecast, 0.004% down: displayed as -0.0%, so at risk on attainment alone.
+    const flat = tinyDataset({
+      ...dataset,
+      markets: dataset.markets.map((market) =>
+        market.id === "us"
+          ? {
+              ...market,
+              series: {
+                ...market.series,
+                veltrix: series({
+                  actual: 190,
+                  forecast: 200,
+                  priorYear: 190.0076,
+                  units: 20,
+                }),
+              },
+            }
+          : market,
+      ),
+    });
+    expect(topRisks(flat, unitedStates, "2026-01", 3)).toEqual([
+      expect.objectContaining({
+        status: "at-risk",
+        reason: "Attainment 95.0%, 5.0 points under forecast.",
+      }),
+    ]);
+  });
+
   it("only uses an anomaly recorded against that child", () => {
     const marketNote: Dataset = {
       ...dataset,

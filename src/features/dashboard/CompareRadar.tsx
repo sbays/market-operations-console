@@ -73,7 +73,7 @@ export function CompareRadar({ dataset, selected, period }: Props) {
   return (
     <ChartFrame
       title="Compare"
-      summary={radarSummary(dataset, series, period)}
+      summary={radarSummary(dataset, series, period, metrics)}
       height={HEIGHT}
       table={<RadarTable dataset={dataset} series={series} metrics={metrics} />}
       legend={<RadarLegend dataset={dataset} series={series} />}

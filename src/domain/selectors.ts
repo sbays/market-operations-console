@@ -181,10 +181,14 @@ export type StatusInputs = { attainment: number; growth: number | undefined };
  * Off track when far under forecast or shrinking against the prior year, at risk when somewhat
  * under forecast. Judged on the values as displayed, so a badge never contradicts its numbers.
  */
+/** Shrinking as displayed: a decline that rounds to 0.0% isn't one. */
+function isShrinking(growth: number | undefined): boolean {
+  return growth !== undefined && displayedRatio(growth) < 0;
+}
+
 export function statusFor({ attainment, growth }: StatusInputs): Status {
   const displayed = displayedRatio(attainment);
-  const shrinking = growth !== undefined && displayedRatio(growth) < 0;
-  if (displayed < AT_RISK_FROM || shrinking) return "off-track";
+  if (displayed < AT_RISK_FROM || isShrinking(growth)) return "off-track";
   if (displayed < ON_TRACK_FROM) return "at-risk";
   return "on-track";
 }
@@ -515,7 +519,11 @@ export type Risk = {
 /** Why a status was given, in one sentence: the shortfall, or the decline when that decided it. */
 function statusSentence({ attainment, growth }: StatusInputs): string {
   const displayed = displayedRatio(attainment);
-  if (displayed >= AT_RISK_FROM && growth !== undefined && growth < 0) {
+  if (
+    displayed >= AT_RISK_FROM &&
+    growth !== undefined &&
+    isShrinking(growth)
+  ) {
     return `Revenue ${formatPercent(displayedRatio(growth), { signed: true })} on the prior year, at ${formatPercent(displayed)} of forecast.`;
   }
   return `Attainment ${formatPercent(displayed)}, ${formatPoints((1 - displayed) * 100)} under forecast.`;

@@ -20,9 +20,13 @@ export function matchFixture(fixtures: Fixtures, question: string): Fixture {
   );
 }
 
-/** One word and the whitespace after it per token, as the pack's reference route streams. */
+/**
+ * One word and the whitespace after it per token, as the pack's reference route streams.
+ * Unlike the reference, leading whitespace rides on the first token, so the tokens always
+ * join back into the text exactly (CONTRACT.md).
+ */
 export function tokenize(text: string): string[] {
-  return text.match(/\S+\s*/g) ?? [];
+  return text.match(/\s*\S+\s*/g) ?? (text === "" ? [] : [text]);
 }
 
 export const FALLBACK_ERROR = "Something went wrong.";
