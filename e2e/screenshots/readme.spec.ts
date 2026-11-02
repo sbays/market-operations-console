@@ -43,7 +43,10 @@ test("analyst view", async ({ page }) => {
 test("chat with citations", async ({ page }) => {
   await page.goto("/console?path=eu.de");
   await settled(page);
-  const assistant = await ask(page, "Why did Germany's revenue dip in March?");
+  const assistant = await ask(
+    page,
+    "Why did Germany's revenue dip in March 2026?",
+  );
   await expect(assistant.getByText("High confidence")).toBeVisible();
   await assistant.getByRole("button", { name: "DE · Mar 2026" }).focus();
   await expect(page.getByRole("tooltip")).toBeVisible();

@@ -41,7 +41,7 @@ describe("ConsolePage", () => {
       name: "Assistant",
     });
     expect(assistant).toHaveTextContent(
-      "Why did Germany's revenue dip in March?",
+      "Why did Germany's revenue dip in March 2026?",
     );
   });
 });
