@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { normaliseQuestion } from "./fixtures";
-import { MonthSchema, nextMonth, parsePeriod, PeriodRefSchema } from "./period";
+import { MonthSchema, nextMonth, parsePeriod } from "./period";
 
 export { MonthSchema, PeriodRefSchema, QuarterSchema } from "./period";
 export type { Month, PeriodRef, Quarter } from "./period";
@@ -8,8 +7,8 @@ export type { Month, PeriodRef, Quarter } from "./period";
 // Identifiers --------------------------------------------------------------
 
 export const RegionIdSchema = z.string().regex(/^[a-z]+$/);
-/** ISO 3166-1 alpha-2, e.g. "DE". */
-export const MarketIdSchema = z.string().regex(/^[A-Z]{2}$/);
+/** The starter pack's market id: ISO 3166-1 alpha-2 in lower case, e.g. "de". */
+export const MarketIdSchema = z.string().regex(/^[a-z]{2}$/);
 export const ProductIdSchema = z.string().regex(/^[a-z][a-z0-9-]*$/);
 
 export type RegionId = z.infer<typeof RegionIdSchema>;
@@ -31,7 +30,7 @@ export const EntityRefSchema = z.discriminatedUnion("level", [
 export type EntityRef = z.infer<typeof EntityRefSchema>;
 
 /**
- * An entity as a string, for URLs and keys: "eu.DE.beacon" is region, market, product, and ""
+ * An entity as a string, for URLs and keys: "eu.de.nuvora" is region, market, product, and ""
  * is the portfolio. Comes from pathOf; a raw string from a URL goes through refFromPath.
  */
 export const EntityPathSchema = z.string().brand<"EntityPath", "inout">();
@@ -64,8 +63,6 @@ export const PointSchema = z.object({
   units: amount,
   forecast: amount,
   priorYear: amount,
-  /** Total category revenue in the market, so share rolls up as Σactual / ΣmarketSize. */
-  marketSize: amount,
 });
 export type Point = z.infer<typeof PointSchema>;
 
@@ -76,9 +73,16 @@ export const ProductSchema = z.object({
 });
 export const MarketSchema = z.object({
   id: MarketIdSchema,
+  /** ISO 3166-1 alpha-2 as written ("de"), the short code a chip shows. */
+  iso2: z.string().regex(/^[A-Z]{2}$/),
   name: z.string(),
   regionId: RegionIdSchema,
   series: z.record(ProductIdSchema, z.array(PointSchema)),
+  /**
+   * Total category revenue in the market, by month, for the months the data states a share
+   * for. Share is Σactual / ΣmarketSize, so it rolls up; a month without one has no share.
+   */
+  marketSize: z.record(z.string(), z.number().positive()),
 });
 
 /** A stored annotation: the reason behind an unusual value, which no selector can derive. */
@@ -166,6 +170,13 @@ export const DatasetSchema = z
           );
         }
       }
+      for (const month of Object.keys(market.marketSize)) {
+        if (!dataset.periods.some((period) => period === month)) {
+          fail(
+            `Market ${market.id} has a market size for unknown month ${month}`,
+          );
+        }
+      }
     }
 
     const resolves = (ref: EntityRef): boolean => {
@@ -194,43 +205,46 @@ export type Dataset = z.infer<typeof DatasetSchema>;
 
 // Stream contract (src/pack/CONTRACT.md) -------------------------------------
 
+export const ConfidenceSchema = z.enum(["high", "medium", "low"]);
+export type Confidence = z.infer<typeof ConfidenceSchema>;
+
+/** How an answer ended: a full answer, a hedged one, a refusal, or a failure. */
+export const AnswerKindSchema = z.enum([
+  "normal",
+  "low_confidence",
+  "abstain",
+  "error",
+]);
+export type AnswerKind = z.infer<typeof AnswerKindSchema>;
+
+/**
+ * Points a claim at the data. Every field is optional on the wire, and ids are plain strings:
+ * a citation the data can't resolve is shown as unverified, not dropped (domain/citations.ts).
+ */
 export const CitationSchema = z.object({
-  /** Matches the inline marker [id] in the answer text. */
-  id: z.number().int().positive(),
-  ref: EntityRefSchema,
-  period: PeriodRefSchema,
-  metric: MetricSchema,
+  marketId: z.string().min(1).optional(),
+  regionId: z.string().min(1).optional(),
+  productId: z.string().min(1).optional(),
+  period: MonthSchema.optional(),
+  /** The model's own wording for what it cites. */
+  label: z.string().min(1).optional(),
 });
 export type Citation = z.infer<typeof CitationSchema>;
 
-const citationList = z
-  .array(CitationSchema)
-  .refine(
-    (citations) =>
-      new Set(citations.map((c) => c.id)).size === citations.length,
-    "Citation ids must be unique",
-  );
-
 export const StreamEventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("token"), text: z.string() }),
+  /** `value` keeps its trailing whitespace: the values concatenate to the answer exactly. */
+  z.object({ type: z.literal("token"), value: z.string() }),
   z.object({
-    type: z.literal("final"),
-    confidence: z.number().min(0).max(1),
-    citations: citationList,
-    uncertainty: z.string().min(1).optional(),
+    type: z.literal("done"),
+    kind: AnswerKindSchema,
+    citations: z.array(CitationSchema),
+    confidence: ConfidenceSchema,
   }),
-  z.object({
-    type: z.literal("abstain"),
-    reason: z.string().min(1),
-    coverage: z.object({ from: MonthSchema, to: MonthSchema }),
-  }),
-  z.object({
-    type: z.literal("error"),
-    message: z.string().min(1),
-    retryable: z.boolean(),
-  }),
+  /** Sent instead of any further tokens when the answer fails. */
+  z.object({ type: z.literal("error"), message: z.string().min(1) }),
 ]);
 export type StreamEvent = z.infer<typeof StreamEventSchema>;
+export type DoneEvent = Extract<StreamEvent, { type: "done" }>;
 
 export const ChatRequestSchema = z.object({
   question: z.string().trim().min(1).max(500),
@@ -239,46 +253,37 @@ export type ChatRequest = z.infer<typeof ChatRequestSchema>;
 
 // Fixtures -----------------------------------------------------------------
 
-export const FixtureResponseSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("answer"),
-    text: z.string().min(1),
-    confidence: z.number().min(0).max(1),
-    citations: citationList,
-    uncertainty: z.string().min(1).optional(),
-  }),
-  z.object({
-    kind: z.literal("abstention"),
-    /** Optional lead-in streamed before the abstain event. */
-    text: z.string().min(1).optional(),
-    reason: z.string().min(1),
-  }),
-  z.object({
-    kind: z.literal("error"),
-    /** Partial answer streamed before the failure. */
-    text: z.string().min(1),
-    message: z.string().min(1),
-  }),
-]);
-
-export const FixtureSchema = z.object({
-  id: z.string().regex(/^[a-z0-9-]+$/),
-  question: z.string().min(1),
-  /** Shown as a suggested-question chip. */
-  suggested: z.boolean(),
-  response: FixtureResponseSchema,
-});
+export const FixtureSchema = z
+  .object({
+    id: z.string().min(1),
+    /** Matched as case-insensitive substrings of the question; the first fixture to match wins. */
+    keywords: z.array(z.string().min(1)).optional(),
+    kind: AnswerKindSchema,
+    answer: z.object({
+      text: z.string(),
+      citations: z.array(CitationSchema),
+      confidence: ConfidenceSchema,
+    }),
+    /** The failure message an `error` fixture sends. */
+    error: z.string().min(1).optional(),
+  })
+  .refine(
+    (fixture) => fixture.kind === "error" || fixture.answer.text.length > 0,
+    "Only an error fixture may have no answer text",
+  );
 export type Fixture = z.infer<typeof FixtureSchema>;
 
 export const FixturesSchema = z
-  .array(FixtureSchema)
+  .object({
+    note: z.string().optional(),
+    /** The answer when no fixture's keywords match. */
+    default: FixtureSchema,
+    fixtures: z.array(FixtureSchema),
+  })
   .refine(
-    (fixtures) =>
-      new Set(fixtures.map((f) => normaliseQuestion(f.question))).size ===
-      fixtures.length,
-    "Fixture questions must be unique after normalising",
-  )
-  .refine(
-    (fixtures) => new Set(fixtures.map((f) => f.id)).size === fixtures.length,
+    ({ default: fallback, fixtures }) =>
+      new Set([fallback.id, ...fixtures.map((f) => f.id)]).size ===
+      fixtures.length + 1,
     "Fixture ids must be unique",
   );
+export type Fixtures = z.infer<typeof FixturesSchema>;

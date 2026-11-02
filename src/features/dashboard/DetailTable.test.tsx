@@ -13,9 +13,9 @@ import { useSelection } from "@/state/url";
 import { DetailTable } from "./DetailTable";
 
 /*
- * Expected figures are read off the generated data pack (src/pack/data.json) once and written
- * down as literals. Europe's children in Q3 2026 are the five European markets, in data order:
- * Germany, France, United Kingdom, Italy, Spain.
+ * Expected figures are read off the starter pack (src/pack/data.json) once and written down
+ * as literals. Europe's children in May 2026 are the five European markets, in data order:
+ * Germany, United Kingdom, France, Italy, Spain.
  */
 
 /** Reads the selection from the URL exactly as the dashboard does, then renders the table. */
@@ -61,11 +61,11 @@ describe("DetailTable", () => {
   it("lists the children in data order until a column is chosen", () => {
     renderTable();
 
-    expect(table()).toHaveAccessibleName("Europe by market · Q3 2026");
+    expect(table()).toHaveAccessibleName("Europe by market · May 2026");
     expect(rowNames()).toEqual([
       "Germany",
-      "France",
       "United Kingdom",
+      "France",
       "Italy",
       "Spain",
     ]);
@@ -80,8 +80,8 @@ describe("DetailTable", () => {
     );
     expect(column("Revenue")).toHaveAttribute("aria-sort", "descending");
     expect(rowNames()).toEqual([
-      "Germany",
       "United Kingdom",
+      "Germany",
       "France",
       "Italy",
       "Spain",
@@ -95,8 +95,8 @@ describe("DetailTable", () => {
       "Spain",
       "Italy",
       "France",
-      "United Kingdom",
       "Germany",
+      "United Kingdom",
     ]);
   });
 
@@ -127,13 +127,13 @@ describe("DetailTable", () => {
       }),
     );
 
-    // +2.4%, +2.2%, +2.1%, +1.5%, +1.4%
+    // +11.6%, +8.8%, +0.3%, -4.6%, -9.7%
     expect(rowNames()).toEqual([
-      "Germany",
-      "Spain",
+      "France",
       "United Kingdom",
       "Italy",
-      "France",
+      "Spain",
+      "Germany",
     ]);
   });
 
@@ -165,7 +165,7 @@ describe("DetailTable", () => {
     await user.click(within(table()).getByRole("button", { name: "Germany" }));
 
     const event = onUrlUpdate.mock.calls.at(-1)?.[0];
-    expect(event?.queryString).toContain("path=eu.DE");
+    expect(event?.queryString).toContain("path=eu.de");
     expect(event?.options.history).toBe("push");
   });
 
@@ -179,8 +179,8 @@ describe("DetailTable", () => {
     await user.click(germany);
 
     const event = onUrlUpdate.mock.calls.at(-1)?.[0];
-    expect(event?.queryString).toContain("compare=eu.FR");
-    expect(event?.queryString).not.toContain("eu.DE");
+    expect(event?.queryString).toContain("compare=eu.gb,eu.fr,eu.it");
+    expect(event?.queryString).not.toContain("eu.de");
     expect(event?.options.history).toBe("replace");
   });
 });

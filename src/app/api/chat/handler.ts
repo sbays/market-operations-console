@@ -1,11 +1,11 @@
 /**
- * The mock assistant: matches the question to a fixture and streams it as SSE, paced so the
- * connecting and streaming states are visible. A mock by design (CLAUDE.md): no model calls.
+ * The mock assistant, after the starter pack's reference route: matches the question to a
+ * fixture and streams it as SSE, paced so the connecting and streaming states are visible.
+ * Unlike the reference, it validates the body and the fixtures. A mock by design (CLAUDE.md): no model calls.
  */
-import { loadDataset, loadFixtures } from "@/data/pack";
+import { loadFixtures } from "@/data/pack";
 import { fixtureEvents, matchFixture } from "@/domain/fixtures";
 import { ChatRequestSchema } from "@/domain/schema";
-import { coverageOf } from "@/domain/selectors";
 import { encodeSseEvent } from "@/domain/sse";
 
 export type ChatHandlerOptions = {
@@ -47,7 +47,6 @@ export function createChatHandler(options: ChatHandlerOptions) {
 
     const events = fixtureEvents(
       matchFixture(loadFixtures(), parsed.data.question),
-      coverageOf(loadDataset()),
     );
     // Stop on either a client abort or the body being cancelled.
     const cancelled = new AbortController();

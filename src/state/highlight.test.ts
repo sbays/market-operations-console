@@ -13,8 +13,8 @@ afterEach(() => act(() => clearHighlight()));
 function setup() {
   const highlighted = renderHook(() => useHighlightedPath());
   return {
-    germany: { current: highlightHandlers(entityPath("eu.DE")) },
-    france: { current: highlightHandlers(entityPath("eu.FR")) },
+    germany: { current: highlightHandlers(entityPath("eu.de")) },
+    france: { current: highlightHandlers(entityPath("eu.fr")) },
     highlighted: highlighted.result,
   };
 }
@@ -25,7 +25,7 @@ describe("highlight state", () => {
     expect(highlighted.current).toBeNull();
 
     act(() => germany.current.onMouseEnter());
-    expect(highlighted.current).toBe("eu.DE");
+    expect(highlighted.current).toBe("eu.de");
 
     act(() => germany.current.onMouseLeave());
     expect(highlighted.current).toBeNull();
@@ -35,7 +35,7 @@ describe("highlight state", () => {
     const { germany, highlighted } = setup();
 
     act(() => germany.current.onFocus());
-    expect(highlighted.current).toBe("eu.DE");
+    expect(highlighted.current).toBe("eu.de");
 
     act(() => germany.current.onBlur());
     expect(highlighted.current).toBeNull();
@@ -48,7 +48,7 @@ describe("highlight state", () => {
     act(() => germany.current.onMouseEnter());
     act(() => france.current.onMouseEnter());
     act(() => germany.current.onMouseLeave());
-    expect(highlighted.current).toBe("eu.FR");
+    expect(highlighted.current).toBe("eu.fr");
   });
 
   it("keeps a keyboard user's focus highlight when the mouse passes over something else", () => {
@@ -57,10 +57,10 @@ describe("highlight state", () => {
     act(() => france.current.onFocus());
     act(() => germany.current.onMouseEnter());
     // The pointer wins while it's over an item.
-    expect(highlighted.current).toBe("eu.DE");
+    expect(highlighted.current).toBe("eu.de");
 
     act(() => germany.current.onMouseLeave());
-    expect(highlighted.current).toBe("eu.FR");
+    expect(highlighted.current).toBe("eu.fr");
   });
 
   it("clears both pointer and focus highlights", () => {
@@ -75,7 +75,7 @@ describe("highlight state", () => {
   it("answers per item whether it is linked, including parent and child", () => {
     const { germany } = setup();
     const europe = renderHook(() => useIsLinked(entityPath("eu")));
-    const france = renderHook(() => useIsLinked(entityPath("eu.FR")));
+    const france = renderHook(() => useIsLinked(entityPath("eu.fr")));
 
     act(() => germany.current.onMouseEnter());
     expect(europe.result.current).toBe(true);

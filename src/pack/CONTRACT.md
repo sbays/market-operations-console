@@ -1,80 +1,90 @@
-# Assistant stream contract
+# Starter pack: data and streaming contract
 
-The mock assistant answers `POST /api/chat` with a Server-Sent Events stream. Every shape below is a Zod
-schema in `src/domain/schema.ts`; types are inferred from those schemas, and the client validates every
-event before using it.
+This pack gives you everything behind the assistant so you can spend your time on the front-end. The "intelligence" is faked: a fixture lookup that streams a canned answer. You may use the reference endpoint as-is, or build your own equivalent. The event contract below is what matters.
 
-## Request
+## Files
 
-```http
-POST /api/chat
-Content-Type: application/json
+- `data.json`: the canonical market operations dataset (regions, markets, products, and a monthly series). Identical for every candidate.
+- `fixtures.json`: canned question to answer pairs for the assistant, including the awkward cases.
+- `reference/chat-route.ts`: a ~40-line Next.js App Router handler that streams a fixture as Server-Sent Events. Drop it in at `app/api/chat/route.ts` and point the import at wherever you put `fixtures.json`.
 
-{ "question": "Why did Germany's revenue dip in March 2026?" }
+## The streaming contract
+
+`POST /api/chat` with a JSON body `{ "question": string }`. The response is `text/event-stream`. Each event is a single line of JSON prefixed with `data: ` and terminated by a blank line:
+
+```
+data: {"type":"token","value":"Three "}
+
+data: {"type":"token","value":"markets "}
+
+data: {"type":"done","kind":"normal","citations":[...],"confidence":"high"}
 ```
 
-`question` is trimmed, 1–500 characters (`ChatRequestSchema`). An invalid body gets `400` with no stream.
+Event types:
 
-## Response
+- `token`: one chunk of the answer. `value` includes its trailing whitespace, so concatenating every `value` reconstructs the text exactly.
+- `done`: the final event. Carries `kind` (`normal` | `low_confidence` | `abstain` | `error`), `citations` (array, see below), and `confidence` (`high` | `medium` | `low`).
+- `error`: emitted instead of any tokens when something fails. Carries `message`. Render your error state from this.
 
-`Content-Type: text/event-stream`. Each frame has an `event:` line naming the type and a `data:` line
-holding JSON with the same `type`:
+A citation references real ids in `data.json`. Any of these fields may appear: `marketId`, `regionId`, `productId`, `period` (a `YYYY-MM` string), and `label` (a human-readable hint). Resolve them against `data.json` to link a claim back to the data it came from.
 
-```text
-event: token
-data: {"type":"token","text":"Germany's March revenue was $4M [1] "}
+### Consuming it (reference)
 
-event: final
-data: {"type":"final","confidence":0.9,"citations":[{"id":1,"ref":{"level":"market","id":"DE"},"period":"2026-03","metric":"revenue"}]}
+Native `EventSource` is GET-only, so use streaming fetch for the POST:
+
+```ts
+const res = await fetch("/api/chat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ question }),
+});
+const reader = res.body!.getReader();
+const decoder = new TextDecoder();
+let buffer = "";
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  buffer += decoder.decode(value, { stream: true });
+  // split on the blank line between events, parse each `data:` payload, update state
+}
 ```
 
-### Events (`StreamEventSchema`)
+Stop generation by aborting the fetch (`AbortController`) or calling `reader.cancel()`.
 
-| `type` | Fields | Meaning |
-| --- | --- | --- |
-| `token` | `text: string` | Next piece of the answer (Markdown). May contain citation markers `[n]`, and a marker may be split across two tokens. |
-| `final` | `confidence: 0..1`, `citations: Citation[]`, `uncertainty?: string` | The answer is complete. Resolves every `[n]` in the text. `uncertainty` explains a low-confidence answer. |
-| `abstain` | `reason: string`, `coverage: { from, to }` | The question can't be answered from the data. Not an error. `coverage` is the range of months the data does cover. |
-| `error` | `message: string`, `retryable: boolean` | The answer failed. Tokens already sent are a partial answer and stay on screen. |
+## data.json shape
 
-`Citation`: `{ id, ref: EntityRef, period, metric }`
+```jsonc
+{
+  "meta": { "currency": "USD", "periods": ["2024-06", ...], "latestPeriod": "2026-05", "generatedAt": "..." },
+  "regions":  [{ "id": "eu", "name": "Europe" }, ...],
+  "products": [{ "id": "veltrix", "name": "Veltrix" }, ...],
+  "markets": [
+    {
+      "id": "de", "name": "Germany", "iso3": "DEU", "iso2": "DE", "regionId": "eu",
+      "kpis": {
+        "revenue": 0,                  // latest-period revenue across products
+        "growthPct": 0,                // year on year, latest period
+        "sharePct": 0,                 // market share (synthetic)
+        "forecastAttainmentPct": 0,    // actual / forecast, latest period
+        "status": "off_track",         // on_track | at_risk | off_track
+        "anomalies": [{ "period": "2026-03", "type": "dip", "note": "..." }]
+      }
+    }
+  ],
+  "series": [
+    { "marketId": "de", "productId": "veltrix", "period": "2024-06",
+      "actual": 0, "forecast": 0, "units": 0, "priorYear": 0 }
+  ]
+}
+```
 
-- `id` matches a marker `[id]` in the text. Ids are unique within an answer.
-- `ref` is the shared `EntityRef`: `{ level: "portfolio" }`, `{ level: "region", id }`,
-  `{ level: "market", id }` (ISO alpha-2) or `{ level: "product", marketId, id }`.
-- `period` is a month (`2026-03`) or a quarter (`2026-Q3`).
-- `metric` is one of `revenue`, `units`, `forecast`, `growth`, `attainment`, `share`.
+`series` is the fact table: one row per market x product x month, for 24 months. Region and portfolio totals are simple sums over it. The `iso3` / `iso2` codes are for the map. `kpis` are precomputed at the latest period so your radar, scatter, and map have consistent values to render; you're free to recompute anything from `series`.
 
-The client looks up the cited value in the dataset itself (`valueAt`); it never trusts the number in the text.
+## fixtures.json shape
 
-### Ordering
+A `default` fallback plus a `fixtures` array. Each fixture has `keywords` (matched as case-insensitive substrings of the question, first match wins in array order), a `kind`, and an `answer` with `text`, `citations`, and `confidence`. The `error` fixture also carries an `error` message.
 
-1. Zero or more `token` events.
-2. Exactly one terminal event: `final`, `abstain` or `error`. Nothing follows it.
+## Notes
 
-An `abstain` may follow tokens (a lead-in sentence). A stream that closes without a terminal event is treated
-as an error.
-
-### Invalid events
-
-- A frame whose `type` the client doesn't know is **ignored**, so the contract can grow.
-- A frame with a known `type` but a shape that fails validation **aborts the stream**: the partial text is
-  kept, the answer is marked as interrupted, and the failure is logged. Silently dropping a token or a
-  citation could change what the answer means.
-
-## Fixtures
-
-`fixtures.json` (`FixturesSchema`) holds the canned answers. A question matches a fixture only when it is
-equal after trimming, collapsing whitespace and lower-casing (`normaliseQuestion` in `src/domain/fixtures.ts`);
-anything else gets an `abstain`. `fixtureEvents` in the same file turns a fixture into the events below. `suggested: true` fixtures appear as suggested-question chips.
-
-How the route turns a fixture into events:
-
-| `response.kind` | Events |
-| --- | --- |
-| `answer` | `text` as `token` events, then `final` with the fixture's `confidence`, `citations` and `uncertainty` |
-| `abstention` | `text` (if any) as `token` events, then `abstain` with the fixture's `reason`; `coverage` is the first and last month of `data.json`, so it can never disagree with the data |
-| `error` | `text` as `token` events (the partial answer), then `error` with the fixture's `message` and `retryable: true` |
-
-`data.json` and `fixtures.json` are generated by `pnpm data:generate` (`scripts/generate-data.ts`). Don't edit
-them by hand: numbers in the fixture text are filled in from the data.
+- The numbers are synthetic but internally consistent. There is a deliberate story in the data so the assistant's canned answers line up with it: Germany is off-track with a sharp dip in March 2026, Italy and Brazil are at risk, and China, Japan, and the United States are ahead of or on plan.
+- Keep the dataset and fixtures as the source of truth. If you extend them, stay within this contract so the front-end you build keeps working.

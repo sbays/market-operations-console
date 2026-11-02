@@ -16,22 +16,23 @@ import { ancestorsOf } from "./selectors";
 import type { Dataset, EntityRef } from "./schema";
 
 /**
- * Dataset market id (ISO alpha-2) to the numeric id world-atlas writes on each country,
- * zero-padded as the topology has it ("036" is Australia).
+ * Dataset market id (the pack's lower-case ISO alpha-2) to the numeric id world-atlas writes
+ * on each country, zero-padded as the topology has it ("036" is Australia).
  */
 export const MARKET_GEO_IDS: Record<string, string> = {
-  US: "840",
-  CA: "124",
-  DE: "276",
-  FR: "250",
-  GB: "826",
-  IT: "380",
-  ES: "724",
-  JP: "392",
-  AU: "036",
-  IN: "356",
-  BR: "076",
-  MX: "484",
+  us: "840",
+  ca: "124",
+  de: "276",
+  fr: "250",
+  gb: "826",
+  it: "380",
+  es: "724",
+  jp: "392",
+  cn: "156",
+  au: "036",
+  in: "356",
+  br: "076",
+  mx: "484",
 };
 
 // Only the parts of TopoJSON the map reads. Zod strips everything else.

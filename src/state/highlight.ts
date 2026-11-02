@@ -46,7 +46,7 @@ export function useIsLinked(path: EntityPath | undefined): boolean {
 /**
  * Clears the highlight. The dashboard calls it when the selection changes: the hovered or
  * focused item usually unmounts in a drill without firing its leave or blur, and a stale
- * "eu.DE" would otherwise link every product of Germany at the next level.
+ * "eu.de" would otherwise link every product of Germany at the next level.
  */
 export function clearHighlight(): void {
   useHighlightStore.setState({ pointer: null, focus: null });

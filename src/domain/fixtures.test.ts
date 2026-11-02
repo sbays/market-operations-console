@@ -1,124 +1,115 @@
 import { describe, expect, it } from "vitest";
-import type { Fixture } from "./schema";
+import type { Fixture, Fixtures } from "./schema";
 import {
+  FALLBACK_ERROR,
   fixtureEvents,
   matchFixture,
   tokenize,
-  UNMATCHED_REASON,
 } from "./fixtures";
 
-const coverage = { from: "2024-10", to: "2026-09" } as const;
-
-const citation = {
-  id: 1,
-  ref: { level: "market", id: "DE" },
-  period: "2026-03",
-  metric: "revenue",
-} as const;
-
-const answer: Fixture = {
-  id: "germany-dip",
-  question: "Why did Germany dip?",
-  suggested: true,
-  response: {
-    kind: "answer",
-    text: "Revenue was $4M [1] in March",
-    confidence: 0.9,
-    citations: [citation],
+const atRisk: Fixture = {
+  id: "at-risk",
+  keywords: ["at risk", "which markets"],
+  kind: "normal",
+  answer: {
+    text: "Three markets stand out.",
+    citations: [{ marketId: "de", period: "2026-05", label: "Germany" }],
+    confidence: "high",
   },
 };
 
+const germany: Fixture = {
+  id: "germany-dip",
+  keywords: ["germany"],
+  kind: "normal",
+  answer: { text: "Germany fell.", citations: [], confidence: "high" },
+};
+
+const fallback: Fixture = {
+  id: "default",
+  kind: "low_confidence",
+  answer: { text: "I don't have enough.", citations: [], confidence: "low" },
+};
+
+const fixtures: Fixtures = { default: fallback, fixtures: [atRisk, germany] };
+
 describe("matchFixture", () => {
-  it("matches ignoring case and spacing", () => {
-    expect(matchFixture([answer], "  why did   GERMANY dip? ")).toBe(answer);
+  it("matches a keyword anywhere in the question, ignoring case", () => {
+    expect(matchFixture(fixtures, "Why did GERMANY dip?")).toBe(germany);
   });
 
-  it("returns undefined for any other question", () => {
-    expect(matchFixture([answer], "Why did Germany dip")).toBeUndefined();
+  it("takes the first fixture to match, in order", () => {
+    expect(matchFixture(fixtures, "Is Germany at risk?")).toBe(atRisk);
+  });
+
+  it("falls back to the default answer", () => {
+    expect(matchFixture(fixtures, "How is Peru doing?")).toBe(fallback);
+  });
+
+  it("skips a fixture without keywords", () => {
+    const noKeywords = { ...germany, keywords: undefined };
+    expect(
+      matchFixture({ default: fallback, fixtures: [noKeywords] }, "germany"),
+    ).toBe(fallback);
   });
 });
 
 describe("tokenize", () => {
-  it("cuts text into 3–9 character pieces that sometimes split a marker", () => {
-    // Lengths cycle 5, 3, 7, 4, 9, …: cuts at 5, 8, 15, 19, 28 split "[12]" after "[12".
-    expect(tokenize("Revenue was $4M [12] in March")).toEqual([
-      "Reven",
-      "ue ",
-      "was $4M",
-      " [12",
-      "] in Marc",
-      "h",
+  it("streams a word and its trailing whitespace per token", () => {
+    expect(tokenize("Here's the portfolio.\n\nOverall ")).toEqual([
+      "Here's ",
+      "the ",
+      "portfolio.\n\n",
+      "Overall ",
     ]);
+  });
+
+  it("joins back into the text, from its first word", () => {
+    const text = "A  long\nanswer, with  spacing. ";
+    expect(tokenize(text).join("")).toBe(text);
   });
 });
 
 describe("fixtureEvents", () => {
-  it("streams an answer's text, then a final event with its evidence", () => {
-    const events = fixtureEvents(answer, coverage);
-    const final = events.at(-1);
-    expect(
-      events
-        .slice(0, -1)
-        .map((e) => (e.type === "token" ? e.text : "?"))
-        .join(""),
-    ).toBe("Revenue was $4M [1] in March");
-    expect(final).toEqual({
-      type: "final",
-      confidence: 0.9,
-      citations: [citation],
-    });
-  });
-
-  it("passes on an answer's uncertainty", () => {
-    const uncertain: Fixture = {
-      ...answer,
-      response: {
-        ...answer.response,
-        kind: "answer",
-        text: "Maybe",
-        confidence: 0.4,
-        citations: [],
-        uncertainty: "Thin data",
+  it("streams the answer's words, then ends with its kind, citations and confidence", () => {
+    expect(fixtureEvents(atRisk)).toEqual([
+      { type: "token", value: "Three " },
+      { type: "token", value: "markets " },
+      { type: "token", value: "stand " },
+      { type: "token", value: "out." },
+      {
+        type: "done",
+        kind: "normal",
+        citations: atRisk.answer.citations,
+        confidence: "high",
       },
-    };
-    expect(fixtureEvents(uncertain, coverage).at(-1)).toEqual({
-      type: "final",
-      confidence: 0.4,
-      citations: [],
-      uncertainty: "Thin data",
+    ]);
+  });
+
+  it("ends a hedged or refused answer with its own kind", () => {
+    expect(fixtureEvents(fallback).at(-1)).toMatchObject({
+      type: "done",
+      kind: "low_confidence",
+      confidence: "low",
     });
+    expect(
+      fixtureEvents({ ...fallback, kind: "abstain" }).at(-1),
+    ).toMatchObject({ type: "done", kind: "abstain" });
   });
 
-  it("ends an abstention with the data's coverage", () => {
-    const abstention: Fixture = {
-      id: "q1-2027",
-      question: "Q1 2027?",
-      suggested: true,
-      response: { kind: "abstention", reason: "Beyond the data" },
+  it("fails an error fixture at once, with its message", () => {
+    const error: Fixture = {
+      id: "error",
+      keywords: ["force error"],
+      kind: "error",
+      answer: { text: "", citations: [], confidence: "low" },
+      error: "The model service timed out.",
     };
-    expect(fixtureEvents(abstention, coverage)).toEqual([
-      { type: "abstain", reason: "Beyond the data", coverage },
+    expect(fixtureEvents(error)).toEqual([
+      { type: "error", message: "The model service timed out." },
     ]);
-  });
-
-  it("streams the partial answer before a retryable error", () => {
-    const failing: Fixture = {
-      id: "broken",
-      question: "Broken?",
-      suggested: false,
-      response: { kind: "error", text: "Germany's", message: "Timed out" },
-    };
-    expect(fixtureEvents(failing, coverage)).toEqual([
-      { type: "token", text: "Germa" },
-      { type: "token", text: "ny'" },
-      { type: "token", text: "s" },
-      { type: "error", message: "Timed out", retryable: true },
-    ]);
-  });
-
-  it("abstains, without guessing, when no fixture matches", () => {
-    expect(fixtureEvents(undefined, coverage)).toEqual([
-      { type: "abstain", reason: UNMATCHED_REASON, coverage },
+    expect(fixtureEvents({ ...error, error: undefined })).toEqual([
+      { type: "error", message: FALLBACK_ERROR },
     ]);
   });
 });

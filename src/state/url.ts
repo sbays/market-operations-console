@@ -33,7 +33,7 @@ const parseAsPeriod = createParser<PeriodRef>({
 });
 
 export const selectionParsers = {
-  /** Drill path, e.g. "eu.DE.beacon" (see refFromPath). Absent means the portfolio. */
+  /** Drill path, e.g. "eu.de.nuvora" (see refFromPath). Absent means the portfolio. */
   path: parseAsString.withDefault(PORTFOLIO_PATH),
   /** Focused period, a month ("2026-03") or a quarter ("2026-Q3"). */
   period: parseAsPeriod,
@@ -97,7 +97,7 @@ export function useSetPeriod(): (period: PeriodRef) => void {
   };
 }
 
-/** Entities to compare, as drill paths: "eu.DE,eu.FR". Same format as `path`. */
+/** Entities to compare, as drill paths: "eu.de,eu.fr". Same format as `path`. */
 const compareParser = parseAsArrayOf(parseAsString, ",").withDefault([]);
 
 /** The entities the radar compares under a selection (see comparedRefs). */

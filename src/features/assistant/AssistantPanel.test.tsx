@@ -1,5 +1,5 @@
 import { TestDataset } from "@/test/dataset";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import {
@@ -8,33 +8,40 @@ import {
 } from "nuqs/adapters/testing";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { StreamEvent } from "@/domain/schema";
-import { encodeSseEvent } from "@/domain/sse";
+import { loadDataset } from "@/data/pack";
+import { formatMetric } from "@/domain/format";
+import type { DoneEvent, StreamEvent } from "@/domain/schema";
+import { valueAt } from "@/domain/selectors";
 import { server, sseResponse, type TestFrame } from "@/test/msw";
 import { DASHBOARD_FOCUS_ID } from "@/ui/dashboardFocus";
 import { AssistantPanel } from "./AssistantPanel";
 
-const GERMANY_DIP = "Why did Germany's revenue dip in March 2026?";
-const SUGGESTED = [GERMANY_DIP, "What will revenue be in Q1 2027?"];
+const GERMANY_DIP = "Why did Germany's revenue dip in March?";
+const SUGGESTED = [GERMANY_DIP, "Will sales grow next year?"];
 
-const germanyMarchRevenue = {
-  id: 1,
-  ref: { level: "market", id: "DE" },
+const germanyMarch = {
+  marketId: "de",
   period: "2026-03",
-  metric: "revenue",
+  label: "Germany, Mar 2026",
 } as const;
 
-function token(text: string): StreamEvent {
-  return { type: "token", text };
+/** What the data says for Germany in March 2026, as the tooltip must show it. */
+const germanyMarchRevenue = formatMetric(
+  "revenue",
+  valueAt(loadDataset(), { level: "market", id: "de" }, "2026-03", "revenue") ??
+    NaN,
+);
+
+function token(value: string): StreamEvent {
+  return { type: "token", value };
 }
 
-function final(
-  overrides: Partial<Extract<StreamEvent, { type: "final" }>> = {},
-): StreamEvent {
+function done(overrides: Partial<DoneEvent> = {}): DoneEvent {
   return {
-    type: "final",
-    confidence: 0.9,
-    citations: [germanyMarchRevenue],
+    type: "done",
+    kind: "normal",
+    citations: [germanyMarch],
+    confidence: "high",
     ...overrides,
   };
 }
@@ -62,39 +69,62 @@ function renderPanel({ searchParams = "" }: { searchParams?: string } = {}) {
 
 describe("AssistantPanel", () => {
   it("answers a suggested question on an AI surface with its confidence", async () => {
-    respondWith([
-      token("Germany's revenue "),
-      token("fell to $4M [1]."),
-      final(),
-    ]);
+    respondWith([token("Germany's revenue "), token("fell in March."), done()]);
     const { user } = renderPanel();
 
     await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
 
     expect(await screen.findByText("High confidence")).toBeInTheDocument();
     const answer = screen.getByRole("article", { name: "Answer" });
-    expect(answer).toHaveTextContent("Germany's revenue fell to $4M");
+    expect(answer).toHaveTextContent("Germany's revenue fell in March.");
     expect(answer).toHaveTextContent("AI-generated · verify with sources");
   });
 
-  it("checks a citation against the dataset, not the model's number", async () => {
-    // The model misquotes the figure: the chip must show what the data says.
-    respondWith([token("Germany fell to $9M [1]."), final()]);
+  it("lists the answer's sources once it is complete", async () => {
+    respondWith([
+      token("Three markets stand out."),
+      done({
+        citations: [
+          germanyMarch,
+          { regionId: "eu", period: "2026-05", label: "Europe" },
+          {
+            marketId: "de",
+            productId: "veltrix",
+            period: "2026-03",
+            label: "Veltrix in Germany",
+          },
+        ],
+      }),
+    ]);
     const { user } = renderPanel();
 
     await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
-    const chip = await screen.findByRole("button", {
-      name: "DE · Mar 2026 · Revenue",
-    });
-    act(() => chip.focus());
+    const sources = await screen.findByRole("region", { name: "Sources" });
 
-    expect(await screen.findByRole("tooltip")).toHaveTextContent(
-      "Source data: Germany, Mar 2026, Revenue: $4M",
-    );
+    expect(
+      within(sources)
+        .getAllByRole("button")
+        .map((chip) => chip.textContent),
+    ).toEqual(["DE · Mar 2026", "Europe · May 2026", "DE Veltrix · Mar 2026"]);
   });
 
-  it("drills the dashboard to the cited entity and period, and moves focus there", async () => {
-    respondWith([token("Germany fell [1]."), final()]);
+  it("checks a source against the dataset, not the model's number", async () => {
+    // The model misquotes the figure: the tooltip must show what the data says.
+    respondWith([token("Germany fell to $9M."), done()]);
+    const { user } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
+    const chip = await screen.findByRole("button", { name: "DE · Mar 2026" });
+    act(() => chip.focus());
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Source data: Germany, Mar 2026");
+    expect(tooltip).toHaveTextContent(`Revenue: ${germanyMarchRevenue}`);
+    expect(tooltip).toHaveTextContent("Off track");
+  });
+
+  it("drills the dashboard to the cited entity and month, and moves focus there", async () => {
+    respondWith([token("Germany fell."), done()]);
     const { user, onUrlUpdate } = renderPanel();
     // Stands in for the dashboard's key figures, which the console renders beside the panel.
     const figures = document.createElement("section");
@@ -104,12 +134,12 @@ describe("AssistantPanel", () => {
 
     await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
     await user.click(
-      await screen.findByRole("button", { name: "DE · Mar 2026 · Revenue" }),
+      await screen.findByRole("button", { name: "DE · Mar 2026" }),
     );
 
     expect(onUrlUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryString: "?path=eu.DE&period=2026-03",
+        queryString: "?path=eu.de&period=2026-03",
         options: expect.objectContaining({ history: "push" }),
       }),
     );
@@ -117,50 +147,24 @@ describe("AssistantPanel", () => {
     figures.remove();
   });
 
-  it("shows markers as pending until the answer's evidence arrives", async () => {
-    // The marker is split across tokens, and the final event waits for the test.
-    let release = () => {};
-    const evidence = new Promise<void>((resolve) => (release = resolve));
-    server.use(
-      http.post("*/api/chat", () => {
-        const encoder = new TextEncoder();
-        const body = new ReadableStream<Uint8Array>({
-          async start(controller) {
-            for (const event of [
-              token("Germany fell [1"),
-              token("] in March."),
-            ]) {
-              controller.enqueue(encoder.encode(encodeSseEvent(event)));
-            }
-            await evidence;
-            controller.enqueue(encoder.encode(encodeSseEvent(final())));
-            controller.close();
-          },
-        });
-        return new Response(body, {
-          headers: { "content-type": "text/event-stream" },
-        });
-      }),
-    );
+  it("shows no sources until the answer's done event arrives", async () => {
+    respondWith([token("Germany "), token("fell."), done()], { delayMs: 60 });
     const { user } = renderPanel();
 
     await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
+    const answer = await screen.findByRole("article", { name: "Answer" });
+    await waitFor(() => expect(answer).toHaveTextContent("Germany"));
     expect(
-      await screen.findByText("Citation 1, checking the source"),
-    ).toBeInTheDocument();
-
-    release();
-
-    expect(
-      await screen.findByRole("button", { name: "DE · Mar 2026 · Revenue" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText("Citation 1, checking the source"),
+      screen.queryByRole("region", { name: "Sources" }),
     ).not.toBeInTheDocument();
+
+    expect(
+      await screen.findByRole("region", { name: "Sources" }),
+    ).toBeInTheDocument();
   });
 
-  it("stops on request and labels what remains as partial", async () => {
-    respondWith([token("One "), token("two "), token("three "), final()], {
+  it("stops on request and labels what remains as partial, with no sources", async () => {
+    respondWith([token("One "), token("two "), token("three "), done()], {
       delayMs: 50,
     });
     const { user } = renderPanel();
@@ -176,49 +180,45 @@ describe("AssistantPanel", () => {
       screen.queryByRole("button", { name: "Stop" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("High confidence")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Sources" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("abstains in its own card, saying what the data does cover", async () => {
+  it("abstains in its own card: the assistant's reason, and what the data covers", async () => {
     respondWith([
-      {
-        type: "abstain",
-        reason: "The data has no forecasts beyond Sep 2026.",
-        coverage: { from: "2024-10", to: "2026-09" },
-      },
+      token("I can't answer that. "),
+      token("The data **ends** in May 2026."),
+      done({ kind: "abstain", citations: [], confidence: "low" }),
     ]);
     const { user } = renderPanel();
 
     await user.click(
-      screen.getByRole("button", { name: "What will revenue be in Q1 2027?" }),
+      screen.getByRole("button", { name: "Will sales grow next year?" }),
     );
 
     const card = await screen.findByRole("article", {
       name: "This isn't in the data",
     });
-    expect(card).toHaveTextContent(
-      "The data has no forecasts beyond Sep 2026.",
-    );
-    expect(card).toHaveTextContent("The data covers Oct 2024 to Sep 2026.");
+    expect(card).toHaveTextContent("I can't answer that.");
+    expect(card).toHaveTextContent("AI-generated · verify with sources");
+    expect(screen.getByText("ends").tagName).toBe("STRONG");
+    expect(card).toHaveTextContent("The data covers Jun 2024 to May 2026.");
     expect(
       screen.queryByRole("article", { name: "Answer" }),
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the partial answer on an error and retries the same question", async () => {
+  it("shows the pack's error, which arrives before any text, and retries the same question", async () => {
     let calls = 0;
     server.use(
       http.post("*/api/chat", () => {
         calls += 1;
         return calls === 1
           ? sseResponse([
-              token("Germany's five products "),
-              {
-                type: "error",
-                message: "The answer timed out.",
-                retryable: true,
-              },
+              { type: "error", message: "The model service timed out." },
             ])
-          : sseResponse([token("Recovered [1]."), final()]);
+          : sseResponse([token("Recovered."), done()]);
       }),
     );
     const { user } = renderPanel();
@@ -226,9 +226,8 @@ describe("AssistantPanel", () => {
     await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
     const answer = await screen.findByRole("article", { name: "Answer" });
     await waitFor(() =>
-      expect(answer).toHaveTextContent("The answer timed out."),
+      expect(answer).toHaveTextContent("The model service timed out."),
     );
-    expect(answer).toHaveTextContent("Germany's five products");
 
     await user.click(screen.getByRole("button", { name: "Retry" }));
 
@@ -239,13 +238,25 @@ describe("AssistantPanel", () => {
     expect(calls).toBe(2);
   });
 
-  it("explains a low-confidence answer when the assistant says why", async () => {
+  it("keeps the partial answer when an error interrupts it", async () => {
     respondWith([
-      token("Cirrus is weaker in some markets [1]."),
-      final({
-        confidence: 0.42,
-        uncertainty: "Only two quarters of data for the new pricing.",
-      }),
+      token("Germany's five products "),
+      { type: "error", message: "The answer timed out." },
+    ]);
+    const { user } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
+    const answer = await screen.findByRole("article", { name: "Answer" });
+    await waitFor(() =>
+      expect(answer).toHaveTextContent("The answer timed out."),
+    );
+    expect(answer).toHaveTextContent("Germany's five products");
+  });
+
+  it("says in words that a low-confidence answer is tentative", async () => {
+    respondWith([
+      token("The shortfall is concentrated in a few markets."),
+      done({ kind: "low_confidence", confidence: "low" }),
     ]);
     const { user } = renderPanel();
 
@@ -253,40 +264,35 @@ describe("AssistantPanel", () => {
 
     expect(await screen.findByText("Low confidence")).toBeInTheDocument();
     expect(screen.getByRole("article", { name: "Answer" })).toHaveTextContent(
-      "Why it's uncertain: Only two quarters of data for the new pricing.",
+      "flagged this answer as tentative",
     );
   });
 
-  it("adds no caveat line when the assistant gives no reason", async () => {
-    respondWith([token("Germany fell [1]."), final({ confidence: 0.42 })]);
-    const { user } = renderPanel();
-
-    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
-
-    expect(await screen.findByText("Low confidence")).toBeInTheDocument();
-    expect(screen.queryByText(/Why it's uncertain/)).not.toBeInTheDocument();
-  });
-
-  it("explains a medium-confidence answer too, not only a low one", async () => {
-    respondWith([
-      token("APAC grew faster [1]."),
-      final({
-        confidence: 0.66,
-        uncertainty: "APAC forecasts were set more aggressively.",
-      }),
-    ]);
+  it("adds no caveat line to a normal answer, whatever its band", async () => {
+    respondWith([token("APAC grew faster."), done({ confidence: "medium" })]);
     const { user } = renderPanel();
 
     await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
 
     expect(await screen.findByText("Medium confidence")).toBeInTheDocument();
-    expect(screen.getByRole("article", { name: "Answer" })).toHaveTextContent(
-      "Why it's uncertain: APAC forecasts were set more aggressively.",
-    );
+    expect(screen.queryByText(/tentative/)).not.toBeInTheDocument();
+  });
+
+  it("says when an answer cites nothing", async () => {
+    respondWith([token("Mixed."), done({ citations: [] })]);
+    const { user } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
+
+    expect(
+      await screen.findByText(
+        "No sources cited: nothing here is checked against the data.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("announces the start and the outcome, not every token", async () => {
-    respondWith([token("Germany "), token("fell [1]."), final()], {
+    respondWith([token("Germany "), token("fell."), done()], {
       delayMs: 50,
     });
     const { user } = renderPanel();
@@ -303,7 +309,7 @@ describe("AssistantPanel", () => {
   });
 
   it("asks a typed question, and won't send an empty one", async () => {
-    respondWith([token("Typed answer [1]."), final()]);
+    respondWith([token("Typed answer."), done()]);
     const { user } = renderPanel();
     const input = screen.getByRole("textbox", { name: "Ask about the data" });
 
@@ -321,50 +327,12 @@ describe("AssistantPanel", () => {
     expect(input).toHaveValue("");
   });
 
-  it("marks citations unverified when the answer stops before its evidence", async () => {
-    respondWith([token("Germany fell [1]. "), token("More "), final()], {
-      delayMs: 80,
-    });
-    const { user } = renderPanel();
-
-    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
-    await screen.findByText("Citation 1, checking the source");
-    await user.click(screen.getByRole("button", { name: "Stop" }));
-
-    expect(screen.getByText("[1] Unverified")).toBeInTheDocument();
-    expect(
-      screen.queryByText("Citation 1, checking the source"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows an abstention's lead-in as AI text, rendered like an answer", async () => {
+  it("won't drill to a cited entity the data doesn't contain, and says so in the model's words", async () => {
     respondWith([
-      token("Germany fell **sharply** [1] in March. "),
-      {
-        type: "abstain",
-        reason: "The data has no forecasts beyond Sep 2026.",
-        coverage: { from: "2024-10", to: "2026-09" },
-      },
-    ]);
-    const { user } = renderPanel();
-
-    await user.click(screen.getByRole("button", { name: GERMANY_DIP }));
-    const card = await screen.findByRole("article", {
-      name: "This isn't in the data",
-    });
-
-    expect(card).toHaveTextContent("AI-generated · verify with sources");
-    expect(card).not.toHaveTextContent("**");
-    expect(screen.getByText("sharply").tagName).toBe("STRONG");
-    expect(card).toHaveTextContent("[1] Unverified");
-  });
-
-  it("won't drill to a cited entity the data doesn't contain", async () => {
-    respondWith([
-      token("New Zealand grew [1]."),
-      final({
+      token("New Zealand grew."),
+      done({
         citations: [
-          { ...germanyMarchRevenue, ref: { level: "market", id: "NZ" } },
+          { marketId: "nz", period: "2026-03", label: "New Zealand" },
         ],
       }),
     ]);
@@ -374,17 +342,19 @@ describe("AssistantPanel", () => {
     await screen.findByText("High confidence");
 
     expect(
-      screen.queryByRole("button", { name: /NZ · Mar 2026/ }),
+      within(screen.getByRole("region", { name: "Sources" })).queryByRole(
+        "button",
+      ),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText("NZ · Mar 2026 · Revenue · not in the data"),
+      screen.getByText("New Zealand · not in the data"),
     ).toBeInTheDocument();
   });
 
   it("doesn't turn links in the answer into live links", async () => {
     respondWith([
-      token("See [the report](https://example.com/report) [1]."),
-      final(),
+      token("See [the report](https://example.com/report)."),
+      done(),
     ]);
     const { user } = renderPanel();
 
@@ -394,9 +364,6 @@ describe("AssistantPanel", () => {
 
     expect(answer).toHaveTextContent("See the report");
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "DE · Mar 2026 · Revenue" }),
-    ).toBeInTheDocument();
   });
 
   it("says why an empty question wasn't sent", async () => {

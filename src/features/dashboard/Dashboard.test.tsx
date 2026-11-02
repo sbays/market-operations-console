@@ -13,8 +13,9 @@ import { Toaster } from "@/ui/Toaster";
 import { Dashboard } from "./Dashboard";
 
 /*
- * Expected figures are read off the generated data pack (src/pack/data.json) once and
- * written down as literals, so a selector or formatting change can't silently move them.
+ * Expected figures are read off the starter pack (src/pack/data.json) once and written down
+ * as literals, so a selector or formatting change can't silently move them. The pack runs
+ * Jun 2024 to May 2026; with no period in the URL the dashboard shows May 2026.
  */
 
 /** The dashboard as the console mounts it: dataset hydrated, URL state with memory. */
@@ -54,7 +55,7 @@ const trendFigure = () =>
   screen.getByRole("figure", { name: "Germany revenue" });
 
 describe("Dashboard", () => {
-  it("shows the portfolio for the latest full quarter when the URL is empty", () => {
+  it("shows the portfolio for the pack's latest month when the URL is empty", () => {
     renderDashboard();
 
     expect(within(breadcrumb()).getByText("Portfolio")).toHaveAttribute(
@@ -62,12 +63,13 @@ describe("Dashboard", () => {
       "page",
     );
     const kpis = keyFigures();
-    expect(kpis).toHaveTextContent("Q3 2026");
-    expect(kpis).toHaveTextContent(/Revenue\s*\$116\.8M/);
-    expect(kpis).toHaveTextContent(/Forecast attainment\s*97\.1%/);
-    expect(within(kpis).getAllByText("At risk").length).toBeGreaterThan(0);
-    expect(kpis).toHaveTextContent(/Growth vs prior year\s*\+4\.9%/);
-    expect(kpis).toHaveTextContent(/Off track or at risk\s*3 of 4/);
+    expect(kpis).toHaveTextContent("May 2026");
+    expect(kpis).toHaveTextContent(/Revenue\s*\$22\.9M/);
+    expect(kpis).toHaveTextContent(/Forecast attainment\s*100\.4%/);
+    expect(within(kpis).getAllByText("On track").length).toBeGreaterThan(0);
+    expect(kpis).toHaveTextContent(/Growth vs prior year\s*\+7\.3%/);
+    // Europe is the one region at risk.
+    expect(kpis).toHaveTextContent(/Off track or at risk\s*1 of 4/);
   });
 
   it("drills down through the breakdown, pushing history and keeping the period", async () => {
@@ -89,75 +91,80 @@ describe("Dashboard", () => {
         { name: "Germany" },
       ),
     );
-    expect(lastUrl(onUrlUpdate).query).toBe("?period=2026-03&path=eu.DE");
+    expect(lastUrl(onUrlUpdate).query).toBe("?period=2026-03&path=eu.de");
     expect(breadcrumb()).toHaveTextContent(/Portfolio.*Europe.*Germany/);
   });
 
   it("reads the selection from the URL and goes back up from the breadcrumb", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-Q3");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.de&period=2026-Q1");
 
     expect(within(breadcrumb()).getByText("Germany")).toHaveAttribute(
       "aria-current",
       "page",
     );
     const kpis = keyFigures();
-    expect(kpis).toHaveTextContent(/Revenue\s*\$13\.6M/);
-    expect(kpis).toHaveTextContent(/Forecast attainment\s*95\.4%/);
-    expect(kpis).toHaveTextContent(/Off track or at risk\s*1 of 5/);
+    expect(kpis).toHaveTextContent(/Revenue\s*\$4\.6M/);
+    expect(kpis).toHaveTextContent(/Forecast attainment\s*91\.9%/);
+    expect(kpis).toHaveTextContent(/Off track or at risk\s*5 of 5/);
 
     await user.click(
       within(breadcrumb()).getByRole("button", { name: "Europe" }),
     );
 
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu&period=2026-Q3",
+      query: "?path=eu&period=2026-Q1",
       history: "push",
     });
   });
 
   it("lets a period in the URL override the quarter, badge matching the number", () => {
-    renderDashboard("?path=eu.DE&period=2026-03");
+    renderDashboard("?path=eu.de&period=2026-03");
 
     const kpis = keyFigures();
     expect(kpis).toHaveTextContent("Mar 2026");
-    expect(kpis).toHaveTextContent(/Revenue\s*\$4M/);
-    expect(kpis).toHaveTextContent(/Forecast attainment\s*82\.1%/);
+    expect(kpis).toHaveTextContent(/Revenue\s*\$1\.2M/);
+    expect(kpis).toHaveTextContent(/Forecast attainment\s*92\.2%/);
     expect(within(kpis).getByText("Off track")).toBeInTheDocument();
-    expect(kpis).toHaveTextContent(/16\.7%/);
+    // The pack's March dip: 31% down on the prior year.
+    expect(kpis).toHaveTextContent(/Growth vs prior year\s*-31\.0%/);
   });
 
   it("picks a quarter or a month from the period picker", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-03");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.de&period=2026-03");
     const picker = screen.getByRole("combobox", { name: "Period" });
     expect(picker).toHaveDisplayValue("Mar 2026");
 
-    await user.selectOptions(picker, "Q2 2026");
+    await user.selectOptions(picker, "Q1 2026");
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu.DE&period=2026-Q2",
+      query: "?path=eu.de&period=2026-Q1",
       history: "replace",
     });
-    expect(keyFigures()).toHaveTextContent("Q2 2026");
+    expect(keyFigures()).toHaveTextContent("Q1 2026");
+    // Q2 2026 has only April and May in the pack, so it isn't offered.
+    expect(
+      within(picker).queryByRole("option", { name: "Q2 2026" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("pins the shown quarter into a link without a period, so a shared link never drifts", async () => {
-    const { onUrlUpdate } = renderDashboard("?path=eu.DE");
+  it("pins the shown month into a link without a period, so a shared link never drifts", async () => {
+    const { onUrlUpdate } = renderDashboard("?path=eu.de");
 
     await waitFor(() =>
       expect(lastUrl(onUrlUpdate)).toEqual({
-        query: "?path=eu.DE&period=2026-Q3",
+        query: "?path=eu.de&period=2026-05",
         history: "replace",
       }),
     );
     expect(screen.getByRole("combobox", { name: "Period" })).toHaveDisplayValue(
-      "Q3 2026",
+      "May 2026",
     );
   });
 
-  it("pins the shown quarter in place of a period the data doesn't cover", async () => {
-    const { onUrlUpdate } = renderDashboard("?path=eu.DE&period=2030-Q1");
+  it("pins the shown month in place of a period the data doesn't cover", async () => {
+    const { onUrlUpdate } = renderDashboard("?path=eu.de&period=2030-Q1");
 
     await waitFor(() =>
-      expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.DE&period=2026-Q3"),
+      expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.de&period=2026-05"),
     );
   });
 
@@ -165,8 +172,8 @@ describe("Dashboard", () => {
     const { onUrlUpdate } = renderDashboard("?path=xx.YY&period=2026-03");
 
     expect(within(breadcrumb()).getAllByRole("listitem")).toHaveLength(1);
-    // The portfolio's March figure; Europe's would be $15.6M.
-    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$40\.5M/);
+    // The portfolio's March figure; Europe's would be $6.4M.
+    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$21\.2M/);
     const notice =
       "That link points to something not in the data, so you're seeing the portfolio.";
     // Read aloud through the polite live region, and shown as a toast (sonner's region).
@@ -186,11 +193,11 @@ describe("Dashboard", () => {
   });
 
   it("describes the trend chart in words and offers it as a table", async () => {
-    const { user } = renderDashboard("?path=eu.DE");
+    const { user } = renderDashboard("?path=eu.de");
 
     expect(
       screen.getByRole("img", {
-        name: /^Germany revenue, Oct 2024 to Sep 2026: /,
+        name: /^Germany revenue, Jun 2024 to May 2026: /,
       }),
     ).toBeInTheDocument();
 
@@ -202,61 +209,61 @@ describe("Dashboard", () => {
       name: /Germany revenue by month/,
     });
     const march = within(table).getByRole("row", { name: /Mar 2026/ });
-    expect(march).toHaveTextContent("$4M");
+    expect(march).toHaveTextContent("$1.2M");
     expect(
       screen.queryByRole("img", { name: /Germany revenue/ }),
     ).not.toBeInTheDocument();
   });
 
   it("steps through months with the keyboard and focuses one without pushing history", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
-    const september = screen.getByRole("button", {
-      name: /^Sep 2026: revenue /,
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.de");
+    const may = screen.getByRole("button", {
+      name: /^May 2026: revenue /,
     });
-    expect(september).toHaveAttribute("tabindex", "0");
+    expect(may).toHaveAttribute("tabindex", "0");
 
-    act(() => september.focus());
+    act(() => may.focus());
     await user.keyboard("{ArrowLeft}");
-    const august = screen.getByRole("button", { name: /^Aug 2026: revenue / });
-    expect(august).toHaveFocus();
+    const april = screen.getByRole("button", { name: /^Apr 2026: revenue / });
+    expect(april).toHaveFocus();
 
     await user.keyboard("{Enter}");
 
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu.DE&period=2026-08",
+      query: "?path=eu.de&period=2026-04",
       history: "replace",
     });
-    expect(keyFigures()).toHaveTextContent("Aug 2026");
+    expect(keyFigures()).toHaveTextContent("Apr 2026");
   });
 
   it("enters the chart on the selected month, marked as current", () => {
-    renderDashboard("?path=eu.DE&period=2026-03");
+    renderDashboard("?path=eu.de&period=2026-03");
 
     const march = screen.getByRole("button", { name: /^Mar 2026: revenue / });
     expect(march).toHaveAttribute("tabindex", "0");
     expect(march).toHaveAttribute("aria-current", "date");
     expect(
-      screen.getByRole("button", { name: /^Sep 2026: revenue / }),
+      screen.getByRole("button", { name: /^May 2026: revenue / }),
     ).toHaveAttribute("tabindex", "-1");
   });
 
   it("gives each point the same figures as the table, prior year included", () => {
-    renderDashboard("?path=eu.DE");
+    renderDashboard("?path=eu.de");
 
     expect(
       screen.getByRole("button", { name: /^Mar 2026: revenue / }),
     ).toHaveAccessibleName(
-      /^Mar 2026: revenue \$4M, forecast \$[\d.]+M, prior year \$[\d.]+M\./,
+      /^Mar 2026: revenue \$1\.2M, forecast \$[\d.]+M, prior year \$[\d.]+M\./,
     );
   });
 
-  it("flags an anomaly from a product on its market's trend, naming where it comes from", async () => {
-    const { user } = renderDashboard("?path=eu.DE");
+  it("flags the pack's anomaly on its market's trend, in its own words", async () => {
+    const { user } = renderDashboard("?path=eu.de");
 
     expect(
       screen.getByRole("button", { name: /^Mar 2026: revenue / }),
     ).toHaveAccessibleName(
-      /prior year \$[\d.]+M\. Anomaly in Beacon in Germany: A distributor stock-out in Germany held back most Beacon shipments in March\.$/,
+      /prior year \$[\d.]+M\. Anomaly: Revenue fell 27% versus the prior month\.$/,
     );
     expect(
       screen.getByRole("button", { name: /^Feb 2026: revenue / }),
@@ -279,32 +286,43 @@ describe("Dashboard", () => {
     ).toBeInTheDocument();
     expect(
       within(table).getByRole("row", { name: /Mar 2026/ }),
-    ).toHaveTextContent("Beacon in Germany: A distributor stock-out");
+    ).toHaveTextContent("Revenue fell 27% versus the prior month.");
     expect(
       within(table).getByRole("row", { name: /Apr 2026/ }),
-    ).not.toHaveTextContent("stock-out");
+    ).not.toHaveTextContent("Revenue fell");
   });
 
-  it("flags an anomaly on the entity it belongs to without repeating its name", () => {
-    renderDashboard("?path=eu.DE.beacon");
+  it("flags a market's anomaly on its region's trend, naming the market", () => {
+    renderDashboard("?path=eu");
 
     expect(
-      screen.getByRole("button", { name: /^Mar 2026: revenue / }),
+      within(screen.getByRole("figure", { name: "Europe revenue" })).getByRole(
+        "button",
+        { name: /^Mar 2026: revenue / },
+      ),
     ).toHaveAccessibleName(
-      /prior year \$[\d.]+M\. Anomaly: A distributor stock-out in Germany/,
+      /Anomaly in Germany: Revenue fell 27% versus the prior month\.$/,
     );
   });
 
-  it("lists every anomaly month at the portfolio, from different entities", () => {
+  it("keeps a market's anomaly off its products' trends", () => {
+    renderDashboard("?path=eu.de.nuvora");
+
+    expect(
+      screen.getByRole("button", { name: /^Mar 2026: revenue / }),
+    ).not.toHaveAccessibleName(/Anomaly/);
+  });
+
+  it("lists the anomaly month at the portfolio", () => {
     renderDashboard("");
 
     expect(
       screen.getByRole("img", { name: /^Portfolio revenue, / }),
-    ).toHaveAccessibleName(/\. Anomalies flagged in Mar 2026 and Apr 2026\.$/);
+    ).toHaveAccessibleName(/\. Anomaly flagged in Mar 2026\.$/);
   });
 
   it("adds no anomaly column or legend item where the selection has none", async () => {
-    const { user } = renderDashboard("?path=na.US");
+    const { user } = renderDashboard("?path=na.us");
     const usTrend = screen.getByRole("figure", {
       name: "United States revenue",
     });
@@ -324,7 +342,7 @@ describe("Dashboard", () => {
   });
 
   it("keeps anomaly markers out of the executive view", () => {
-    renderDashboard("?path=eu.DE&mode=exec");
+    renderDashboard("?path=eu.de&mode=exec");
 
     expect(
       screen.getByRole("button", { name: /^Mar 2026: revenue / }),
@@ -338,12 +356,12 @@ describe("Dashboard", () => {
   });
 
   it("names each line in a legend, and reads the summary once", async () => {
-    const { user } = renderDashboard("?path=eu.DE");
+    const { user } = renderDashboard("?path=eu.de");
 
     const legend = within(trendFigure()).getByRole("list", { name: "Legend" });
     expect(legend).toHaveTextContent(/Actual.*Forecast.*Prior year/);
     // Chart mode: the svg carries the summary, so the visible copy is hidden from AT.
-    const summary = /^Germany revenue, Oct 2024 to Sep 2026: /;
+    const summary = /^Germany revenue, Jun 2024 to May 2026: /;
     expect(screen.getByText(summary)).toHaveAttribute("aria-hidden", "true");
 
     await user.click(
@@ -353,13 +371,13 @@ describe("Dashboard", () => {
   });
 
   it("ticks the compared rows, up to four, starting from the radar's defaults", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu&period=2026-Q3");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu&period=2026-Q1");
     const table = screen.getByRole("table", { name: /Europe by market/ });
     const box = (market: string) =>
       within(table).getByRole("checkbox", { name: `Compare ${market}` });
 
     // The radar's default comparison shows as ticked, so the boxes match the chart.
-    for (const market of ["Germany", "France", "United Kingdom", "Italy"]) {
+    for (const market of ["Germany", "United Kingdom", "France", "Italy"]) {
       expect(box(market)).toBeChecked();
     }
     expect(box("Spain")).toBeDisabled();
@@ -370,14 +388,14 @@ describe("Dashboard", () => {
     // Unticking one keeps the other three rather than collapsing to one.
     await user.click(box("Germany"));
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu&period=2026-Q3&compare=eu.FR,eu.GB,eu.IT",
+      query: "?path=eu&period=2026-Q1&compare=eu.gb,eu.fr,eu.it",
       history: "replace",
     });
     expect(box("Spain")).toBeEnabled();
 
     await user.click(box("Spain"));
     expect(lastUrl(onUrlUpdate).query).toBe(
-      "?path=eu&period=2026-Q3&compare=eu.FR,eu.GB,eu.IT,eu.ES",
+      "?path=eu&period=2026-Q1&compare=eu.gb,eu.fr,eu.it,eu.es",
     );
   });
 
@@ -398,7 +416,7 @@ describe("Dashboard", () => {
   });
 
   it("compares the new level's children after a drill", async () => {
-    const { user } = renderDashboard("?path=eu&compare=eu.DE,eu.ES");
+    const { user } = renderDashboard("?path=eu&compare=eu.de,eu.es");
     const table = screen.getByRole("table", { name: /Europe by market/ });
 
     await user.click(within(table).getByRole("button", { name: "Germany" }));
@@ -411,38 +429,39 @@ describe("Dashboard", () => {
   });
 
   it("focuses a month from the heat map, and the key figures follow", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.de");
 
     await user.click(
-      screen.getByRole("button", { name: /^Beacon in Germany, Mar 2026: / }),
+      screen.getByRole("button", { name: /^Nuvora in Germany, Mar 2026: / }),
     );
 
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu.DE&period=2026-03",
+      query: "?path=eu.de&period=2026-03",
       history: "replace",
     });
-    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$4M/);
+    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$1\.2M/);
   });
 
   it("drills to a market from the map", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?period=2026-Q3");
+    const { user, onUrlUpdate } = renderDashboard("?period=2026-Q1");
 
     await user.click(
       await screen.findByRole("button", { name: /^Germany: attainment / }),
     );
 
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?period=2026-Q3&path=eu.DE",
+      query: "?period=2026-Q1&path=eu.de",
       history: "push",
     });
     expect(breadcrumb()).toHaveTextContent(/Portfolio.*Europe.*Germany/);
   });
 
   it("shows every panel in analyst mode, the default", () => {
-    renderDashboard("?path=eu.DE");
+    renderDashboard("?path=eu.de");
 
-    expect(keyFigures()).toHaveTextContent(/Units\s*141\.9K/);
-    expect(keyFigures()).toHaveTextContent(/Market share\s*19\.6%/);
+    expect(keyFigures()).toHaveTextContent(/Units\s*7\.6K/);
+    // The pack's own share for Germany in May 2026.
+    expect(keyFigures()).toHaveTextContent(/Market share\s*8\.9%/);
     expect(
       within(trendFigure()).getByRole("list", { name: "Legend" }),
     ).toHaveTextContent("Prior year");
@@ -454,10 +473,10 @@ describe("Dashboard", () => {
   });
 
   it("hides the dense panels in exec mode", () => {
-    renderDashboard("?path=eu.DE&mode=exec");
+    renderDashboard("?path=eu.de&mode=exec");
 
     expect(keyFigures()).not.toHaveTextContent("Units");
-    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$13\.6M/);
+    expect(keyFigures()).toHaveTextContent(/Revenue\s*\$1\.7M/);
     expect(
       within(trendFigure()).getByRole("list", { name: "Legend" }),
     ).not.toHaveTextContent("Prior year");
@@ -470,11 +489,11 @@ describe("Dashboard", () => {
   });
 
   it("switches mode from the toggle, replacing history", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-Q3");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.de&period=2026-Q1");
 
     await user.click(screen.getByRole("button", { name: "Exec" }));
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu.DE&period=2026-Q3&mode=exec",
+      query: "?path=eu.de&period=2026-Q1&mode=exec",
       history: "replace",
     });
     expect(screen.getByRole("button", { name: "Exec" })).toHaveAttribute(
@@ -483,17 +502,17 @@ describe("Dashboard", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Analyst" }));
-    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.DE&period=2026-Q3");
+    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu.de&period=2026-Q1");
   });
 
   it("drills from a top risk, and the other panels follow", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=latam&period=2026-Q2");
+    const { user, onUrlUpdate } = renderDashboard("?path=latam&period=2026-05");
     const risks = screen.getByRole("region", { name: "Top risks" });
 
     await user.click(within(risks).getByRole("button", { name: "Brazil" }));
 
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=latam.BR&period=2026-Q2",
+      query: "?path=latam.br&period=2026-05",
       history: "push",
     });
     expect(within(breadcrumb()).getByText("Brazil")).toHaveAttribute(
@@ -517,7 +536,7 @@ describe("Dashboard", () => {
   });
 
   it("goes up a level on Escape from inside the dashboard, pushing history", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-03");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.de&period=2026-03");
     const march = within(trendFigure()).getByRole("button", {
       name: /^Mar 2026:/,
     });
@@ -532,7 +551,7 @@ describe("Dashboard", () => {
   });
 
   it("ignores Escape outside the dashboard", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-Q3");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.de&period=2026-Q1");
     // Stands in for the chat input beside the dashboard.
     const chatInput = document.createElement("input");
     document.body.append(chatInput);
@@ -544,7 +563,7 @@ describe("Dashboard", () => {
   });
 
   it("does nothing on Escape at the portfolio", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?period=2026-Q3");
+    const { user, onUrlUpdate } = renderDashboard("?period=2026-Q1");
 
     act(() => screen.getByRole("button", { name: "Analyst" }).focus());
     await user.keyboard("{Escape}");
@@ -559,7 +578,9 @@ describe("Dashboard", () => {
       within(screen.getByRole("figure", { name: /and month$/ }))
         .getAllByRole("button", { name: /, \w{3} \d{4}: / })
         .filter((cell) => cell.tabIndex === 0);
-    expect(within(radar()).getByRole("img")).toHaveAccessibleName(/in Q3 2026/);
+    expect(within(radar()).getByRole("img")).toHaveAccessibleName(
+      /in May 2026/,
+    );
 
     await user.click(
       within(screen.getByRole("figure", { name: "Europe revenue" })).getByRole(
@@ -578,7 +599,7 @@ describe("Dashboard", () => {
   });
 
   it("moves focus to the key figures after Escape, so the next Escape still works", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-Q3");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.de&period=2026-Q1");
     act(() =>
       within(screen.getByRole("table", { name: /Germany by product/ }))
         .getAllByRole("checkbox")[0]
@@ -588,11 +609,11 @@ describe("Dashboard", () => {
     await user.keyboard("{Escape}");
     expect(keyFigures()).toHaveFocus();
     await user.keyboard("{Escape}");
-    expect(lastUrl(onUrlUpdate).query).toBe("?period=2026-Q3");
+    expect(lastUrl(onUrlUpdate).query).toBe("?period=2026-Q1");
   });
 
   it("goes up on Escape when nothing has focus, as after a click in Safari", async () => {
-    const { user, onUrlUpdate } = renderDashboard("?path=eu.DE&period=2026-Q3");
+    const { user, onUrlUpdate } = renderDashboard("?path=eu.de&period=2026-Q1");
     act(() => {
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
@@ -600,7 +621,7 @@ describe("Dashboard", () => {
     });
 
     await user.keyboard("{Escape}");
-    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu&period=2026-Q3");
+    expect(lastUrl(onUrlUpdate).query).toBe("?path=eu&period=2026-Q1");
   });
 });
 
@@ -668,7 +689,7 @@ describe("Dashboard: linked highlighting", () => {
       within(tableRow("Germany")).getByRole("button", { name: "Germany" }),
     );
 
-    // Without clearing, "eu.DE" would link every one of Germany's products.
+    // Without clearing, "eu.de" would link every one of Germany's products.
     expect(
       screen.getByRole("table", { name: /Germany by product/ }),
     ).toBeInTheDocument();
@@ -676,7 +697,7 @@ describe("Dashboard: linked highlighting", () => {
   });
 
   it("emphasises a hovered market among the top risks", async () => {
-    const { user } = renderDashboard("?path=latam&period=2026-Q2");
+    const { user } = renderDashboard("?path=latam&period=2026-05");
     const risks = screen.getByRole("region", { name: "Top risks" });
 
     await user.hover(tableRow("Brazil"));

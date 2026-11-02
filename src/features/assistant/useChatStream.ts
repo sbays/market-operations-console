@@ -8,29 +8,33 @@
  */
 import { useEffect, useReducer, useRef } from "react";
 import { ChatRequestError, streamChat } from "@/data/chatStream";
-import type { StreamEvent } from "@/domain/schema";
+import type { DoneEvent } from "@/domain/schema";
 
-type FinalEvent = Extract<StreamEvent, { type: "final" }>;
-type AbstainEvent = Extract<StreamEvent, { type: "abstain" }>;
+/** A `done` event that carries an answer, full or hedged. */
+export type AnswerEvent = DoneEvent & { kind: "normal" | "low_confidence" };
 
 type Run = { question: string; text: string };
 
-/** Each status carries exactly what it needs: a complete answer always has its evidence. */
+/**
+ * Each status carries exactly what it needs: a complete answer always has its evidence. An
+ * abstention's reason is its streamed text; every error can be retried, since the pack's
+ * errors don't say otherwise.
+ */
 export type ChatState =
   | { status: "idle" }
   | ({ status: "connecting" | "streaming" | "stopped" } & Run)
-  | ({ status: "complete"; final: FinalEvent } & Run)
-  | ({ status: "abstained"; abstain: AbstainEvent } & Run)
-  | ({ status: "error"; error: { message: string; retryable: boolean } } & Run);
+  | ({ status: "complete"; done: AnswerEvent } & Run)
+  | ({ status: "abstained" } & Run)
+  | ({ status: "error"; error: { message: string } } & Run);
 
 export type ChatStatus = ChatState["status"];
 
 type Action =
   | { type: "start"; question: string }
   | { type: "tokens"; text: string }
-  | { type: "final"; event: FinalEvent }
-  | { type: "abstain"; event: AbstainEvent }
-  | { type: "error"; message: string; retryable: boolean }
+  | { type: "complete"; event: AnswerEvent }
+  | { type: "abstain" }
+  | { type: "error"; message: string }
   | { type: "stop" };
 
 const initialState: ChatState = { status: "idle" };
@@ -47,16 +51,12 @@ function reducer(state: ChatState, action: Action): ChatState {
   switch (action.type) {
     case "tokens":
       return { ...run, status: "streaming", text: run.text + action.text };
-    case "final":
-      return { ...run, status: "complete", final: action.event };
+    case "complete":
+      return { ...run, status: "complete", done: action.event };
     case "abstain":
-      return { ...run, status: "abstained", abstain: action.event };
+      return { ...run, status: "abstained" };
     case "error":
-      return {
-        ...run,
-        status: "error",
-        error: { message: action.message, retryable: action.retryable },
-      };
+      return { ...run, status: "error", error: { message: action.message } };
     case "stop":
       return { ...run, status: "stopped" };
   }
@@ -66,6 +66,20 @@ const INTERRUPTED = "Answer interrupted";
 const ENDED_EARLY = "The answer ended before it was complete.";
 const UNREACHABLE = "Couldn't reach the assistant.";
 const UNAVAILABLE = "The assistant isn't available right now.";
+const FAILED = "The assistant couldn't answer.";
+
+/** What a `done` event ends the run as. */
+function doneAction(event: DoneEvent): Action {
+  switch (event.kind) {
+    case "normal":
+    case "low_confidence":
+      return { type: "complete", event: { ...event, kind: event.kind } };
+    case "abstain":
+      return { type: "abstain" };
+    case "error":
+      return { type: "error", message: FAILED };
+  }
+}
 
 export function useChatStream() {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -106,7 +120,7 @@ export function useChatStream() {
       current.abort();
     };
     const fail = (message: string) => {
-      if (isCurrent()) settle({ type: "error", message, retryable: true });
+      if (isCurrent()) settle({ type: "error", message });
     };
 
     void (async () => {
@@ -123,18 +137,12 @@ export function useChatStream() {
           const event = item.event;
           switch (event.type) {
             case "token":
-              append(event.text);
+              append(event.value);
               continue;
-            case "final":
-              return settle({ type: "final", event });
-            case "abstain":
-              return settle({ type: "abstain", event });
+            case "done":
+              return settle(doneAction(event));
             case "error":
-              return settle({
-                type: "error",
-                message: event.message,
-                retryable: event.retryable,
-              });
+              return settle({ type: "error", message: event.message });
           }
         }
         fail(ENDED_EARLY);

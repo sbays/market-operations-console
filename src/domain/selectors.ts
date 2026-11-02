@@ -18,8 +18,9 @@ import { formatPercent, formatPoints, PERCENT_DECIMALS } from "./format";
 import { monthKey, monthsOfQuarter, parsePeriod, quarterKey } from "./period";
 
 /**
- * Attainment thresholds for status, judged over the period shown: the latest quarter by
- * default, or the quarter or month a reader picks.
+ * Status thresholds, judged over the period shown: the latest month by default, or the month
+ * or quarter a reader picks. With "shrinking is off track" (statusFor), they reproduce every
+ * status the starter pack states (docs/PLAN.md, Data layer).
  */
 export const ON_TRACK_FROM = 0.98;
 export const AT_RISK_FROM = 0.92;
@@ -39,29 +40,68 @@ export function expandPeriod(dataset: Dataset, period: PeriodRef): Month[] {
   return months.every((m) => dataset.periods.includes(m)) ? months : [];
 }
 
-/** Every product-market series under an entity, or undefined if the entity isn't in the data. */
-function seriesUnder(dataset: Dataset, ref: EntityRef): Point[][] | undefined {
-  const all = (markets: Dataset["markets"]) =>
-    markets.flatMap((market) => Object.values(market.series));
+type Market = Dataset["markets"][number];
+
+/**
+ * The markets an entity sits in, each with the series under the entity there, or undefined if
+ * the entity isn't in the data.
+ */
+function marketsUnder(
+  dataset: Dataset,
+  ref: EntityRef,
+): { market: Market; series: Point[][] }[] | undefined {
+  const whole = (market: Market) => ({
+    market,
+    series: Object.values(market.series),
+  });
 
   switch (ref.level) {
     case "portfolio":
-      return all(dataset.markets);
+      return dataset.markets.map(whole);
     case "region": {
       if (!dataset.regions.some((r) => r.id === ref.id)) return undefined;
-      return all(dataset.markets.filter((m) => m.regionId === ref.id));
+      return dataset.markets.filter((m) => m.regionId === ref.id).map(whole);
     }
     case "market": {
       const market = dataset.markets.find((m) => m.id === ref.id);
-      return market && Object.values(market.series);
+      return market && [whole(market)];
     }
     case "product": {
-      const series = dataset.markets.find((m) => m.id === ref.marketId)?.series[
-        ref.id
-      ];
-      return series && [series];
+      const market = dataset.markets.find((m) => m.id === ref.marketId);
+      const series = market?.series[ref.id];
+      return market && series && [{ market, series: [series] }];
     }
   }
+}
+
+/** Every product-market series under an entity, or undefined if the entity isn't in the data. */
+function seriesUnder(dataset: Dataset, ref: EntityRef): Point[][] | undefined {
+  return marketsUnder(dataset, ref)?.flatMap(({ series }) => series);
+}
+
+/**
+ * Share over some months: revenue over the category revenue of the markets it is earned in.
+ * Undefined unless every one of those markets states a market size for every month, so a
+ * share is never computed from part of its market.
+ */
+function shareOver(
+  dataset: Dataset,
+  ref: EntityRef,
+  months: Month[],
+): number | undefined {
+  const markets = marketsUnder(dataset, ref);
+  if (!markets) return undefined;
+  let actual = 0;
+  let marketSize = 0;
+  for (const { market, series } of markets) {
+    for (const month of months) {
+      const size = market.marketSize[month];
+      if (size === undefined) return undefined;
+      marketSize += size;
+    }
+    actual += totals(series, months).actual;
+  }
+  return ratio(actual, marketSize);
 }
 
 type Totals = Omit<Point, "period">;
@@ -77,7 +117,6 @@ function totals(series: Point[][], months: Month[]): Totals {
     units: 0,
     forecast: 0,
     priorYear: 0,
-    marketSize: 0,
   };
   for (const points of series) {
     for (const point of points) {
@@ -86,7 +125,6 @@ function totals(series: Point[][], months: Month[]): Totals {
       sum.units += point.units;
       sum.forecast += point.forecast;
       sum.priorYear += point.priorYear;
-      sum.marketSize += point.marketSize;
     }
   }
   return sum;
@@ -121,7 +159,7 @@ export function valueAt(
       return vsPriorYear === undefined ? undefined : vsPriorYear - 1;
     }
     case "share":
-      return ratio(sum.actual, sum.marketSize);
+      return shareOver(dataset, ref, months);
   }
 }
 
@@ -134,19 +172,29 @@ export function displayedRatio(ratio: number): number {
   return Math.round(ratio * scale) / scale;
 }
 
-export function statusForAttainment(attainment: number): Status {
+/** What a status is judged on. Growth is undefined when there is no prior year to compare. */
+export type StatusInputs = { attainment: number; growth: number | undefined };
+
+/**
+ * Off track when far under forecast or shrinking against the prior year, at risk when somewhat
+ * under forecast. Judged on the values as displayed, so a badge never contradicts its numbers.
+ */
+export function statusFor({ attainment, growth }: StatusInputs): Status {
   const displayed = displayedRatio(attainment);
-  if (displayed >= ON_TRACK_FROM) return "on-track";
-  if (displayed >= AT_RISK_FROM) return "at-risk";
-  return "off-track";
+  const shrinking = growth !== undefined && displayedRatio(growth) < 0;
+  if (displayed < AT_RISK_FROM || shrinking) return "off-track";
+  if (displayed < ON_TRACK_FROM) return "at-risk";
+  return "on-track";
 }
 
-export function statusOf(
+function statusInputs(
   dataset: Dataset,
   ref: EntityRef,
-  quarter: Quarter,
-): Status | undefined {
-  return statusAt(dataset, ref, quarter);
+  period: PeriodRef,
+): StatusInputs | undefined {
+  const attainment = valueAt(dataset, ref, period, "attainment");
+  if (attainment === undefined) return undefined;
+  return { attainment, growth: valueAt(dataset, ref, period, "growth") };
 }
 
 /** The status of an entity over a month or a quarter, or undefined outside the data. */
@@ -155,33 +203,8 @@ export function statusAt(
   ref: EntityRef,
   period: PeriodRef,
 ): Status | undefined {
-  const attainment = valueAt(dataset, ref, period, "attainment");
-  return attainment === undefined ? undefined : statusForAttainment(attainment);
-}
-
-export function statusCounts(
-  dataset: Dataset,
-  quarter: Quarter,
-): Record<Status, number> {
-  const counts: Record<Status, number> = {
-    "on-track": 0,
-    "at-risk": 0,
-    "off-track": 0,
-  };
-  for (const market of dataset.markets) {
-    const status = statusOf(
-      dataset,
-      { level: "market", id: market.id },
-      quarter,
-    );
-    if (status) counts[status] += 1;
-  }
-  return counts;
-}
-
-/** The most recent quarter whose three months are all in the data. */
-export function latestQuarter(dataset: Dataset): Quarter | undefined {
-  return periodOptions(dataset).quarters[0];
+  const inputs = statusInputs(dataset, ref, period);
+  return inputs && statusFor(inputs);
 }
 
 /** The periods a reader can pick: every quarter the data fully covers, and every month, newest first. */
@@ -203,7 +226,7 @@ export function periodOptions(dataset: Dataset): {
 
 /**
  * The period a view should show: the requested one when the data covers it, otherwise the
- * latest complete quarter, otherwise the last month.
+ * latest month, which is when the starter pack states its KPIs.
  */
 export function selectionPeriod(
   dataset: Dataset,
@@ -212,7 +235,7 @@ export function selectionPeriod(
   if (period !== null && expandPeriod(dataset, period).length > 0) {
     return period;
   }
-  return latestQuarter(dataset) ?? coverageOf(dataset).to;
+  return coverageOf(dataset).to;
 }
 
 /** The entities one level below `ref`, in dataset order. */
@@ -309,18 +332,6 @@ export function topMovers(
   };
 }
 
-export type ConfidenceBand = "high" | "medium" | "low";
-
-/** Model confidence thresholds for the High / Medium / Low badge. */
-export const HIGH_CONFIDENCE_FROM = 0.75;
-export const MEDIUM_CONFIDENCE_FROM = 0.5;
-
-export function confidenceBand(confidence: number): ConfidenceBand {
-  if (confidence >= HIGH_CONFIDENCE_FROM) return "high";
-  if (confidence >= MEDIUM_CONFIDENCE_FROM) return "medium";
-  return "low";
-}
-
 /** The months the data covers, as quoted by an abstention. */
 export function coverageOf(dataset: Dataset): { from: Month; to: Month } {
   const from = dataset.periods[0];
@@ -384,7 +395,7 @@ export function pathOf(
   }
 }
 
-/** True when `ancestor` is a strict ancestor of `path` by whole segments ("eu" of "eu.DE"). */
+/** True when `ancestor` is a strict ancestor of `path` by whole segments ("eu" of "eu.de"). */
 export function isAncestorPath(
   ancestor: EntityPath,
   path: EntityPath,
@@ -399,7 +410,7 @@ export function coversPath(scope: EntityPath, path: EntityPath): boolean {
   return path === scope || isAncestorPath(scope, path);
 }
 
-/** A display name for any entity: "Germany", "Beacon in Germany". */
+/** A display name for any entity: "Germany", "Nuvora in Germany". */
 export function entityName(
   dataset: Dataset,
   ref: EntityRef,
@@ -422,16 +433,18 @@ export function entityName(
 }
 
 /**
- * The short label a citation chip shows: market codes as the data writes them, names
- * otherwise. Never undefined, so a citation the data can't resolve still says what it cites.
+ * The short label a citation chip shows: a market's ISO code ("de"), names otherwise. Never
+ * undefined, so a citation the data can't resolve still says what it cites.
  */
 export function entityCode(dataset: Dataset, ref: EntityRef): string {
+  const marketCode = (id: string) =>
+    dataset.markets.find((m) => m.id === id)?.iso2 ?? id;
   switch (ref.level) {
     case "market":
-      return ref.id;
+      return marketCode(ref.id);
     case "product": {
       const product = dataset.products.find((p) => p.id === ref.id);
-      return `${ref.marketId} ${product?.name ?? ref.id}`;
+      return `${marketCode(ref.marketId)} ${product?.name ?? ref.id}`;
     }
     case "region":
       return entityName(dataset, ref) ?? ref.id;
@@ -483,6 +496,15 @@ export type Risk = {
   reason: string;
 };
 
+/** Why a status was given, in one sentence: the shortfall, or the decline when that decided it. */
+function statusSentence({ attainment, growth }: StatusInputs): string {
+  const displayed = displayedRatio(attainment);
+  if (displayed >= AT_RISK_FROM && growth !== undefined && growth < 0) {
+    return `Revenue ${formatPercent(displayedRatio(growth), { signed: true })} on the prior year, at ${formatPercent(displayed)} of forecast.`;
+  }
+  return `Attainment ${formatPercent(displayed)}, ${formatPoints((1 - displayed) * 100)} under forecast.`;
+}
+
 /**
  * The reason a risk is shown: the note of an anomaly recorded against that child in the period
  * shown, or else a sentence about the shortfall. The note is only used when the child's path
@@ -492,7 +514,7 @@ function riskReason(
   dataset: Dataset,
   ref: EntityRef,
   period: PeriodRef,
-  attainment: number,
+  inputs: StatusInputs,
 ): string {
   const path = pathOf(dataset, ref);
   const months = expandPeriod(dataset, period);
@@ -504,14 +526,12 @@ function riskReason(
             pathOf(dataset, anomaly.ref) === path &&
             months.includes(anomaly.period),
         )?.note;
-  if (note !== undefined) return note;
-  const displayed = displayedRatio(attainment);
-  return `Attainment ${formatPercent(displayed)}, ${formatPoints((1 - displayed) * 100)} under forecast.`;
+  return note ?? statusSentence(inputs);
 }
 
 /**
- * The children of `selected` that are at risk or off track over a period, lowest attainment
- * first, at most `count`. Children with no status (outside the data) are left out.
+ * The children of `selected` that are at risk or off track over a period, off track first and
+ * then lowest attainment, at most `count`. Children with no status (outside the data) are left out.
  */
 export function topRisks(
   dataset: Dataset,
@@ -522,24 +542,29 @@ export function topRisks(
   const flagged: {
     ref: EntityRef;
     status: Risk["status"];
-    attainment: number;
+    inputs: StatusInputs;
   }[] = [];
   for (const ref of childrenOf(dataset, selected)) {
-    const attainment = valueAt(dataset, ref, period, "attainment");
-    if (attainment === undefined) continue;
-    // The same status statusAt would give, without reading the attainment twice.
-    const status = statusForAttainment(attainment);
+    const inputs = statusInputs(dataset, ref, period);
+    if (!inputs) continue;
+    const status = statusFor(inputs);
     if (status === "on-track") continue;
-    flagged.push({ ref, status, attainment });
+    flagged.push({ ref, status, inputs });
   }
+  // Off track first, then by attainment, lowest first.
+  const rank = (status: Risk["status"]) => (status === "off-track" ? 0 : 1);
   return flagged
-    .sort((a, b) => a.attainment - b.attainment)
+    .sort(
+      (a, b) =>
+        rank(a.status) - rank(b.status) ||
+        a.inputs.attainment - b.inputs.attainment,
+    )
     .slice(0, Math.max(0, count))
-    .map(({ ref, status, attainment }) => ({
+    .map(({ ref, status, inputs }) => ({
       ref,
       status,
-      attainment,
-      reason: riskReason(dataset, ref, period, attainment),
+      attainment: inputs.attainment,
+      reason: riskReason(dataset, ref, period, inputs),
     }));
 }
 
@@ -547,7 +572,7 @@ export type TrendAnomaly = { period: Month; ref: EntityRef; note: string };
 
 /**
  * The revenue anomalies behind a selection's trend, in period order. A child's anomaly shows
- * on every ancestor, because the parent's line is the sum of its children: the Beacon
+ * on every ancestor, because the parent's line is the sum of its children: the Nuvora
  * stock-out is Germany's March dip too. A parent's or a sibling's never shows. Unlike a risk's
  * reason, each anomaly keeps its own ref, so a label can name where it comes from.
  */

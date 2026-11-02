@@ -130,7 +130,14 @@ function mapSummary(
   const when = formatPeriod(period);
   const lowest = shown[0];
   const highest = shown.at(-1);
-  if (!lowest || !highest) return `No market data for ${when}.`;
+  if (!lowest || !highest) {
+    // Share is the usual case: the pack states it for its latest month only.
+    const what =
+      metric === "attainment"
+        ? "market"
+        : formatMetricShortName(metric).toLowerCase();
+    return `No ${what} data for ${when}.`;
+  }
   if (selected.level === "market" || selected.level === "product") {
     return `${markLabel(lowest, metric)}, in ${when}.`;
   }

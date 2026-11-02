@@ -71,7 +71,10 @@ export function createSseParser(): SseParser {
   };
 }
 
-/** One event as one frame. JSON.stringify never emits a raw newline, so one data line suffices. */
+/**
+ * One event as one frame, as the pack's contract writes it: a single `data:` line, no `event:`
+ * line. JSON.stringify never emits a raw newline, so one data line suffices.
+ */
 export function encodeSseEvent(event: StreamEvent): string {
-  return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
+  return `data: ${JSON.stringify(event)}\n\n`;
 }

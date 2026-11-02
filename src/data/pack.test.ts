@@ -1,27 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { formatMetric } from "@/domain/format";
-import type { EntityRef } from "@/domain/schema";
+import rawDataset from "@/pack/data.json";
+import { resolveCitation } from "@/domain/citations";
+import { matchFixture } from "@/domain/fixtures";
+import type { EntityRef, Status } from "@/domain/schema";
 import {
-  latestQuarter,
-  ON_TRACK_FROM,
-  statusOf,
+  displayedRatio,
+  selectionPeriod,
+  statusAt,
   valueAt,
 } from "@/domain/selectors";
+import { StarterPackSchema } from "@/domain/starterPack";
 import { loadDataset, loadFixtures } from "./pack";
+import { SUGGESTED_QUESTIONS } from "./suggestions";
 
 const dataset = loadDataset();
+const pack = StarterPackSchema.parse(rawDataset);
+const latest = pack.meta.latestPeriod;
 
 const market = (id: string): EntityRef => ({ level: "market", id });
-const product = (marketId: string, id: string): EntityRef => ({
-  level: "product",
-  marketId,
-  id,
-});
 
-describe("generated dataset", () => {
-  it("covers 24 months, 4 regions, 12 markets and 5 products", () => {
-    expect(dataset.periods[0]).toBe("2024-10");
-    expect(dataset.periods.at(-1)).toBe("2026-09");
+const PACK_STATUS: Record<
+  (typeof pack.markets)[number]["kpis"]["status"],
+  Status
+> = {
+  on_track: "on-track",
+  at_risk: "at-risk",
+  off_track: "off-track",
+};
+
+describe("the starter pack, as loaded", () => {
+  it("covers 24 months to May 2026, 4 regions, 13 markets and 5 products", () => {
+    expect(dataset.periods[0]).toBe("2024-06");
+    expect(dataset.periods.at(-1)).toBe("2026-05");
     expect(dataset.periods).toHaveLength(24);
     expect(dataset.regions.map((r) => r.id)).toEqual([
       "na",
@@ -29,299 +39,122 @@ describe("generated dataset", () => {
       "apac",
       "latam",
     ]);
-    expect(dataset.markets.map((m) => m.id)).toEqual([
-      "US",
-      "CA",
-      "DE",
-      "FR",
-      "GB",
-      "IT",
-      "ES",
-      "JP",
-      "AU",
-      "IN",
-      "BR",
-      "MX",
-    ]);
+    expect(dataset.markets.map((m) => m.id)).toEqual(
+      pack.markets.map((m) => m.id),
+    );
+    expect(dataset.markets).toHaveLength(13);
     expect(dataset.products).toHaveLength(5);
   });
+
+  it("opens on the pack's latest month", () => {
+    expect(selectionPeriod(dataset, null)).toBe(latest);
+  });
 });
 
-describe("story: why did Germany's revenue dip in March 2026?", () => {
-  it("Germany missed forecast by about a fifth in March", () => {
-    const attainment = valueAt(dataset, market("DE"), "2026-03", "attainment");
-    expect(attainment).toBeGreaterThan(0.78);
-    expect(attainment).toBeLessThan(0.85);
-  });
-
-  it("the miss is concentrated in Beacon", () => {
-    expect(
-      valueAt(dataset, product("DE", "beacon"), "2026-03", "attainment"),
-    ).toBeLessThan(0.6);
-    for (const other of ["atlas", "cirrus", "delta", "ember"]) {
+/**
+ * The pack precomputes KPIs at its latest month; the app recomputes them from the fact table.
+ * These hold the selectors to the pack, so the dashboard never contradicts it.
+ */
+describe("selectors reproduce the pack's KPIs at its latest month", () => {
+  it.each(pack.markets.map((m) => [m.id, m.kpis] as const))(
+    "%s",
+    (id, kpis) => {
+      const ref = market(id);
+      expect(statusAt(dataset, ref, latest)).toBe(PACK_STATUS[kpis.status]);
       expect(
-        valueAt(dataset, product("DE", other), "2026-03", "attainment"),
-      ).toBeGreaterThan(0.9);
-    }
-  });
+        displayedRatio(valueAt(dataset, ref, latest, "growth") ?? NaN),
+      ).toBe(displayedRatio(kpis.growthPct / 100));
+      expect(
+        displayedRatio(valueAt(dataset, ref, latest, "share") ?? NaN),
+      ).toBe(displayedRatio(kpis.sharePct / 100));
+      // The pack's revenue is the sum of its own rows to within rounding ($2).
+      expect(
+        Math.abs(
+          (valueAt(dataset, ref, latest, "revenue") ?? NaN) - kpis.revenue,
+        ),
+      ).toBeLessThanOrEqual(2);
+      // Its precomputed attainment drifts from its own rows by up to 1.1 points (India:
+      // 103.1% stated, 104.2% from the rows). The rows are the facts, so the app shows those.
+      expect(
+        Math.abs(
+          (valueAt(dataset, ref, latest, "attainment") ?? NaN) -
+            kpis.forecastAttainmentPct / 100,
+        ),
+      ).toBeLessThanOrEqual(0.012);
+    },
+  );
 
-  it("the stock-out cost Beacon market share: the category didn't shrink", () => {
-    const beacon = product("DE", "beacon");
-    const february = valueAt(dataset, beacon, "2026-02", "share") ?? 0;
-    const march = valueAt(dataset, beacon, "2026-03", "share") ?? 0;
-    expect(march).toBeLessThan(february * 0.6);
-  });
-
-  it("Germany is back on forecast by May", () => {
-    expect(
-      valueAt(dataset, market("DE"), "2026-05", "attainment"),
-    ).toBeGreaterThanOrEqual(ON_TRACK_FROM);
-  });
-
-  it("an anomaly explains the March dip", () => {
-    expect(dataset.anomalies).toContainEqual(
-      expect.objectContaining({
-        ref: product("DE", "beacon"),
-        period: "2026-03",
-        metric: "revenue",
-      }),
-    );
+  it("has no share for any other month", () => {
+    expect(valueAt(dataset, market("de"), "2026-04", "share")).toBeUndefined();
   });
 });
 
-describe("story: which markets are at risk this quarter, and why?", () => {
-  it("this quarter is Q3 2026, the last complete quarter", () => {
-    expect(latestQuarter(dataset)).toBe("2026-Q3");
-  });
-
-  it("Brazil is off-track; Germany, Japan and India are at risk; the rest are on track", () => {
-    const statuses = Object.fromEntries(
-      dataset.markets.map((m) => [
-        m.id,
-        statusOf(dataset, market(m.id), "2026-Q3"),
-      ]),
-    );
-    expect(statuses).toEqual({
-      US: "on-track",
-      CA: "on-track",
-      DE: "at-risk",
-      FR: "on-track",
-      GB: "on-track",
-      IT: "on-track",
-      ES: "on-track",
-      JP: "at-risk",
-      AU: "on-track",
-      IN: "at-risk",
-      BR: "off-track",
-      MX: "on-track",
+describe("the pack's story", () => {
+  it("Germany is off track, with a sharp revenue dip in March 2026", () => {
+    expect(statusAt(dataset, market("de"), latest)).toBe("off-track");
+    const february = valueAt(dataset, market("de"), "2026-02", "revenue") ?? 0;
+    const march = valueAt(dataset, market("de"), "2026-03", "revenue") ?? 0;
+    // The pack's note: "Revenue fell 27% versus the prior month."
+    expect(displayedRatio(march / february - 1)).toBeCloseTo(-0.27, 2);
+    expect(dataset.anomalies).toContainEqual({
+      ref: market("de"),
+      period: "2026-03",
+      metric: "revenue",
+      note: "Revenue fell 27% versus the prior month.",
     });
   });
-});
 
-describe("story: compare APAC and Europe on growth and forecast attainment", () => {
-  const apac: EntityRef = { level: "region", id: "apac" };
-  const europe: EntityRef = { level: "region", id: "eu" };
-
-  it("APAC grows much faster than Europe", () => {
-    expect(valueAt(dataset, apac, "2026-Q3", "growth")).toBeGreaterThan(0.09);
-    const europeGrowth = valueAt(dataset, europe, "2026-Q3", "growth");
-    expect(europeGrowth).toBeGreaterThan(0);
-    expect(europeGrowth).toBeLessThan(0.04);
-  });
-
-  it("but APAC misses its forecast while Europe nearly meets it", () => {
-    expect(valueAt(dataset, apac, "2026-Q3", "attainment")).toBeLessThan(0.96);
-    expect(valueAt(dataset, europe, "2026-Q3", "attainment")).toBeGreaterThan(
-      0.975,
-    );
-  });
-});
-
-describe("story: what's driving the portfolio's forecast miss?", () => {
-  const lastTwoQuarters = ["2026-Q2", "2026-Q3"] as const;
-
-  /** Forecast minus revenue for one product summed across every market. */
-  function productShortfall(productId: string): number {
-    let gap = 0;
-    for (const m of dataset.markets) {
-      for (const quarter of lastTwoQuarters) {
-        const ref = product(m.id, productId);
-        gap +=
-          (valueAt(dataset, ref, quarter, "forecast") ?? 0) -
-          (valueAt(dataset, ref, quarter, "revenue") ?? 0);
-      }
-    }
-    return gap;
-  }
-
-  it("the portfolio has been at risk for two quarters running, after an on-track Q1", () => {
-    expect(statusOf(dataset, { level: "portfolio" }, "2026-Q1")).toBe(
-      "on-track",
-    );
-    for (const quarter of lastTwoQuarters) {
-      expect(statusOf(dataset, { level: "portfolio" }, quarter)).toBe(
-        "at-risk",
-      );
+  it("Italy and Brazil are at risk", () => {
+    for (const id of ["it", "br"]) {
+      expect(statusAt(dataset, market(id), latest), id).toBe("at-risk");
     }
   });
 
-  it("Cirrus accounts for the largest shortfall of any product", () => {
-    const shortfalls = dataset.products
-      .map((p) => ({ id: p.id, gap: productShortfall(p.id) }))
-      .sort((a, b) => b.gap - a.gap);
-    expect(shortfalls[0]?.id).toBe("cirrus");
+  it("China, Japan and the United States are on or ahead of plan", () => {
+    for (const id of ["cn", "jp", "us"]) {
+      expect(statusAt(dataset, market(id), latest), id).toBe("on-track");
+    }
   });
 });
 
 describe("fixtures", () => {
   const fixtures = loadFixtures();
-  const answers = fixtures.flatMap((f) =>
-    f.response.kind === "answer" ? [{ id: f.id, ...f.response }] : [],
-  );
-
-  it("answer the brief's four example questions", () => {
-    expect(fixtures.map((f) => f.question)).toEqual(
-      expect.arrayContaining([
-        "Which markets are at risk this quarter, and why?",
-        "Why did Germany's revenue dip in March 2026?",
-        "Compare APAC and Europe on growth and forecast attainment",
-        "What's driving the portfolio's forecast miss?",
-      ]),
-    );
-  });
+  const all = [fixtures.default, ...fixtures.fixtures];
 
   it("include the awkward cases: low confidence, abstention, error and a long answer", () => {
-    expect(
-      answers.some((a) => a.confidence < 0.5 && a.uncertainty !== undefined),
-    ).toBe(true);
-    expect(fixtures.some((f) => f.response.kind === "abstention")).toBe(true);
-    expect(fixtures.some((f) => f.response.kind === "error")).toBe(true);
-    expect(answers.some((a) => a.text.length > 1500)).toBe(true);
+    const kinds = all.map((f) => f.kind);
+    expect(kinds).toEqual(
+      expect.arrayContaining(["normal", "low_confidence", "abstain", "error"]),
+    );
+    expect(all.some((f) => f.answer.text.length > 900)).toBe(true);
   });
 
-  it("cite only entities and periods that exist in the data", () => {
-    for (const answer of answers) {
-      for (const c of answer.citations) {
+  it("cite only entities and months the data contains", () => {
+    for (const fixture of all) {
+      for (const citation of fixture.answer.citations) {
         expect(
-          valueAt(dataset, c.ref, c.period, c.metric),
-          `${answer.id} [${c.id}]`,
+          resolveCitation(dataset, citation),
+          `${fixture.id}: ${citation.label ?? ""}`,
         ).toBeDefined();
-      }
-    }
-  });
-
-  it("pair every [n] marker with exactly one citation", () => {
-    for (const answer of answers) {
-      const markers = [...answer.text.matchAll(/\[(\d+)\]/g)].map((m) =>
-        Number(m[1]),
-      );
-      expect(new Set(markers).size, answer.id).toBe(markers.length);
-      expect(
-        [...markers].sort((a, b) => a - b),
-        answer.id,
-      ).toEqual(answer.citations.map((c) => c.id).sort((a, b) => a - b));
-    }
-  });
-
-  it("quote each cited number exactly as the dataset has it", () => {
-    for (const answer of answers) {
-      for (const c of answer.citations) {
-        const value = valueAt(dataset, c.ref, c.period, c.metric) ?? NaN;
-        expect(answer.text, `${answer.id} [${c.id}]`).toContain(
-          `${formatMetric(c.metric, value)} [${c.id}]`,
-        );
       }
     }
   });
 });
 
-/** Sentences in the fixture prose that quote no number but still make a claim about the data. */
-describe("fixture prose claims", () => {
-  const q3 = "2026-Q3" as const;
-  const at = (ref: EntityRef, metric: "growth" | "attainment" | "revenue") =>
-    valueAt(dataset, ref, q3, metric) ?? NaN;
-  const shortfall = (ref: EntityRef) =>
-    (valueAt(dataset, ref, q3, "forecast") ?? 0) -
-    (valueAt(dataset, ref, q3, "revenue") ?? 0);
-
-  it("Asia Pacific had the fastest growth of any region", () => {
-    const growth = dataset.regions.map((r) => ({
-      id: r.id,
-      growth: at({ level: "region", id: r.id }, "growth"),
-    }));
-    growth.sort((a, b) => b.growth - a.growth);
-    expect(growth[0]?.id).toBe("apac");
-  });
-
-  it("North America is comfortably on track (at least a point above the line)", () => {
-    expect(
-      at({ level: "region", id: "na" }, "attainment"),
-    ).toBeGreaterThanOrEqual(ON_TRACK_FROM + 0.01);
-  });
-
-  it("Germany is the only European market at risk, and most of Europe's shortfall", () => {
-    const european = dataset.markets.filter((m) => m.regionId === "eu");
-    const notOnTrack = european.filter(
-      (m) => statusOf(dataset, market(m.id), q3) !== "on-track",
-    );
-    expect(notOnTrack.map((m) => m.id)).toEqual(["DE"]);
-    const gaps = european
-      .map((m) => ({ id: m.id, gap: shortfall(market(m.id)) }))
-      .sort((a, b) => b.gap - a.gap);
-    expect(gaps[0]?.id).toBe("DE");
-  });
-
-  it("Latin America is held back by Brazil", () => {
-    expect(at(market("BR"), "attainment")).toBeLessThan(
-      at(market("MX"), "attainment"),
-    );
-    expect(shortfall(market("BR"))).toBeGreaterThan(shortfall(market("MX")));
-  });
-
-  it("Japan and India are both growing", () => {
-    expect(at(market("JP"), "growth")).toBeGreaterThan(0);
-    expect(at(market("IN"), "growth")).toBeGreaterThan(0);
-  });
-
-  it("Cirrus has been below forecast in every market in every month since April", () => {
-    for (const m of dataset.markets) {
-      for (const month of [
-        "2026-04",
-        "2026-05",
-        "2026-06",
-        "2026-07",
-        "2026-08",
-        "2026-09",
-      ] as const) {
-        expect(
-          valueAt(dataset, product(m.id, "cirrus"), month, "attainment"),
-          `${m.id} ${month}`,
-        ).toBeLessThan(1);
-      }
+describe("suggested questions", () => {
+  it("each reach the fixture they are there to show", () => {
+    for (const { fixtureId, question } of SUGGESTED_QUESTIONS) {
+      expect(matchFixture(loadFixtures(), question).id, question).toBe(
+        fixtureId,
+      );
     }
   });
 
-  it("the United States is Cirrus's largest market", () => {
-    const revenue = dataset.markets
-      .map((m) => ({
-        id: m.id,
-        revenue: at(product(m.id, "cirrus"), "revenue"),
-      }))
-      .sort((a, b) => b.revenue - a.revenue);
-    expect(revenue[0]?.id).toBe("US");
-  });
-
-  it("Atlas has grown steadily in Germany", () => {
-    for (const quarter of [
-      "2025-Q4",
-      "2026-Q1",
-      "2026-Q2",
-      "2026-Q3",
-    ] as const) {
-      expect(
-        valueAt(dataset, product("DE", "atlas"), quarter, "growth"),
-        quarter,
-      ).toBeGreaterThan(0);
-    }
+  it("cover every fixture", () => {
+    expect(SUGGESTED_QUESTIONS.map((s) => s.fixtureId).sort()).toEqual(
+      loadFixtures()
+        .fixtures.map((f) => f.id)
+        .sort(),
+    );
   });
 });

@@ -66,31 +66,22 @@ describe("createSseParser", () => {
 });
 
 describe("encodeSseEvent", () => {
-  it("writes a frame the parser reads back", () => {
+  it("writes a data-only frame, as the pack's contract does, that the parser reads back", () => {
     const events: StreamEvent[] = [
-      { type: "token", text: "Line one\nline two [1" },
+      { type: "token", value: "Line one\nline two " },
       {
-        type: "final",
-        confidence: 0.82,
-        citations: [
-          {
-            id: 1,
-            ref: { level: "market", id: "DE" },
-            period: "2026-03",
-            metric: "revenue",
-          },
-        ],
+        type: "done",
+        kind: "normal",
+        citations: [{ marketId: "de", period: "2026-03", label: "Germany" }],
+        confidence: "high",
       },
-      {
-        type: "abstain",
-        reason: "Beyond the data",
-        coverage: { from: "2024-10", to: "2026-09" },
-      },
-      { type: "error", message: "Timed out", retryable: true },
+      { type: "error", message: "Timed out" },
     ];
     for (const event of events) {
-      const [frame] = parseAll([encodeSseEvent(event)]);
-      expect(frame?.event).toBe(event.type);
+      const encoded = encodeSseEvent(event);
+      expect(encoded).toBe(`data: ${JSON.stringify(event)}\n\n`);
+      const [frame] = parseAll([encoded]);
+      expect(frame?.event).toBeUndefined();
       expect(JSON.parse(frame?.data ?? "")).toEqual(event);
     }
   });

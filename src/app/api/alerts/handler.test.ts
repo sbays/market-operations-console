@@ -5,7 +5,7 @@ import { createAlertsHandlers } from "./handler";
 
 const rule = {
   name: "Europe attainment",
-  scope: ["eu.DE", "eu.FR"],
+  scope: ["eu.de", "eu.fr"],
   metric: "attainment",
   operator: "below",
   threshold: 95,
@@ -114,12 +114,12 @@ describe("POST /api/alerts", () => {
     const { POST, store } = setup();
     const response = await post(POST, {
       ...rule,
-      scope: ["eu.DE", "eu.ZZ", "eu.DE.beacon"],
+      scope: ["eu.de", "eu.ZZ", "eu.de.nuvora"],
     });
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
       error:
-        "Scope must name regions or markets in the data, not: eu.ZZ, eu.DE.beacon",
+        "Scope must name regions or markets in the data, not: eu.ZZ, eu.de.nuvora",
     });
     expect(store).toEqual([]);
   });
@@ -128,9 +128,9 @@ describe("POST /api/alerts", () => {
     const { POST, store } = setup();
     const response = await post(POST, {
       ...rule,
-      scope: ["eu.DE", "eu", "eu.DE", "na.US"],
+      scope: ["eu.de", "eu", "eu.de", "na.us"],
     });
     expect(response.status).toBe(201);
-    expect(store.map((saved) => saved.scope)).toEqual([["eu", "na.US"]]);
+    expect(store.map((saved) => saved.scope)).toEqual([["eu", "na.us"]]);
   });
 });
