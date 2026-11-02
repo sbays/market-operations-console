@@ -459,7 +459,7 @@ function MarketTable({
           <th scope="col" className="py-1.5 text-right font-medium">
             {formatMetricName(metric)}
           </th>
-          <th scope="col" className="py-1.5 text-left font-medium">
+          <th scope="col" className="py-1.5 pl-4 text-left font-medium">
             Status
           </th>
         </tr>
@@ -473,7 +473,7 @@ function MarketTable({
             <td className="py-1.5 text-right">
               {formatMetric(metric, mark.value)}
             </td>
-            <td className="py-1.5">
+            <td className="py-1.5 pl-4">
               {mark.status ? (
                 <StatusBadge status={mark.status} className="font-normal" />
               ) : (
