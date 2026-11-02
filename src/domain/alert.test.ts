@@ -1,6 +1,6 @@
 import { entityPath } from "@/test/path";
+import { tinyDataset } from "@/test/tinyDataset";
 import { describe, expect, it } from "vitest";
-import { DatasetSchema } from "./schema";
 import {
   AlertRuleInputSchema,
   type AlertRule,
@@ -21,23 +21,23 @@ const point = {
   priorYear: 1,
   marketSize: 1,
 };
-const dataset = DatasetSchema.parse({
+const dataset = tinyDataset({
   currency: "USD",
   periods: ["2026-01"],
   regions: [{ id: "eu", name: "Europe" }],
-  products: [{ id: "beacon", name: "Beacon" }],
+  products: [{ id: "nuvora", name: "Nuvora" }],
   markets: [
     {
-      id: "DE",
+      id: "de",
       name: "Germany",
       regionId: "eu",
-      series: { beacon: [point] },
+      series: { nuvora: [point] },
     },
     {
-      id: "FR",
+      id: "fr",
       name: "France",
       regionId: "eu",
-      series: { beacon: [point] },
+      series: { nuvora: [point] },
     },
   ],
   anomalies: [],
@@ -45,7 +45,7 @@ const dataset = DatasetSchema.parse({
 
 const valid: AlertRuleInput = {
   name: "Europe attainment",
-  scope: [entityPath("eu.DE")],
+  scope: [entityPath("eu.de")],
   metric: "attainment",
   operator: "below",
   threshold: 95,
@@ -193,7 +193,7 @@ describe("describeAlert", () => {
     const rule: AlertRule = {
       id: "r1",
       name: "Watch Germany",
-      scope: [entityPath("eu.DE"), entityPath("eu.FR")],
+      scope: [entityPath("eu.de"), entityPath("eu.fr")],
       metric: "attainment",
       operator: "below",
       threshold: 95,
@@ -221,7 +221,7 @@ describe("describeAlert", () => {
     const rule: AlertRule = {
       id: "r3",
       name: "Stale",
-      scope: [entityPath("eu.DE"), entityPath("na.US")],
+      scope: [entityPath("eu.de"), entityPath("na.us")],
       metric: "attainment",
       operator: "below",
       threshold: 90,
@@ -236,22 +236,22 @@ describe("normaliseScope", () => {
   it("rejects paths the data doesn't contain, or that aren't a region or market", () => {
     expect(
       normaliseScope(dataset, [
-        entityPath("eu.DE"),
-        entityPath("na.US"),
+        entityPath("eu.de"),
+        entityPath("na.us"),
         entityPath(""),
-        entityPath("eu.DE.beacon"),
+        entityPath("eu.de.nuvora"),
         entityPath("eu"),
       ]),
-    ).toEqual({ ok: false, invalid: ["na.US", "", "eu.DE.beacon"] });
+    ).toEqual({ ok: false, invalid: ["na.us", "", "eu.de.nuvora"] });
   });
 
   it("drops repeats and markets their ticked region already covers, keeping the order", () => {
     expect(
       normaliseScope(dataset, [
-        entityPath("eu.DE"),
-        entityPath("eu.FR"),
+        entityPath("eu.de"),
+        entityPath("eu.fr"),
         entityPath("eu"),
-        entityPath("eu.DE"),
+        entityPath("eu.de"),
       ]),
     ).toEqual({
       ok: true,
@@ -259,13 +259,13 @@ describe("normaliseScope", () => {
     });
     expect(
       normaliseScope(dataset, [
-        entityPath("eu.FR"),
-        entityPath("eu.DE"),
-        entityPath("eu.FR"),
+        entityPath("eu.fr"),
+        entityPath("eu.de"),
+        entityPath("eu.fr"),
       ]),
     ).toEqual({
       ok: true,
-      scope: ["eu.FR", "eu.DE"],
+      scope: ["eu.fr", "eu.de"],
     });
   });
 });
@@ -284,44 +284,44 @@ const flat = (actual: number, forecast: number, priorYear: number) =>
     priorYear,
     marketSize: 1000,
   }));
-const matchData = DatasetSchema.parse({
+const matchData = tinyDataset({
   currency: "USD",
   periods: months,
   regions: [
     { id: "eu", name: "Europe" },
     { id: "na", name: "North America" },
   ],
-  products: [{ id: "beacon", name: "Beacon" }],
+  products: [{ id: "nuvora", name: "Nuvora" }],
   markets: [
     {
-      id: "DE",
+      id: "de",
       name: "Germany",
       regionId: "eu",
-      series: { beacon: flat(90, 100, 100) },
+      series: { nuvora: flat(90, 100, 100) },
     },
     {
-      id: "FR",
+      id: "fr",
       name: "France",
       regionId: "eu",
-      series: { beacon: flat(100, 100, 80) },
+      series: { nuvora: flat(100, 100, 80) },
     },
     {
-      id: "IT",
+      id: "it",
       name: "Italy",
       regionId: "eu",
-      series: { beacon: flat(94996, 100000, 100000) },
+      series: { nuvora: flat(94996, 100000, 100000) },
     },
     {
-      id: "CA",
+      id: "ca",
       name: "Canada",
       regionId: "na",
-      series: { beacon: flat(1, 1, 1000) },
+      series: { nuvora: flat(1, 1, 1000) },
     },
     {
-      id: "US",
+      id: "us",
       name: "United States",
       regionId: "na",
-      series: { beacon: flat(50, 100, 50) },
+      series: { nuvora: flat(50, 100, 50) },
     },
   ],
   anomalies: [],
@@ -340,7 +340,7 @@ const rule = (overrides: Partial<AlertRule>): AlertRule => ({
 describe("alertMatches", () => {
   it("flags the markets in a region scope that fall below the threshold", () => {
     expect(alertMatches(matchData, rule({}), "2026-Q1")).toEqual([
-      { level: "market", id: "DE" },
+      { level: "market", id: "de" },
     ]);
   });
 
@@ -348,12 +348,12 @@ describe("alertMatches", () => {
     expect(
       alertMatches(
         matchData,
-        rule({ scope: [entityPath("eu"), entityPath("na.US")] }),
+        rule({ scope: [entityPath("eu"), entityPath("na.us")] }),
         "2026-02",
       ),
     ).toEqual([
-      { level: "market", id: "DE" },
-      { level: "market", id: "US" },
+      { level: "market", id: "de" },
+      { level: "market", id: "us" },
     ]);
   });
 
@@ -364,7 +364,7 @@ describe("alertMatches", () => {
         rule({ metric: "growth", operator: "above", threshold: 20 }),
         "2026-Q1",
       ),
-    ).toEqual([{ level: "market", id: "FR" }]);
+    ).toEqual([{ level: "market", id: "fr" }]);
   });
 
   it("doesn't flag a value equal to the threshold", () => {
@@ -381,7 +381,7 @@ describe("alertMatches", () => {
     expect(
       alertMatches(
         matchData,
-        rule({ scope: [entityPath("eu.IT")] }),
+        rule({ scope: [entityPath("eu.it")] }),
         "2026-Q1",
       ),
     ).toEqual([]);
@@ -392,7 +392,7 @@ describe("alertMatches", () => {
       alertMatches(
         matchData,
         rule({
-          scope: [entityPath("na.CA")],
+          scope: [entityPath("na.ca")],
           metric: "growth",
           operator: "above",
           threshold: -99.9,

@@ -44,30 +44,43 @@ describe("POST /api/chat", () => {
     );
   });
 
-  it("streams a matching fixture's text, then exactly one final event", async () => {
-    const fixture = loadFixtures().find((f) => f.id === "germany-march-dip");
+  it("streams a matching fixture's text, then exactly one done event", async () => {
+    const fixture = loadFixtures().fixtures.find((f) => f.id === "germany-dip");
     const response = await post({
-      question: "  why did germany's revenue dip in MARCH 2026? ",
+      question: "Why did GERMANY's revenue dip in March?",
     });
     const events = eventsOf(await response.text());
 
     const terminal = events.filter((e) => e.type !== "token");
-    expect(terminal.map((e) => e.type)).toEqual(["final"]);
-    expect(events.at(-1)?.type).toBe("final");
-    expect(events.map((e) => (e.type === "token" ? e.text : "")).join("")).toBe(
-      fixture?.response.kind === "answer" ? fixture.response.text : "?",
-    );
+    expect(terminal).toEqual([
+      {
+        type: "done",
+        kind: "normal",
+        citations: fixture?.answer.citations,
+        confidence: "high",
+      },
+    ]);
+    expect(events.at(-1)?.type).toBe("done");
+    expect(
+      events.map((e) => (e.type === "token" ? e.value : "")).join(""),
+    ).toBe(fixture?.answer.text);
   });
 
-  it("abstains on a question it has no fixture for, quoting the data's range", async () => {
+  it("answers a question no fixture matches with the pack's hedged default", async () => {
     const events = eventsOf(
       await (await post({ question: "What's the weather in Berlin?" })).text(),
     );
+    expect(events.at(-1)).toEqual(
+      expect.objectContaining({ type: "done", kind: "low_confidence" }),
+    );
+  });
+
+  it("fails the error fixture with one error event and no tokens", async () => {
+    const events = eventsOf(
+      await (await post({ question: "Please force error now" })).text(),
+    );
     expect(events).toEqual([
-      expect.objectContaining({
-        type: "abstain",
-        coverage: { from: "2024-10", to: "2026-09" },
-      }),
+      { type: "error", message: expect.stringContaining("timed out") },
     ]);
   });
 
@@ -78,7 +91,7 @@ describe("POST /api/chat", () => {
       new Request("http://localhost/api/chat", {
         method: "POST",
         body: JSON.stringify({
-          question: "Give me a full portfolio review for Q3 2026",
+          question: "Give me a full overview of the portfolio",
         }),
         signal: controller.signal,
       }),
@@ -104,7 +117,7 @@ describe("POST /api/chat", () => {
       new Request("http://localhost/api/chat", {
         method: "POST",
         body: JSON.stringify({
-          question: "Give me a full portfolio review for Q3 2026",
+          question: "Give me a full overview of the portfolio",
         }),
       }),
     );

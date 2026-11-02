@@ -3,9 +3,17 @@ import { classifyFrame } from "./stream";
 
 describe("classifyFrame", () => {
   it("accepts an event that matches the contract", () => {
+    expect(classifyFrame({ data: '{"type":"token","value":"Hi "}' })).toEqual({
+      kind: "event",
+      event: { type: "token", value: "Hi " },
+    });
+  });
+
+  it("accepts a frame that also names its event, if the name agrees", () => {
     expect(
-      classifyFrame({ event: "token", data: '{"type":"token","text":"Hi"}' }),
-    ).toEqual({ kind: "event", event: { type: "token", text: "Hi" } });
+      classifyFrame({ event: "token", data: '{"type":"token","value":"Hi"}' })
+        .kind,
+    ).toBe("event");
   });
 
   it("ignores event types it doesn't know, so the contract can grow", () => {
@@ -15,14 +23,12 @@ describe("classifyFrame", () => {
   });
 
   it("flags a known type with the wrong shape as invalid", () => {
-    expect(
-      classifyFrame({ event: "token", data: '{"type":"token","text":42}' })
-        .kind,
-    ).toBe("invalid");
+    expect(classifyFrame({ data: '{"type":"token","value":42}' }).kind).toBe(
+      "invalid",
+    );
     expect(
       classifyFrame({
-        event: "final",
-        data: '{"type":"final","confidence":2,"citations":[]}',
+        data: '{"type":"done","kind":"normal","confidence":0.9,"citations":[]}',
       }).kind,
     ).toBe("invalid");
   });
@@ -35,7 +41,7 @@ describe("classifyFrame", () => {
 
   it("flags a frame whose event name contradicts its data", () => {
     expect(
-      classifyFrame({ event: "final", data: '{"type":"token","text":"Hi"}' })
+      classifyFrame({ event: "done", data: '{"type":"token","value":"Hi"}' })
         .kind,
     ).toBe("invalid");
   });

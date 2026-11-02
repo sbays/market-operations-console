@@ -21,11 +21,32 @@ const dataset: Dataset = {
     { id: "eu", name: "Europe" },
     { id: "na", name: "North America" },
   ],
-  products: [{ id: "beacon", name: "Beacon" }],
+  products: [{ id: "nuvora", name: "Nuvora" }],
   markets: [
-    { id: "DE", name: "Germany", regionId: "eu", series: {} },
-    { id: "FR", name: "France", regionId: "eu", series: {} },
-    { id: "US", name: "United States", regionId: "na", series: {} },
+    {
+      id: "de",
+      iso2: "DE",
+      name: "Germany",
+      regionId: "eu",
+      series: {},
+      marketSize: {},
+    },
+    {
+      id: "fr",
+      iso2: "FR",
+      name: "France",
+      regionId: "eu",
+      series: {},
+      marketSize: {},
+    },
+    {
+      id: "us",
+      iso2: "US",
+      name: "United States",
+      regionId: "na",
+      series: {},
+      marketSize: {},
+    },
   ],
   anomalies: [],
 };
@@ -38,8 +59,8 @@ describe("MARKET_GEO_IDS", () => {
   });
 
   it("uses the zero-padded numeric ids the topology writes", () => {
-    expect(MARKET_GEO_IDS.DE).toBe("276");
-    expect(MARKET_GEO_IDS.AU).toBe("036");
+    expect(MARKET_GEO_IDS.de).toBe("276");
+    expect(MARKET_GEO_IDS.au).toBe("036");
   });
 });
 
@@ -60,20 +81,20 @@ describe("marketsInSelection", () => {
     [...marketsInSelection(dataset, ref)].sort();
 
   it("covers every market at the portfolio", () => {
-    expect(idsOf({ level: "portfolio" })).toEqual(["DE", "FR", "US"]);
+    expect(idsOf({ level: "portfolio" })).toEqual(["de", "fr", "us"]);
   });
 
   it("covers a region's markets", () => {
-    expect(idsOf({ level: "region", id: "eu" })).toEqual(["DE", "FR"]);
+    expect(idsOf({ level: "region", id: "eu" })).toEqual(["de", "fr"]);
   });
 
   it("covers only the selected market", () => {
-    expect(idsOf({ level: "market", id: "DE" })).toEqual(["DE"]);
+    expect(idsOf({ level: "market", id: "de" })).toEqual(["de"]);
   });
 
   it("covers the market a product belongs to", () => {
-    expect(idsOf({ level: "product", marketId: "DE", id: "beacon" })).toEqual([
-      "DE",
+    expect(idsOf({ level: "product", marketId: "de", id: "nuvora" })).toEqual([
+      "de",
     ]);
   });
 });
@@ -95,8 +116,8 @@ describe("marketAnchor", () => {
 
   it("is the projected location of the market", () => {
     const project = worldProjection({ width: 800, height: 400 });
-    const location = marketLocation("DE");
-    expect(marketAnchor("DE", project)).toEqual(location && project(location));
+    const location = marketLocation("de");
+    expect(marketAnchor("de", project)).toEqual(location && project(location));
   });
 });
 

@@ -1,12 +1,12 @@
 import { entityPath } from "@/test/path";
+import { tinyDataset, type TinyPoint } from "@/test/tinyDataset";
 import { describe, expect, it } from "vitest";
-import { DatasetSchema, type Dataset, type Point } from "./schema";
+import { type Dataset } from "./schema";
 import {
   ancestorsOf,
   childLevelOf,
   childrenOf,
   childStatusCounts,
-  confidenceBand,
   coverageOf,
   entityCode,
   entityLabel,
@@ -15,16 +15,13 @@ import {
   coversPath,
   isAncestorPath,
   isPortfolioPath,
-  latestQuarter,
   monthlySeries,
   pathOf,
   periodOptions,
   refFromPath,
   selectionPeriod,
   statusAt,
-  statusCounts,
-  statusForAttainment,
-  statusOf,
+  statusFor,
   topMovers,
   topRisks,
   trendAnomalies,
@@ -33,13 +30,13 @@ import {
 
 /*
  * A tiny dataset whose answers can be worked out by hand.
- * Every month (Jan–Jun 2026) is identical except DE/beacon in March.
+ * Every month (Jan–Jun 2026) is identical except DE/nuvora in March.
  *
  *            actual  forecast  priorYear  marketSize  units
- * DE/atlas     100      100        80        1000       10
- * DE/beacon     50      100        50         500        5   (March: actual 20)
- * US/atlas     200      200       200        2000       20
- * US/beacon    100      100       100        1000       10
+ * DE/veltrix     100      100        80        1000       10
+ * DE/nuvora     50      100        50         500        5   (March: actual 20)
+ * US/veltrix     200      200       200        2000       20
+ * US/nuvora    100      100       100        1000       10
  */
 const months = [
   "2026-01",
@@ -51,9 +48,9 @@ const months = [
 ] as const;
 
 function series(
-  values: Omit<Point, "period">,
-  overrides: Record<string, Partial<Point>> = {},
-): Point[] {
+  values: Omit<TinyPoint, "period">,
+  overrides: Record<string, Partial<TinyPoint>> = {},
+): TinyPoint[] {
   return months.map((period) => ({
     period,
     ...values,
@@ -61,7 +58,7 @@ function series(
   }));
 }
 
-const dataset = DatasetSchema.parse({
+const dataset = tinyDataset({
   currency: "USD",
   periods: months,
   regions: [
@@ -69,23 +66,23 @@ const dataset = DatasetSchema.parse({
     { id: "na", name: "North America" },
   ],
   products: [
-    { id: "atlas", name: "Atlas" },
-    { id: "beacon", name: "Beacon" },
+    { id: "veltrix", name: "Veltrix" },
+    { id: "nuvora", name: "Nuvora" },
   ],
   markets: [
     {
-      id: "DE",
+      id: "de",
       name: "Germany",
       regionId: "eu",
       series: {
-        atlas: series({
+        veltrix: series({
           actual: 100,
           forecast: 100,
           priorYear: 80,
           marketSize: 1000,
           units: 10,
         }),
-        beacon: series(
+        nuvora: series(
           {
             actual: 50,
             forecast: 100,
@@ -98,18 +95,18 @@ const dataset = DatasetSchema.parse({
       },
     },
     {
-      id: "US",
+      id: "us",
       name: "United States",
       regionId: "na",
       series: {
-        atlas: series({
+        veltrix: series({
           actual: 200,
           forecast: 200,
           priorYear: 200,
           marketSize: 2000,
           units: 20,
         }),
-        beacon: series({
+        nuvora: series({
           actual: 100,
           forecast: 100,
           priorYear: 100,
@@ -122,8 +119,8 @@ const dataset = DatasetSchema.parse({
   anomalies: [],
 });
 
-const germany = { level: "market", id: "DE" } as const;
-const unitedStates = { level: "market", id: "US" } as const;
+const germany = { level: "market", id: "de" } as const;
+const unitedStates = { level: "market", id: "us" } as const;
 const europe = { level: "region", id: "eu" } as const;
 
 describe("expandPeriod", () => {
@@ -169,7 +166,7 @@ describe("valueAt: revenue", () => {
     expect(
       valueAt(
         dataset,
-        { level: "product", marketId: "DE", id: "beacon" },
+        { level: "product", marketId: "de", id: "nuvora" },
         "2026-03",
         "revenue",
       ),
@@ -178,7 +175,7 @@ describe("valueAt: revenue", () => {
 
   it("returns undefined for entities or periods outside the data", () => {
     expect(
-      valueAt(dataset, { level: "market", id: "FR" }, "2026-01", "revenue"),
+      valueAt(dataset, { level: "market", id: "fr" }, "2026-01", "revenue"),
     ).toBeUndefined();
     expect(valueAt(dataset, germany, "2025-12", "revenue")).toBeUndefined();
   });
@@ -220,50 +217,79 @@ describe("valueAt: derived metrics", () => {
       0.1,
     );
   });
+
+  it("gives a product its part of its market's category", () => {
+    // 100 / 1500
+    expect(
+      valueAt(
+        dataset,
+        { level: "product", marketId: "de", id: "veltrix" },
+        "2026-01",
+        "share",
+      ),
+    ).toBeCloseTo(1 / 15);
+  });
+
+  it("has no share where a market under the entity states no market size", () => {
+    // The pack states share for its latest month only.
+    const latestOnly: Dataset = {
+      ...dataset,
+      markets: dataset.markets.map((market) => ({
+        ...market,
+        marketSize: { "2026-06": 1500 },
+      })),
+    };
+    expect(valueAt(latestOnly, germany, "2026-06", "share")).toBe(0.1);
+    expect(valueAt(latestOnly, germany, "2026-05", "share")).toBeUndefined();
+    expect(valueAt(latestOnly, germany, "2026-Q2", "share")).toBeUndefined();
+    const usWithout: Dataset = {
+      ...latestOnly,
+      markets: latestOnly.markets.map((market) =>
+        market.id === "us" ? { ...market, marketSize: {} } : market,
+      ),
+    };
+    expect(
+      valueAt(usWithout, { level: "portfolio" }, "2026-06", "share"),
+    ).toBeUndefined();
+  });
 });
 
-describe("status", () => {
+describe("statusFor", () => {
+  const growing = 0.05;
+
   it("is on-track from 98% attainment, at-risk from 92%, off-track below", () => {
-    expect(statusForAttainment(1.05)).toBe("on-track");
-    expect(statusForAttainment(0.98)).toBe("on-track");
-    expect(statusForAttainment(0.9794)).toBe("at-risk");
-    expect(statusForAttainment(0.92)).toBe("at-risk");
-    expect(statusForAttainment(0.9194)).toBe("off-track");
+    expect(statusFor({ attainment: 1.05, growth: growing })).toBe("on-track");
+    expect(statusFor({ attainment: 0.98, growth: growing })).toBe("on-track");
+    expect(statusFor({ attainment: 0.9794, growth: growing })).toBe("at-risk");
+    expect(statusFor({ attainment: 0.92, growth: growing })).toBe("at-risk");
+    expect(statusFor({ attainment: 0.9194, growth: growing })).toBe(
+      "off-track",
+    );
   });
 
-  it("decides on the value as displayed, so a badge never contradicts its number", () => {
+  it("is off-track when revenue is down on the prior year, whatever the attainment", () => {
+    // The pack's Spain: 104.5% of forecast, but 4.6% down on the prior year.
+    expect(statusFor({ attainment: 1.045, growth: -0.046 })).toBe("off-track");
+    expect(statusFor({ attainment: 1.045, growth: 0 })).toBe("on-track");
+  });
+
+  it("judges on attainment alone when there is no prior year", () => {
+    expect(statusFor({ attainment: 0.95, growth: undefined })).toBe("at-risk");
+  });
+
+  it("decides on the values as displayed, so a badge never contradicts its numbers", () => {
     // 97.996% is shown as "98.0%", so it must be on-track
-    expect(statusForAttainment(0.97996)).toBe("on-track");
-    // 97.949% is shown as "97.9%"
-    expect(statusForAttainment(0.97949)).toBe("at-risk");
-    expect(statusForAttainment(0.91996)).toBe("at-risk");
-    expect(statusForAttainment(0.91949)).toBe("off-track");
-  });
-
-  it("judges an entity on its attainment over a quarter", () => {
-    // DE Q1: 420 / 600 = 70%
-    expect(statusOf(dataset, germany, "2026-Q1")).toBe("off-track");
-    // US Q2: 900 / 900 = 100%
-    expect(statusOf(dataset, { level: "market", id: "US" }, "2026-Q2")).toBe(
+    expect(statusFor({ attainment: 0.97996, growth: growing })).toBe(
       "on-track",
     );
-  });
-
-  it("counts markets by status", () => {
-    expect(statusCounts(dataset, "2026-Q2")).toEqual({
-      "on-track": 1,
-      "at-risk": 0,
-      "off-track": 1,
-    });
-  });
-});
-
-describe("latestQuarter", () => {
-  it("is the last quarter the data fully covers", () => {
-    expect(latestQuarter(dataset)).toBe("2026-Q2");
-    expect(latestQuarter({ ...dataset, periods: months.slice(0, 5) })).toBe(
-      "2026-Q1",
+    // 97.949% is shown as "97.9%"
+    expect(statusFor({ attainment: 0.97949, growth: growing })).toBe("at-risk");
+    expect(statusFor({ attainment: 0.91996, growth: growing })).toBe("at-risk");
+    expect(statusFor({ attainment: 0.91949, growth: growing })).toBe(
+      "off-track",
     );
+    // -0.04% is shown as "-0.0%"... which rounds to zero, so it isn't shrinking.
+    expect(statusFor({ attainment: 1, growth: -0.0004 })).toBe("on-track");
   });
 });
 
@@ -296,21 +322,21 @@ describe("childrenOf", () => {
       { level: "region", id: "na" },
     ]);
     expect(childrenOf(dataset, { level: "region", id: "eu" })).toEqual([
-      { level: "market", id: "DE" },
+      { level: "market", id: "de" },
     ]);
     expect(childrenOf(dataset, germany)).toEqual([
-      { level: "product", marketId: "DE", id: "atlas" },
-      { level: "product", marketId: "DE", id: "beacon" },
+      { level: "product", marketId: "de", id: "veltrix" },
+      { level: "product", marketId: "de", id: "nuvora" },
     ]);
     expect(
-      childrenOf(dataset, { level: "product", marketId: "DE", id: "atlas" }),
+      childrenOf(dataset, { level: "product", marketId: "de", id: "veltrix" }),
     ).toEqual([]);
   });
 });
 
 describe("topMovers", () => {
   it("lists growth under up and decline under down", () => {
-    // Jan: DE +15.4%, US flat. Mar: DE -7.7% (beacon 20 against 50), US flat.
+    // Jan: DE +15.4%, US flat. Mar: DE -7.7% (nuvora 20 against 50), US flat.
     const january = topMovers(dataset, [germany, unitedStates], "2026-01", 1);
     expect(january.up.map((m) => m.ref)).toEqual([germany]);
     expect(january.up[0]?.growth).toBeCloseTo(0.153846, 5);
@@ -333,7 +359,7 @@ describe("topMovers", () => {
   it("leaves out an entity the data doesn't contain", () => {
     const movers = topMovers(
       dataset,
-      [{ level: "market", id: "JP" }, germany],
+      [{ level: "market", id: "jp" }, germany],
       "2026-01",
       5,
     );
@@ -344,15 +370,22 @@ describe("topMovers", () => {
 describe("topRisks", () => {
   // Europe in Q2: DE is 75% (off track), FR 95% (at risk), ES 100% (on track).
   // FR comes before DE in the dataset, so the list has to sort, not just filter.
-  const europeWithFrance = {
+  const europeWithFrance = tinyDataset({
     ...dataset,
     markets: [
       {
-        id: "FR",
+        id: "fr",
         name: "France",
         regionId: "eu",
         series: {
-          atlas: series({
+          veltrix: series({
+            actual: 95,
+            forecast: 100,
+            priorYear: 95,
+            marketSize: 1000,
+            units: 9,
+          }),
+          nuvora: series({
             actual: 95,
             forecast: 100,
             priorYear: 95,
@@ -363,11 +396,18 @@ describe("topRisks", () => {
       },
       ...dataset.markets,
       {
-        id: "ES",
+        id: "es",
         name: "Spain",
         regionId: "eu",
         series: {
-          atlas: series({
+          veltrix: series({
+            actual: 100,
+            forecast: 100,
+            priorYear: 100,
+            marketSize: 1000,
+            units: 10,
+          }),
+          nuvora: series({
             actual: 100,
             forecast: 100,
             priorYear: 100,
@@ -377,9 +417,9 @@ describe("topRisks", () => {
         },
       },
     ],
-  };
+  });
 
-  it("lists the children at risk or off track, lowest attainment first", () => {
+  it("lists the children at risk or off track, off track first, then lowest attainment", () => {
     expect(topRisks(europeWithFrance, europe, "2026-Q2", 3)).toEqual([
       {
         ref: germany,
@@ -388,7 +428,7 @@ describe("topRisks", () => {
         reason: "Attainment 75.0%, 25.0 points under forecast.",
       },
       {
-        ref: { level: "market", id: "FR" },
+        ref: { level: "market", id: "fr" },
         status: "at-risk",
         attainment: 0.95,
         reason: "Attainment 95.0%, 5.0 points under forecast.",
@@ -411,7 +451,7 @@ describe("topRisks", () => {
     expect(
       topRisks(
         dataset,
-        { level: "product", marketId: "DE", id: "beacon" },
+        { level: "product", marketId: "de", id: "nuvora" },
         "2026-Q2",
         3,
       ),
@@ -423,26 +463,26 @@ describe("topRisks", () => {
       ...dataset,
       anomalies: [
         {
-          ref: { level: "product", marketId: "DE", id: "beacon" },
+          ref: { level: "product", marketId: "de", id: "nuvora" },
           period: "2026-03",
           metric: "revenue",
-          note: "A distributor stock-out held back Beacon shipments.",
+          note: "A distributor stock-out held back Nuvora shipments.",
         },
       ],
     };
-    // Q1 holds March; beacon is 120 of 300 = 40%.
+    // Q1 holds March; nuvora is 120 of 300 = 40%.
     expect(topRisks(withStockOut, germany, "2026-Q1", 3)).toEqual([
       {
-        ref: { level: "product", marketId: "DE", id: "beacon" },
+        ref: { level: "product", marketId: "de", id: "nuvora" },
         status: "off-track",
         attainment: 0.4,
-        reason: "A distributor stock-out held back Beacon shipments.",
+        reason: "A distributor stock-out held back Nuvora shipments.",
       },
     ]);
     // A month is itself a period: March is inside it, February isn't.
     expect(
       topRisks(withStockOut, germany, "2026-03", 3).map((r) => r.reason),
-    ).toEqual(["A distributor stock-out held back Beacon shipments."]);
+    ).toEqual(["A distributor stock-out held back Nuvora shipments."]);
     expect(
       topRisks(withStockOut, germany, "2026-02", 3).map((r) => r.reason),
     ).toEqual(["Attainment 50.0%, 50.0 points under forecast."]);
@@ -453,20 +493,51 @@ describe("topRisks", () => {
       ...dataset,
       anomalies: [
         {
-          ref: { level: "product", marketId: "DE", id: "beacon" },
+          ref: { level: "product", marketId: "de", id: "nuvora" },
           period: "2026-03",
           metric: "revenue",
-          note: "A distributor stock-out held back Beacon shipments.",
+          note: "A distributor stock-out held back Nuvora shipments.",
         },
       ],
     };
-    // Q2 doesn't hold March: beacon is 150 of 300 = 50%.
+    // Q2 doesn't hold March: nuvora is 150 of 300 = 50%.
     expect(topRisks(withStockOut, germany, "2026-Q2", 3)).toEqual([
       {
-        ref: { level: "product", marketId: "DE", id: "beacon" },
+        ref: { level: "product", marketId: "de", id: "nuvora" },
         status: "off-track",
         attainment: 0.5,
         reason: "Attainment 50.0%, 50.0 points under forecast.",
+      },
+    ]);
+  });
+
+  it("says a child ahead of forecast is off track because it is shrinking", () => {
+    // US/veltrix ahead of plan but 10% down on the prior year, like the pack's Spain.
+    const shrinking = tinyDataset({
+      ...dataset,
+      markets: dataset.markets.map((market) =>
+        market.id === "us"
+          ? {
+              ...market,
+              series: {
+                ...market.series,
+                veltrix: series({
+                  actual: 220,
+                  forecast: 200,
+                  priorYear: 244.4444,
+                  units: 20,
+                }),
+              },
+            }
+          : market,
+      ),
+    });
+    expect(topRisks(shrinking, unitedStates, "2026-01", 3)).toEqual([
+      {
+        ref: { level: "product", marketId: "us", id: "veltrix" },
+        status: "off-track",
+        attainment: 1.1,
+        reason: "Revenue -10.0% on the prior year, at 110.0% of forecast.",
       },
     ]);
   });
@@ -483,7 +554,7 @@ describe("topRisks", () => {
         },
       ],
     };
-    // The note is about Germany, not about its Beacon product.
+    // The note is about Germany, not about its Nuvora product.
     expect(
       topRisks(marketNote, germany, "2026-Q1", 3).map((r) => r.reason),
     ).toEqual(["Attainment 40.0%, 60.0 points under forecast."]);
@@ -491,16 +562,6 @@ describe("topRisks", () => {
     expect(
       topRisks(marketNote, europe, "2026-Q1", 3).map((r) => r.reason),
     ).toEqual(["Germany-wide note."]);
-  });
-});
-
-describe("confidenceBand", () => {
-  it("is high from 0.75, medium from 0.5, low below", () => {
-    expect(confidenceBand(0.9)).toBe("high");
-    expect(confidenceBand(0.75)).toBe("high");
-    expect(confidenceBand(0.7499)).toBe("medium");
-    expect(confidenceBand(0.5)).toBe("medium");
-    expect(confidenceBand(0.4999)).toBe("low");
   });
 });
 
@@ -523,13 +584,6 @@ describe("selectors: review fixes", () => {
   });
 });
 
-describe("period types", () => {
-  it("won't compile a month where a quarter is required", () => {
-    // @ts-expect-error a month is not a quarter
-    expect(statusOf(dataset, germany, "2026-03")).toBeDefined();
-  });
-});
-
 describe("coverageOf", () => {
   it("is the first and last month in the data", () => {
     expect(coverageOf(dataset)).toEqual({ from: "2026-01", to: "2026-06" });
@@ -540,21 +594,21 @@ describe("refFromPath", () => {
   it("reads region, market and product from a dotted path", () => {
     expect(refFromPath(dataset, "")).toEqual({ level: "portfolio" });
     expect(refFromPath(dataset, "eu")).toEqual({ level: "region", id: "eu" });
-    expect(refFromPath(dataset, "eu.DE")).toEqual(germany);
-    expect(refFromPath(dataset, "eu.DE.beacon")).toEqual({
+    expect(refFromPath(dataset, "eu.de")).toEqual(germany);
+    expect(refFromPath(dataset, "eu.de.nuvora")).toEqual({
       level: "product",
-      marketId: "DE",
-      id: "beacon",
+      marketId: "de",
+      id: "nuvora",
     });
   });
 
   it("rejects a path the data doesn't contain", () => {
     expect(refFromPath(dataset, "apac")).toBeUndefined();
-    expect(refFromPath(dataset, "eu.JP")).toBeUndefined();
-    expect(refFromPath(dataset, "na.DE")).toBeUndefined(); // Germany is in Europe
-    expect(refFromPath(dataset, "eu.DE.zephyr")).toBeUndefined();
-    expect(refFromPath(dataset, "eu.DE.beacon.extra")).toBeUndefined();
-    expect(refFromPath(dataset, "eu..beacon")).toBeUndefined();
+    expect(refFromPath(dataset, "eu.jp")).toBeUndefined();
+    expect(refFromPath(dataset, "na.de")).toBeUndefined(); // Germany is in Europe
+    expect(refFromPath(dataset, "eu.de.zephyr")).toBeUndefined();
+    expect(refFromPath(dataset, "eu.de.nuvora.extra")).toBeUndefined();
+    expect(refFromPath(dataset, "eu..nuvora")).toBeUndefined();
   });
 });
 
@@ -562,14 +616,14 @@ describe("pathOf", () => {
   it("writes the drill path, finding a market's region in the data", () => {
     expect(pathOf(dataset, { level: "portfolio" })).toBe("");
     expect(pathOf(dataset, { level: "region", id: "na" })).toBe("na");
-    expect(pathOf(dataset, germany)).toBe("eu.DE");
+    expect(pathOf(dataset, germany)).toBe("eu.de");
     expect(
-      pathOf(dataset, { level: "product", marketId: "US", id: "atlas" }),
-    ).toBe("na.US.atlas");
+      pathOf(dataset, { level: "product", marketId: "us", id: "veltrix" }),
+    ).toBe("na.us.veltrix");
   });
 
   it("has no path for a market the data doesn't contain", () => {
-    expect(pathOf(dataset, { level: "market", id: "JP" })).toBeUndefined();
+    expect(pathOf(dataset, { level: "market", id: "jp" })).toBeUndefined();
   });
 });
 
@@ -579,14 +633,14 @@ describe("entityName", () => {
     expect(entityName(dataset, { level: "region", id: "eu" })).toBe("Europe");
     expect(entityName(dataset, germany)).toBe("Germany");
     expect(
-      entityName(dataset, { level: "product", marketId: "DE", id: "beacon" }),
-    ).toBe("Beacon in Germany");
+      entityName(dataset, { level: "product", marketId: "de", id: "nuvora" }),
+    ).toBe("Nuvora in Germany");
   });
 
   it("has no name for an entity the data doesn't contain", () => {
-    expect(entityName(dataset, { level: "market", id: "JP" })).toBeUndefined();
+    expect(entityName(dataset, { level: "market", id: "jp" })).toBeUndefined();
     expect(
-      entityName(dataset, { level: "product", marketId: "DE", id: "zephyr" }),
+      entityName(dataset, { level: "product", marketId: "de", id: "zephyr" }),
     ).toBeUndefined();
   });
 });
@@ -595,17 +649,18 @@ describe("entityCode", () => {
   it("is the short form a citation chip shows", () => {
     expect(entityCode(dataset, { level: "portfolio" })).toBe("Portfolio");
     expect(entityCode(dataset, { level: "region", id: "eu" })).toBe("Europe");
+    // The market's ISO code as written, not its lower-case id.
     expect(entityCode(dataset, germany)).toBe("DE");
     expect(
-      entityCode(dataset, { level: "product", marketId: "DE", id: "beacon" }),
-    ).toBe("DE Beacon");
+      entityCode(dataset, { level: "product", marketId: "de", id: "nuvora" }),
+    ).toBe("DE Nuvora");
   });
 
   it("falls back to the ids for an entity the data doesn't contain", () => {
     expect(entityCode(dataset, { level: "market", id: "NZ" })).toBe("NZ");
     expect(entityCode(dataset, { level: "region", id: "apac" })).toBe("apac");
     expect(
-      entityCode(dataset, { level: "product", marketId: "DE", id: "zephyr" }),
+      entityCode(dataset, { level: "product", marketId: "de", id: "zephyr" }),
     ).toBe("DE zephyr");
   });
 });
@@ -621,12 +676,12 @@ describe("ancestorsOf", () => {
 
   it("extends a product's chain by the product", () => {
     expect(
-      ancestorsOf(dataset, { level: "product", marketId: "DE", id: "beacon" }),
+      ancestorsOf(dataset, { level: "product", marketId: "de", id: "nuvora" }),
     ).toEqual([
       { level: "portfolio" },
       { level: "region", id: "eu" },
       germany,
-      { level: "product", marketId: "DE", id: "beacon" },
+      { level: "product", marketId: "de", id: "nuvora" },
     ]);
   });
 
@@ -641,20 +696,20 @@ describe("ancestorsOf", () => {
   });
 
   it("stops at the portfolio when the market isn't in the data", () => {
-    expect(ancestorsOf(dataset, { level: "market", id: "JP" })).toEqual([
+    expect(ancestorsOf(dataset, { level: "market", id: "jp" })).toEqual([
       { level: "portfolio" },
-      { level: "market", id: "JP" },
+      { level: "market", id: "jp" },
     ]);
   });
 });
 
 describe("statusAt", () => {
   it("judges a product's month by its attainment that month", () => {
-    // DE/beacon March: 20 / 100 = 20%
+    // DE/nuvora March: 20 / 100 = 20%
     expect(
       statusAt(
         dataset,
-        { level: "product", marketId: "DE", id: "beacon" },
+        { level: "product", marketId: "de", id: "nuvora" },
         "2026-03",
       ),
     ).toBe("off-track");
@@ -662,17 +717,17 @@ describe("statusAt", () => {
 
   it("judges a market's month, and is undefined outside the data", () => {
     // US in January: 300 / 300 = 100%
-    expect(statusAt(dataset, { level: "market", id: "US" }, "2026-01")).toBe(
+    expect(statusAt(dataset, { level: "market", id: "us" }, "2026-01")).toBe(
       "on-track",
     );
     expect(
-      statusAt(dataset, { level: "market", id: "JP" }, "2026-01"),
+      statusAt(dataset, { level: "market", id: "jp" }, "2026-01"),
     ).toBeUndefined();
   });
 
   it("works for a quarter", () => {
     // US Q2: 900 / 900 = 100%
-    expect(statusAt(dataset, { level: "market", id: "US" }, "2026-Q2")).toBe(
+    expect(statusAt(dataset, { level: "market", id: "us" }, "2026-Q2")).toBe(
       "on-track",
     );
   });
@@ -692,13 +747,13 @@ describe("monthlySeries", () => {
   });
 
   it("is empty for an entity the data doesn't contain", () => {
-    expect(monthlySeries(dataset, { level: "market", id: "JP" })).toEqual([]);
+    expect(monthlySeries(dataset, { level: "market", id: "jp" })).toEqual([]);
   });
 });
 
 describe("selectionPeriod", () => {
-  it("defaults to the latest complete quarter when nothing is selected", () => {
-    expect(selectionPeriod(dataset, null)).toBe("2026-Q2");
+  it("defaults to the latest month, when the pack states its KPIs", () => {
+    expect(selectionPeriod(dataset, null)).toBe("2026-06");
   });
 
   it("keeps a selected period the data covers", () => {
@@ -706,12 +761,8 @@ describe("selectionPeriod", () => {
   });
 
   it("falls back to the default for a period outside the data", () => {
-    expect(selectionPeriod(dataset, "2027-01")).toBe("2026-Q2");
-  });
-
-  it("falls back to the last month when no quarter is complete", () => {
-    const twoMonths = { ...dataset, periods: months.slice(0, 2) };
-    expect(selectionPeriod(twoMonths, null)).toBe("2026-02");
+    expect(selectionPeriod(dataset, "2027-01")).toBe("2026-06");
+    expect(selectionPeriod(dataset, "2026-Q3")).toBe("2026-06");
   });
 });
 
@@ -719,8 +770,8 @@ describe("entityLabel", () => {
   it("prefers the name and falls back to the short code", () => {
     expect(entityLabel(dataset, germany)).toBe("Germany");
     expect(
-      entityLabel(dataset, { level: "product", marketId: "DE", id: "beacon" }),
-    ).toBe("Beacon in Germany");
+      entityLabel(dataset, { level: "product", marketId: "de", id: "nuvora" }),
+    ).toBe("Nuvora in Germany");
     expect(entityLabel(dataset, { level: "market", id: "NZ" })).toBe("NZ");
   });
 });
@@ -731,7 +782,7 @@ describe("childLevelOf", () => {
     expect(childLevelOf({ level: "region", id: "eu" })).toBe("market");
     expect(childLevelOf(germany)).toBe("product");
     expect(
-      childLevelOf({ level: "product", marketId: "DE", id: "beacon" }),
+      childLevelOf({ level: "product", marketId: "de", id: "nuvora" }),
     ).toBeUndefined();
   });
 });
@@ -748,7 +799,7 @@ describe("childStatusCounts", () => {
     const noUsForecast = {
       ...dataset,
       markets: dataset.markets.map((market) =>
-        market.id !== "US"
+        market.id !== "us"
           ? market
           : {
               ...market,
@@ -770,14 +821,14 @@ describe("childStatusCounts", () => {
 describe("trendAnomalies", () => {
   const beaconInGermany = {
     level: "product",
-    marketId: "DE",
-    id: "beacon",
+    marketId: "de",
+    id: "nuvora",
   } as const;
   const stockOut = {
     ref: beaconInGermany,
     period: "2026-03",
     metric: "revenue",
-    note: "Beacon stock-out.",
+    note: "Nuvora stock-out.",
   } as const;
   const usDip = {
     ref: unitedStates,
@@ -813,7 +864,7 @@ describe("trendAnomalies", () => {
     const fromBeacon = {
       period: "2026-03",
       ref: beaconInGermany,
-      note: "Beacon stock-out.",
+      note: "Nuvora stock-out.",
     };
     expect(trendAnomalies(withAnomalies, europe)).toEqual([
       fromBeacon,
@@ -828,13 +879,13 @@ describe("trendAnomalies", () => {
 
   it("leaves out a parent's anomaly at the child, and a sibling's", () => {
     expect(trendAnomalies(withAnomalies, beaconInGermany)).toEqual([
-      { period: "2026-03", ref: beaconInGermany, note: "Beacon stock-out." },
+      { period: "2026-03", ref: beaconInGermany, note: "Nuvora stock-out." },
     ]);
     expect(
       trendAnomalies(withAnomalies, {
         level: "product",
-        marketId: "DE",
-        id: "atlas",
+        marketId: "de",
+        id: "veltrix",
       }),
     ).toEqual([]);
   });
@@ -865,13 +916,13 @@ describe("isPortfolioPath", () => {
 
 describe("isAncestorPath", () => {
   it("matches whole segments only, strictly above the path", () => {
-    expect(isAncestorPath(entityPath("eu"), entityPath("eu.DE"))).toBe(true);
-    expect(isAncestorPath(entityPath("eu"), entityPath("eu.DE.beacon"))).toBe(
+    expect(isAncestorPath(entityPath("eu"), entityPath("eu.de"))).toBe(true);
+    expect(isAncestorPath(entityPath("eu"), entityPath("eu.de.nuvora"))).toBe(
       true,
     );
     expect(isAncestorPath(entityPath("eu"), entityPath("eu"))).toBe(false);
-    expect(isAncestorPath(entityPath("eu.D"), entityPath("eu.DE"))).toBe(false);
-    expect(isAncestorPath(entityPath("eu.DE"), entityPath("eu"))).toBe(false);
+    expect(isAncestorPath(entityPath("eu.D"), entityPath("eu.de"))).toBe(false);
+    expect(isAncestorPath(entityPath("eu.de"), entityPath("eu"))).toBe(false);
   });
 
   it("treats the portfolio as the ancestor of everything but itself", () => {
@@ -882,10 +933,10 @@ describe("isAncestorPath", () => {
 
 describe("coversPath", () => {
   it("covers the path itself and everything under it, by whole segments", () => {
-    expect(coversPath(entityPath("eu.DE"), entityPath("eu.DE"))).toBe(true);
-    expect(coversPath(entityPath("eu"), entityPath("eu.DE.beacon"))).toBe(true);
+    expect(coversPath(entityPath("eu.de"), entityPath("eu.de"))).toBe(true);
+    expect(coversPath(entityPath("eu"), entityPath("eu.de.nuvora"))).toBe(true);
     expect(coversPath(entityPath(""), entityPath("eu"))).toBe(true);
-    expect(coversPath(entityPath("eu.DE"), entityPath("eu"))).toBe(false);
-    expect(coversPath(entityPath("eu.D"), entityPath("eu.DE"))).toBe(false);
+    expect(coversPath(entityPath("eu.de"), entityPath("eu"))).toBe(false);
+    expect(coversPath(entityPath("eu.D"), entityPath("eu.de"))).toBe(false);
   });
 });

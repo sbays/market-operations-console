@@ -39,7 +39,7 @@ const LABEL_COLOUR = "var(--muted-foreground)";
 
 /**
  * The anomalies to mark by month, in period order, analyst view only. One recorded against a
- * descendant (Beacon in Germany, on Germany's trend) names it, so the note is never read as
+ * descendant (Nuvora in Germany, on Germany's trend) names it, so the note is never read as
  * the selection's own.
  */
 function anomaliesByMonth(
@@ -58,14 +58,14 @@ function anomaliesByMonth(
   return byMonth;
 }
 
-/** "Anomaly in Beacon in Germany: …" for a point's label. */
+/** "Anomaly in Nuvora in Germany: …" for a point's label. */
 function anomalySentence({ source, note }: MonthAnomaly): string {
   return source === undefined
     ? `Anomaly: ${note}`
     : `Anomaly in ${source}: ${note}`;
 }
 
-/** "Beacon in Germany: …" for the table, where the column already says "Anomaly". */
+/** "Nuvora in Germany: …" for the table, where the column already says "Anomaly". */
 function anomalyCell({ source, note }: MonthAnomaly): string {
   return source === undefined ? note : `${source}: ${note}`;
 }

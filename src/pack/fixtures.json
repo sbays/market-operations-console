@@ -1,430 +1,106 @@
-[
-  {
-    "id": "at-risk-this-quarter",
-    "question": "Which markets are at risk this quarter, and why?",
-    "suggested": true,
-    "response": {
-      "kind": "answer",
-      "text": "In Q3 2026, four of the twelve markets are below the 98.0% on-track line.\n\n- **Brazil** is off-track with attainment of 85.5% [1]. Demand softened after the April devaluation and hasn't recovered.\n- **Japan** (93.8% [2]) and **India** (94.3% [3]) are at risk. Both are growing, but their forecasts have assumed even faster growth since the FY26 plan.\n- **Germany** (95.4% [4]) is at risk because the Q3 forecast assumed it would win back the Beacon sales lost in March, and that hasn't happened.\n\nThe other eight markets are on track.",
-      "confidence": 0.86,
-      "citations": [
-        {
-          "id": 1,
-          "ref": {
-            "level": "market",
-            "id": "BR"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 2,
-          "ref": {
-            "level": "market",
-            "id": "JP"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 3,
-          "ref": {
-            "level": "market",
-            "id": "IN"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 4,
-          "ref": {
-            "level": "market",
-            "id": "DE"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        }
-      ]
+{
+  "note": "Canned answers for the mock assistant. The reference endpoint matches an incoming question against each fixture's `keywords` (first match wins, in array order), falls back to `default`, then streams `answer.text` token-by-token followed by a final event carrying `citations` and `confidence`. Citations reference real ids in data.json. See CONTRACT.md.",
+  "default": {
+    "id": "default",
+    "kind": "low_confidence",
+    "answer": {
+      "text": "I don't have enough in this dataset to answer that precisely. From what's here, the portfolio is mixed: a few markets are tracking below forecast while others are growing. Try asking about a specific market, region, or KPI.",
+      "citations": [],
+      "confidence": "low"
     }
   },
-  {
-    "id": "germany-march-dip",
-    "question": "Why did Germany's revenue dip in March 2026?",
-    "suggested": true,
-    "response": {
-      "kind": "answer",
-      "text": "Germany's March revenue was $4M [1] against a forecast of $4.9M [2], an attainment of 82.1% [3].\n\nAlmost all of the gap is **Beacon**, which reached only 44.6% [4] of its forecast after a distributor stock-out held back most shipments. The other four products were close to plan.\n\nShipments were partly restored in April, and Germany was back on forecast in May at 98.5% [5].",
-      "confidence": 0.9,
-      "citations": [
-        {
-          "id": 1,
-          "ref": {
-            "level": "market",
-            "id": "DE"
-          },
-          "period": "2026-03",
-          "metric": "revenue"
-        },
-        {
-          "id": 2,
-          "ref": {
-            "level": "market",
-            "id": "DE"
-          },
-          "period": "2026-03",
-          "metric": "forecast"
-        },
-        {
-          "id": 3,
-          "ref": {
-            "level": "market",
-            "id": "DE"
-          },
-          "period": "2026-03",
-          "metric": "attainment"
-        },
-        {
-          "id": 4,
-          "ref": {
-            "level": "product",
-            "marketId": "DE",
-            "id": "beacon"
-          },
-          "period": "2026-03",
-          "metric": "attainment"
-        },
-        {
-          "id": 5,
-          "ref": {
-            "level": "market",
-            "id": "DE"
-          },
-          "period": "2026-05",
-          "metric": "attainment"
-        }
-      ]
-    }
-  },
-  {
-    "id": "apac-vs-europe",
-    "question": "Compare APAC and Europe on growth and forecast attainment",
-    "suggested": true,
-    "response": {
-      "kind": "answer",
-      "text": "In Q3 2026, APAC's year-on-year growth was +12.4% [1], against +2.0% [2] for Europe.\n\nAttainment points the other way: Europe delivered 97.8% [3] of forecast and APAC 94.9% [4]. APAC's gap comes from Japan and India, whose forecasts assume even faster growth than they're achieving. Europe's small shortfall is mostly Germany.\n\nPart of the attainment gap reflects how the forecasts were set rather than how the regions performed.",
-      "confidence": 0.66,
-      "citations": [
-        {
-          "id": 1,
-          "ref": {
-            "level": "region",
-            "id": "apac"
-          },
-          "period": "2026-Q3",
-          "metric": "growth"
-        },
-        {
-          "id": 2,
-          "ref": {
-            "level": "region",
-            "id": "eu"
-          },
-          "period": "2026-Q3",
-          "metric": "growth"
-        },
-        {
-          "id": 3,
-          "ref": {
-            "level": "region",
-            "id": "eu"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 4,
-          "ref": {
-            "level": "region",
-            "id": "apac"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        }
-      ],
-      "uncertainty": "APAC forecasts were set more aggressively than Europe's, so attainment isn't like-for-like across the two regions."
-    }
-  },
-  {
-    "id": "forecast-miss",
-    "question": "What's driving the portfolio's forecast miss?",
-    "suggested": true,
-    "response": {
-      "kind": "answer",
-      "text": "The portfolio delivered 97.1% [1] of forecast in Q3 2026, its second quarter in a row below the 98.0% on-track line.\n\nThe biggest single driver is **Cirrus**. The April plan moved growth expectations onto its relaunch, and uptake hasn't followed: in the United States, its largest market, Cirrus reached 66.4% [2] of forecast.\n\nMarket-level misses add to it: Brazil at 85.5% [3], Japan at 93.8% [4] and Germany at 95.4% [5].",
-      "confidence": 0.78,
-      "citations": [
-        {
-          "id": 1,
-          "ref": {
-            "level": "portfolio"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 2,
-          "ref": {
-            "level": "product",
-            "marketId": "US",
-            "id": "cirrus"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 3,
-          "ref": {
-            "level": "market",
-            "id": "BR"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 4,
-          "ref": {
-            "level": "market",
-            "id": "JP"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 5,
-          "ref": {
-            "level": "market",
-            "id": "DE"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        }
-      ]
-    }
-  },
-  {
-    "id": "cirrus-by-market",
-    "question": "Is Cirrus underperforming everywhere or just in some markets?",
-    "suggested": true,
-    "response": {
-      "kind": "answer",
-      "text": "Cirrus has been below forecast in every market since April, but by different amounts. In Q3 2026 it reached 66.4% [1] of forecast in the United States, 63.1% [2] in Japan and 56.8% [3] in Brazil.\n\nThe spread may be noise rather than a real difference between markets: six months under the new plan isn't much to go on.",
-      "confidence": 0.42,
-      "citations": [
-        {
-          "id": 1,
-          "ref": {
-            "level": "product",
-            "marketId": "US",
-            "id": "cirrus"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 2,
-          "ref": {
-            "level": "product",
-            "marketId": "JP",
-            "id": "cirrus"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 3,
-          "ref": {
-            "level": "product",
-            "marketId": "BR",
-            "id": "cirrus"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        }
-      ],
-      "uncertainty": "Cirrus has only six months of data under the new plan, and product-level monthly figures are noisy."
-    }
-  },
-  {
-    "id": "portfolio-review",
-    "question": "Give me a full portfolio review for Q3 2026",
-    "suggested": true,
-    "response": {
-      "kind": "answer",
-      "text": "## Summary\n\nThe portfolio earned $116.8M [1] in Q3 2026, a change of +4.9% [2] on the same quarter last year, but delivered only 97.1% [3] of forecast. That keeps it at risk for a second quarter running.\n\n## Regions\n\n- **North America** changed by +5.1% [4] year on year with attainment of 99.1% [5], comfortably on track.\n- **Europe** changed by +2.0% [6] with attainment of 97.8% [7]. Germany is the only European market at risk.\n- **Asia Pacific** had the fastest growth at +12.4% [8], but reached only 94.9% [9] of forecast.\n- **Latin America** changed by -2.2% [10] with attainment of 91.6% [11], held back by Brazil.\n\n## Markets to watch\n\n- **Brazil** is off-track at 85.5% [12]. Demand softened after the April devaluation and hasn't recovered.\n- **Japan** (93.8% [13]) and **India** (94.3% [14]) are at risk: their forecasts assume faster growth than they're delivering, strong as that growth is.\n- **Germany** (95.4% [15]) recovered from the March stock-out, but the Q3 forecast also assumed it would win back the lost sales.\n\n## Products\n\nCirrus is the largest single gap. Since the April plan moved growth expectations onto its relaunch, it has reached 66.4% [16] of forecast in the United States, and the pattern is similar in other markets.\n\n## What to check next\n\n- Cirrus attainment market by market, to see whether any market is adopting the relaunch faster than the rest.\n- Whether Japan's and India's forecasts should be reset to the growth they're actually achieving.\n- Brazil's recovery plan, since it is the only off-track market.",
-      "confidence": 0.8,
-      "citations": [
-        {
-          "id": 1,
-          "ref": {
-            "level": "portfolio"
-          },
-          "period": "2026-Q3",
-          "metric": "revenue"
-        },
-        {
-          "id": 2,
-          "ref": {
-            "level": "portfolio"
-          },
-          "period": "2026-Q3",
-          "metric": "growth"
-        },
-        {
-          "id": 3,
-          "ref": {
-            "level": "portfolio"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 4,
-          "ref": {
-            "level": "region",
-            "id": "na"
-          },
-          "period": "2026-Q3",
-          "metric": "growth"
-        },
-        {
-          "id": 5,
-          "ref": {
-            "level": "region",
-            "id": "na"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 6,
-          "ref": {
-            "level": "region",
-            "id": "eu"
-          },
-          "period": "2026-Q3",
-          "metric": "growth"
-        },
-        {
-          "id": 7,
-          "ref": {
-            "level": "region",
-            "id": "eu"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 8,
-          "ref": {
-            "level": "region",
-            "id": "apac"
-          },
-          "period": "2026-Q3",
-          "metric": "growth"
-        },
-        {
-          "id": 9,
-          "ref": {
-            "level": "region",
-            "id": "apac"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 10,
-          "ref": {
-            "level": "region",
-            "id": "latam"
-          },
-          "period": "2026-Q3",
-          "metric": "growth"
-        },
-        {
-          "id": 11,
-          "ref": {
-            "level": "region",
-            "id": "latam"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 12,
-          "ref": {
-            "level": "market",
-            "id": "BR"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 13,
-          "ref": {
-            "level": "market",
-            "id": "JP"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 14,
-          "ref": {
-            "level": "market",
-            "id": "IN"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 15,
-          "ref": {
-            "level": "market",
-            "id": "DE"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        },
-        {
-          "id": 16,
-          "ref": {
-            "level": "product",
-            "marketId": "US",
-            "id": "cirrus"
-          },
-          "period": "2026-Q3",
-          "metric": "attainment"
-        }
-      ]
-    }
-  },
-  {
-    "id": "revenue-next-quarter",
-    "question": "What will revenue be in Q1 2027?",
-    "suggested": true,
-    "response": {
-      "kind": "abstention",
-      "reason": "The data ends in September 2026 and has no forecasts beyond it, so any figure for Q1 2027 would be invented."
-    }
-  },
-  {
-    "id": "germany-product-trend",
-    "question": "Show me how each product has trended in Germany",
-    "suggested": true,
-    "response": {
+  "fixtures": [
+    {
+      "id": "at-risk",
+      "keywords": ["at risk", "at-risk", "risk this quarter", "which markets", "markets to watch"],
+      "kind": "normal",
+      "answer": {
+        "text": "Three markets stand out as at risk. Germany is the clearest concern: it's below forecast and down year on year, with a sharp dip in March. Italy is tracking under its forecast on softening demand, and Brazil's growth has stalled near flat. The rest of the portfolio is on or near plan.",
+        "citations": [
+          {"marketId": "de", "period": "2026-05", "label": "Germany, latest period"},
+          {"marketId": "de", "period": "2026-03", "label": "Germany, March dip"},
+          {"marketId": "it", "period": "2026-05", "label": "Italy, latest period"},
+          {"marketId": "br", "period": "2026-05", "label": "Brazil, latest period"}
+        ],
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "germany-dip",
+      "keywords": ["germany", "german"],
+      "kind": "normal",
+      "answer": {
+        "text": "Germany's revenue fell in early 2026, with the steepest drop in March. The decline runs across the product portfolio there, and actuals came in well under forecast for those months, which is what pulled the market into off-track territory. It has steadied since, but is still tracking below the prior year.",
+        "citations": [
+          {"marketId": "de", "period": "2026-02", "label": "Germany, Feb 2026"},
+          {"marketId": "de", "period": "2026-03", "label": "Germany, Mar 2026 (largest dip)"},
+          {"marketId": "de", "productId": "veltrix", "period": "2026-03", "label": "Veltrix in Germany, Mar 2026"}
+        ],
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "apac-vs-europe",
+      "keywords": ["apac", "compare apac", "apac and europe", "europe and apac", "europe vs"],
+      "kind": "normal",
+      "answer": {
+        "text": "APAC is outgrowing Europe this period. APAC's larger markets, China and Japan, are running ahead of forecast and posting strong year-on-year growth, while Europe is dragged down by Germany and Italy tracking under plan. On forecast attainment, APAC sits comfortably above 100% in aggregate; Europe is hovering just below.",
+        "citations": [
+          {"regionId": "apac", "period": "2026-05", "label": "APAC, latest period"},
+          {"marketId": "cn", "period": "2026-05", "label": "China"},
+          {"marketId": "jp", "period": "2026-05", "label": "Japan"},
+          {"regionId": "eu", "period": "2026-05", "label": "Europe, latest period"}
+        ],
+        "confidence": "medium"
+      }
+    },
+    {
+      "id": "forecast-miss",
+      "keywords": ["forecast miss", "driving the", "missing forecast", "under forecast", "forecast gap", "portfolio's forecast"],
+      "kind": "low_confidence",
+      "answer": {
+        "text": "The shortfall against forecast is concentrated in a few markets rather than being broad-based. Germany and Italy are the largest contributors, both running under plan, with Brazil adding a smaller drag. I can't fully attribute the gap from this data alone, since it doesn't break out the drivers behind each market's forecast, so treat this as directional.",
+        "citations": [
+          {"marketId": "de", "period": "2026-05", "label": "Germany"},
+          {"marketId": "it", "period": "2026-05", "label": "Italy"},
+          {"marketId": "br", "period": "2026-05", "label": "Brazil"}
+        ],
+        "confidence": "low"
+      }
+    },
+    {
+      "id": "next-year",
+      "keywords": ["next year", "will sales", "predict", "2027", "forecast for next", "beyond the"],
+      "kind": "abstain",
+      "answer": {
+        "text": "I can't answer that. The dataset only covers actuals and forecasts through the current horizon, which ends 2026-05, so I have no basis for projecting next year. If forward forecast data is loaded, I can summarise it.",
+        "citations": [],
+        "confidence": "low"
+      }
+    },
+    {
+      "id": "summary-long",
+      "keywords": ["summary", "overview", "how is the portfolio", "portfolio health", "full picture", "give me a full"],
+      "kind": "normal",
+      "answer": {
+        "text": "Here's the portfolio at a glance.\n\nOverall the book is mixed but broadly stable. Total revenue in the latest period is up against the prior year, carried by APAC and North America. North America remains the anchor: the United States is the single largest market and is tracking on plan, with Canada steady behind it.\n\nAPAC is the growth story. China and Japan are both well ahead of forecast and growing strongly year on year, and India is improving off a smaller base. Australia is roughly flat but on plan.\n\nEurope is the soft spot. Germany fell sharply in early 2026, worst in March, and is still below the prior year despite steadying; Italy is tracking under forecast; the United Kingdom, France, and Spain are close to plan. LATAM is split, with Mexico steady and Brazil's growth stalled.\n\nIn short: APAC and North America are doing the work, Europe is the drag, and the markets to watch are Germany, Italy, and Brazil. Ask me about any of them for the detail behind these numbers.",
+        "citations": [
+          {"regionId": "na", "period": "2026-05", "label": "North America"},
+          {"regionId": "apac", "period": "2026-05", "label": "APAC"},
+          {"regionId": "eu", "period": "2026-05", "label": "Europe"},
+          {"marketId": "us", "period": "2026-05", "label": "United States"},
+          {"marketId": "cn", "period": "2026-05", "label": "China"},
+          {"marketId": "de", "period": "2026-03", "label": "Germany, March dip"}
+        ],
+        "confidence": "medium"
+      }
+    },
+    {
+      "id": "error",
+      "keywords": ["force error", "__error__", "trigger error"],
       "kind": "error",
-      "text": "Germany's five products have followed different paths since October 2024. Atlas has grown steadily, while Beacon",
-      "message": "The assistant stopped responding before the answer was complete."
+      "answer": {"text": "", "citations": [], "confidence": "low"},
+      "error": "Simulated upstream failure: the model service timed out. Ask anything containing the phrase 'force error' to exercise your error state."
     }
-  }
-]
+  ]
+}

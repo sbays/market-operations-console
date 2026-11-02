@@ -1,6 +1,7 @@
 import { Suspense, use } from "react";
 import { DatasetProvider } from "@/data/DatasetProvider";
-import { loadDataset, loadFixtures } from "@/data/pack";
+import { loadDataset } from "@/data/pack";
+import { SUGGESTED_QUESTIONS } from "@/data/suggestions";
 import { AlertDialog } from "@/features/alerts/AlertDialog";
 import { AlertList } from "@/features/alerts/AlertList";
 import { AssistantPanel } from "@/features/assistant/AssistantPanel";
@@ -9,9 +10,7 @@ import { LiveRegions } from "@/ui/LiveRegions";
 import { Toaster } from "@/ui/Toaster";
 
 export default function ConsolePage({ searchParams }: PageProps<"/console">) {
-  const suggestedQuestions = loadFixtures()
-    .filter((fixture) => fixture.suggested)
-    .map((fixture) => fixture.question);
+  const suggestedQuestions = SUGGESTED_QUESTIONS.map((s) => s.question);
 
   return (
     <DatasetProvider dataset={loadDataset()}>

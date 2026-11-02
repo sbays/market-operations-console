@@ -41,16 +41,11 @@ test("analyst view", async ({ page }) => {
 });
 
 test("chat with citations", async ({ page }) => {
-  await page.goto("/console?path=eu.DE");
+  await page.goto("/console?path=eu.de");
   await settled(page);
-  const assistant = await ask(
-    page,
-    "Why did Germany's revenue dip in March 2026?",
-  );
+  const assistant = await ask(page, "Why did Germany's revenue dip in March?");
   await expect(assistant.getByText("High confidence")).toBeVisible();
-  await assistant
-    .getByRole("button", { name: "DE · Mar 2026 · Revenue" })
-    .focus();
+  await assistant.getByRole("button", { name: "DE · Mar 2026" }).focus();
   await expect(page.getByRole("tooltip")).toBeVisible();
   await page.screenshot({ path: `${OUT}/chat-citations.png` });
 });
@@ -60,7 +55,7 @@ test("low confidence", async ({ page }) => {
   await settled(page);
   const assistant = await ask(
     page,
-    "Is Cirrus underperforming everywhere or just in some markets?",
+    "What's driving the portfolio's forecast miss?",
   );
   await expect(assistant.getByText("Low confidence")).toBeVisible();
   await page.screenshot({ path: `${OUT}/low-confidence.png` });
@@ -69,13 +64,13 @@ test("low confidence", async ({ page }) => {
 test("abstention", async ({ page }) => {
   await page.goto("/console");
   await settled(page);
-  const assistant = await ask(page, "What will revenue be in Q1 2027?");
+  const assistant = await ask(page, "Will sales grow next year?");
   await expect(assistant.getByText("This isn't in the data")).toBeVisible();
   await page.screenshot({ path: `${OUT}/abstention.png` });
 });
 
 test("alert form", async ({ page }) => {
-  await page.goto("/console?path=eu.DE");
+  await page.goto("/console?path=eu.de");
   await settled(page);
   await page.getByRole("button", { name: "New alert" }).click();
   const dialog = page.getByRole("dialog", { name: "New alert rule" });

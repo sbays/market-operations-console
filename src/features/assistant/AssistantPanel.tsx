@@ -106,7 +106,7 @@ export function AssistantPanel({ suggestedQuestions }: Props) {
           {announcement(state)}
         </p>
         {state.status === "abstained" ? (
-          <AbstentionCard abstain={state.abstain} text={state.text} />
+          <AbstentionCard text={state.text} />
         ) : (
           state.status !== "idle" && (
             <AnswerCard state={state} onStop={stop} onRetry={retry} />

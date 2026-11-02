@@ -13,8 +13,9 @@ import { useSelection } from "@/state/url";
 import { AttainmentHeatMap } from "./AttainmentHeatMap";
 
 /*
- * Expected figures are read off the generated data pack (src/pack/data.json) once and
- * written down as literals, so a selector or formatting change can't silently move them.
+ * Expected figures are read off the starter pack (src/pack/data.json) once and written down
+ * as literals, so a selector or formatting change can't silently move them. Germany's
+ * forecasts fell with its actuals, so its weakest cell is Zephyra in April 2026, at 90.0%.
  */
 
 /** Reads the URL the way the dashboard does, so the heat map sees the same selection. */
@@ -59,78 +60,78 @@ const cells = () =>
 
 describe("AttainmentHeatMap", () => {
   it("draws five products by twenty-four months at a region's market", () => {
-    renderHeatMap("?path=eu.DE");
+    renderHeatMap("?path=eu.de");
 
     expect(
       screen.getByRole("img", {
-        name: /^Lowest: Beacon in Germany, Mar 2026, at 44\.6% of forecast\.$/,
+        name: /^Lowest: Zephyra in Germany, Apr 2026, at 90\.0% of forecast\.$/,
       }),
     ).toBeInTheDocument();
     expect(cells()).toHaveLength(5 * 24);
   });
 
   it("names the weakest cell in the grid in its chart name", () => {
-    renderHeatMap("?path=eu.DE");
+    renderHeatMap("?path=eu.de");
 
     expect(
       screen.getByRole("img", {
-        name: /Beacon in Germany, Mar 2026, at 44\.6%/,
+        name: /Zephyra in Germany, Apr 2026, at 90\.0%/,
       }),
     ).toBeInTheDocument();
   });
 
   it("moves focus to the same month in the next row with ArrowDown and to the next month with ArrowRight", async () => {
-    const { user } = renderHeatMap("?path=eu.DE");
+    const { user } = renderHeatMap("?path=eu.de");
 
-    const atlasJune = screen.getByRole("button", {
-      name: /^Atlas in Germany, Jun 2026: /,
+    const veltrixApril = screen.getByRole("button", {
+      name: /^Veltrix in Germany, Apr 2026: /,
     });
-    act(() => atlasJune.focus());
+    act(() => veltrixApril.focus());
 
     await user.keyboard("{ArrowDown}");
     expect(
-      screen.getByRole("button", { name: /^Beacon in Germany, Jun 2026: / }),
+      screen.getByRole("button", { name: /^Nuvora in Germany, Apr 2026: / }),
     ).toHaveFocus();
 
     await user.keyboard("{ArrowRight}");
     expect(
-      screen.getByRole("button", { name: /^Beacon in Germany, Jul 2026: / }),
+      screen.getByRole("button", { name: /^Nuvora in Germany, May 2026: / }),
     ).toHaveFocus();
   });
 
   it("selects a month with Enter, replacing history", async () => {
-    const { user, onUrlUpdate } = renderHeatMap("?path=eu.DE");
+    const { user, onUrlUpdate } = renderHeatMap("?path=eu.de");
 
-    const beaconMarch = screen.getByRole("button", {
-      name: /^Beacon in Germany, Mar 2026: 44\.6% of forecast$/,
+    const zephyraApril = screen.getByRole("button", {
+      name: /^Zephyra in Germany, Apr 2026: 90\.0% of forecast$/,
     });
-    act(() => beaconMarch.focus());
+    act(() => zephyraApril.focus());
     await user.keyboard("{Enter}");
 
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu.DE&period=2026-03",
+      query: "?path=eu.de&period=2026-04",
       history: "replace",
     });
   });
 
   it("renders nothing at a product, which has no children", () => {
-    const { container } = renderHeatMap("?path=eu.DE.atlas");
+    const { container } = renderHeatMap("?path=eu.de.veltrix");
 
     expect(container).toBeEmptyDOMElement();
   });
 
   it("offers the values as a table with one row per product", async () => {
-    const { user } = renderHeatMap("?path=eu.DE");
+    const { user } = renderHeatMap("?path=eu.de");
 
     await user.click(screen.getByRole("button", { name: "View as table" }));
 
     const table = screen.getByRole("table", {
       name: /Germany attainment by month/,
     });
-    const beacon = within(table).getByRole("row", {
-      name: /Beacon in Germany/,
+    const zephyra = within(table).getByRole("row", {
+      name: /Zephyra in Germany/,
     });
-    expect(within(beacon).getByText("44.6%")).toBeInTheDocument();
+    expect(within(zephyra).getAllByText("90.0%").length).toBeGreaterThan(0);
     expect(
       screen.queryByRole("img", { name: /Lowest: / }),
     ).not.toBeInTheDocument();

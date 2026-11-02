@@ -1,4 +1,5 @@
 import { TestDataset } from "@/test/dataset";
+import { tinyDataset } from "@/test/tinyDataset";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -9,26 +10,22 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { loadDataset } from "@/data/pack";
 import { countryOf } from "@/domain/geo";
-import {
-  DatasetSchema,
-  type Dataset,
-  type EntityRef,
-  type PeriodRef,
-} from "@/domain/schema";
+import { type Dataset, type EntityRef, type PeriodRef } from "@/domain/schema";
 import { MarketMap } from "./MarketMap";
 
 /*
- * Expected figures are read off the generated data pack (src/pack/data.json) once and
- * written down as literals. Q3 2026 attainment: Brazil 85.5% (off track), Germany 95.4%
- * (at risk), four of twelve markets flagged.
+ * Expected figures are read off the starter pack (src/pack/data.json) once and written down
+ * as literals. May 2026, its latest month: Germany 92.2% and shrinking (off track), Spain off
+ * track on decline at 104.7%, the United Kingdom, France, Italy and Brazil at risk: six of
+ * thirteen markets flagged.
  */
 
 const PORTFOLIO: EntityRef = { level: "portfolio" };
-const Q3: PeriodRef = "2026-Q3";
+const MAY: PeriodRef = "2026-05";
 
 function renderMap({
   selected = PORTFOLIO,
-  period = Q3,
+  period = MAY,
   searchParams = "",
   dataset = loadDataset(),
 }: {
@@ -62,7 +59,7 @@ function lastUrl(onUrlUpdate: ReturnType<typeof vi.fn<OnUrlUpdateFunction>>) {
 }
 
 const SUMMARY =
-  "4 of 12 markets are off track or at risk in Q3 2026; the lowest is Brazil at 85.5%.";
+  "6 of 13 markets are off track or at risk in May 2026; the lowest is Germany at 92.2%.";
 
 const marker = (name: string) =>
   screen.getByRole("button", { name: new RegExp(`^${name}:`) });
@@ -85,19 +82,19 @@ describe("MarketMap", () => {
 
     expect(
       screen.getByRole("img", {
-        name: "1 of 5 markets in Europe is off track or at risk in Q3 2026; the lowest is Germany at 95.4%.",
+        name: "5 of 5 markets in Europe are off track or at risk in May 2026; the lowest is Germany at 92.2%.",
       }),
     ).toBeInTheDocument();
   });
 
   it("summarises the selected market on its own", () => {
     renderMap({
-      selected: { level: "product", marketId: "DE", id: "atlas" },
+      selected: { level: "product", marketId: "de", id: "veltrix" },
     });
 
     expect(
       screen.getByRole("img", {
-        name: "Germany: attainment 95.4%, at risk, in Q3 2026.",
+        name: "Germany: attainment 92.2%, off track, in May 2026.",
       }),
     ).toBeInTheDocument();
   });
@@ -106,16 +103,20 @@ describe("MarketMap", () => {
     renderMap();
 
     expect(screen.getAllByRole("button", { name: /attainment/ })).toHaveLength(
-      12,
+      13,
     );
     expect(marker("Germany")).toHaveAccessibleName(
-      "Germany: attainment 95.4%, at risk",
+      "Germany: attainment 92.2%, off track",
+    );
+    // Off track on decline, though ahead of forecast.
+    expect(marker("Spain")).toHaveAccessibleName(
+      "Spain: attainment 104.7%, off track",
     );
     expect(marker("Brazil")).toHaveAccessibleName(
-      "Brazil: attainment 85.5%, off track",
+      "Brazil: attainment 95.5%, at risk",
     );
     expect(marker("United States")).toHaveAccessibleName(
-      "United States: attainment 99.2%, on track",
+      "United States: attainment 100.6%, on track",
     );
   });
 
@@ -143,7 +144,7 @@ describe("MarketMap", () => {
     await user.keyboard("{Enter}");
 
     expect(lastUrl(onUrlUpdate)).toEqual({
-      query: "?path=eu.DE",
+      query: "?path=eu.de",
       history: "push",
     });
   });
@@ -154,34 +155,35 @@ describe("MarketMap", () => {
     await user.click(screen.getByRole("button", { name: "View as table" }));
 
     const table = screen.getByRole("table", { name: "Markets by attainment" });
-    const brazil = within(table).getByRole("row", { name: /Brazil/ });
-    expect(within(brazil).getByText("Off track")).toBeInTheDocument();
+    const germany = within(table).getByRole("row", { name: /Germany/ });
+    expect(within(germany).getByText("Off track")).toBeInTheDocument();
 
     const names = within(table)
       .getAllByRole("row")
       .slice(1)
       .map((row) => within(row).getByRole("rowheader").textContent);
     expect(names).toEqual([
-      "Brazil",
-      "Japan",
-      "India",
       "Germany",
       "Italy",
-      "Australia",
-      "France",
       "United Kingdom",
-      "Spain",
-      "Canada",
+      "Brazil",
+      "France",
       "United States",
+      "Australia",
       "Mexico",
+      "Canada",
+      "India",
+      "Japan",
+      "Spain",
+      "China",
     ]);
   });
 });
 
 /*
- * Q3 2026 growth, read off the data pack: Brazil -8.6% (lowest), Japan +12.5% (highest);
- * Europe from France +1.4% to Germany +2.4%. Share: India 9.4% (lowest), Brazil 11.0%,
- * Japan 24.0% (highest).
+ * May 2026 growth, read off the starter pack: Germany -9.7% (lowest), China +18.2% (highest);
+ * Europe from Germany -9.7% to France +11.6%. Share (the pack's kpis.sharePct): the United
+ * States 8.8% (lowest), Brazil 15.0%, China 37.2% (highest).
  */
 describe("MarketMap: colour by another KPI", () => {
   const colourBy = () => screen.getByRole("group", { name: "Colour map by" });
@@ -211,10 +213,10 @@ describe("MarketMap: colour by another KPI", () => {
     renderMap({ searchParams: "?mapMetric=growth" });
 
     expect(marker("Germany")).toHaveAccessibleName(
-      "Germany: growth +2.4%, at risk",
+      "Germany: growth -9.7%, off track",
     );
     expect(marker("Brazil")).toHaveAccessibleName(
-      "Brazil: growth -8.6%, off track",
+      "Brazil: growth +2.0%, at risk",
     );
   });
 
@@ -222,7 +224,7 @@ describe("MarketMap: colour by another KPI", () => {
     renderMap({ searchParams: "?mapMetric=growth" });
     expect(
       screen.getByRole("img", {
-        name: "Growth in Q3 2026 runs from Brazil at -8.6% to Japan at +12.5%.",
+        name: "Growth in May 2026 runs from Germany at -9.7% to China at +18.2%.",
       }),
     ).toBeInTheDocument();
   });
@@ -234,7 +236,7 @@ describe("MarketMap: colour by another KPI", () => {
     });
     expect(
       screen.getByRole("img", {
-        name: "Growth in Europe in Q3 2026 runs from France at +1.4% to Germany at +2.4%.",
+        name: "Growth in Europe in May 2026 runs from Germany at -9.7% to France at +11.6%.",
       }),
     ).toBeInTheDocument();
   });
@@ -252,12 +254,12 @@ describe("MarketMap: colour by another KPI", () => {
       .slice(1)
       .map((row) => within(row).getByRole("rowheader").textContent);
     expect(names.slice(0, 6)).toEqual([
-      "Brazil",
-      "France",
-      "Italy",
-      "United Kingdom",
-      "Spain",
       "Germany",
+      "Spain",
+      "Italy",
+      "Brazil",
+      "Australia",
+      "Mexico",
     ]);
   });
 
@@ -275,7 +277,7 @@ describe("MarketMap: colour by another KPI", () => {
   it("reads market share into the markers", () => {
     renderMap({ searchParams: "?mapMetric=share" });
     expect(marker("Brazil")).toHaveAccessibleName(
-      "Brazil: market share 11.0%, off track",
+      "Brazil: market share 15.0%, at risk",
     );
   });
 
@@ -283,11 +285,21 @@ describe("MarketMap: colour by another KPI", () => {
     renderMap({ searchParams: "?mapMetric=share" });
     expect(
       screen.getByRole("img", {
-        name: "Market share in Q3 2026 runs from India at 9.4% to Japan at 24.0%.",
+        name: "Market share in May 2026 runs from United States at 8.8% to China at 37.2%.",
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("0.0%")).toBeInTheDocument();
-    expect(screen.getByText("24.0%")).toBeInTheDocument();
+    expect(screen.getByText("37.2%")).toBeInTheDocument();
+  });
+
+  it("has no share to show outside the month the pack states it for", () => {
+    renderMap({ period: "2026-04", searchParams: "?mapMetric=share" });
+    expect(
+      screen.getByRole("img", { name: "No market share data for Apr 2026." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /market share/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("falls back to attainment for a value it doesn't know", () => {
@@ -303,7 +315,7 @@ describe("MarketMap: colour by another KPI", () => {
  */
 const q3Months = ["2026-07", "2026-08", "2026-09"] as const;
 const flat = (actual: number, forecast: number, priorYear: number) => ({
-  beacon: q3Months.map((period) => ({
+  nuvora: q3Months.map((period) => ({
     period,
     actual,
     units: 1,
@@ -312,19 +324,19 @@ const flat = (actual: number, forecast: number, priorYear: number) => ({
     marketSize: 1000,
   })),
 });
-const tiny = DatasetSchema.parse({
+const tiny = tinyDataset({
   currency: "USD",
   periods: q3Months,
   regions: [
     { id: "eu", name: "Europe" },
     { id: "na", name: "North America" },
   ],
-  products: [{ id: "beacon", name: "Beacon" }],
+  products: [{ id: "nuvora", name: "Nuvora" }],
   markets: [
-    { id: "DE", name: "Germany", regionId: "eu", series: flat(100, 100, 80) },
-    { id: "FR", name: "France", regionId: "eu", series: flat(100, 0, 100) },
+    { id: "de", name: "Germany", regionId: "eu", series: flat(100, 100, 80) },
+    { id: "fr", name: "France", regionId: "eu", series: flat(100, 0, 100) },
     {
-      id: "US",
+      id: "us",
       name: "United States",
       regionId: "na",
       series: flat(90, 100, 100),
@@ -335,7 +347,11 @@ const tiny = DatasetSchema.parse({
 
 describe("MarketMap: markets with partial data", () => {
   it("keeps a market with no attainment on the growth map, without a status", () => {
-    renderMap({ dataset: tiny, searchParams: "?mapMetric=growth" });
+    renderMap({
+      dataset: tiny,
+      period: "2026-Q3",
+      searchParams: "?mapMetric=growth",
+    });
 
     expect(marker("France")).toHaveAccessibleName("France: growth 0.0%");
     // Not a blank circle: a "no status" mark, explained in the legend.
@@ -351,6 +367,7 @@ describe("MarketMap: markets with partial data", () => {
   it("names one value when the selection holds a single market", () => {
     renderMap({
       dataset: tiny,
+      period: "2026-Q3",
       selected: { level: "region", id: "na" },
       searchParams: "?mapMetric=growth",
     });

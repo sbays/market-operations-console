@@ -14,8 +14,8 @@ describe("EntityRefSchema", () => {
     for (const ref of [
       { level: "portfolio" },
       { level: "region", id: "eu" },
-      { level: "market", id: "DE" },
-      { level: "product", marketId: "DE", id: "beacon" },
+      { level: "market", id: "de" },
+      { level: "product", marketId: "de", id: "nuvora" },
     ]) {
       expect(EntityRefSchema.safeParse(ref).success).toBe(true);
     }
@@ -23,7 +23,7 @@ describe("EntityRefSchema", () => {
 
   it("rejects a product without its market", () => {
     expect(
-      EntityRefSchema.safeParse({ level: "product", id: "beacon" }).success,
+      EntityRefSchema.safeParse({ level: "product", id: "nuvora" }).success,
     ).toBe(false);
   });
 
@@ -54,25 +54,26 @@ const point = (period: string) => ({
   units: 10,
   forecast: 110,
   priorYear: 90,
-  marketSize: 1000,
 });
 
 const germany = {
-  id: "DE",
+  id: "de",
+  iso2: "DE",
   name: "Germany",
   regionId: "eu",
-  series: { atlas: [point("2026-01"), point("2026-02")] },
+  series: { veltrix: [point("2026-01"), point("2026-02")] },
+  marketSize: { "2026-02": 1000 },
 };
 
 const validDataset = {
   currency: "USD",
   periods: ["2026-01", "2026-02"],
   regions: [{ id: "eu", name: "Europe" }],
-  products: [{ id: "atlas", name: "Atlas" }],
+  products: [{ id: "veltrix", name: "Veltrix" }],
   markets: [germany],
   anomalies: [
     {
-      ref: { level: "market", id: "DE" },
+      ref: { level: "market", id: "de" },
       period: "2026-02",
       metric: "revenue",
       note: "Distributor stock-out",
@@ -96,13 +97,13 @@ describe("DatasetSchema", () => {
         ...validDataset,
         markets: [{ ...germany, regionId: "apac" }],
       }),
-    ).toContain('Market DE is in unknown region "apac"');
+    ).toContain('Market de is in unknown region "apac"');
   });
 
   it("rejects a market missing a product's series", () => {
     expect(
       issuesOf({ ...validDataset, markets: [{ ...germany, series: {} }] }),
-    ).toContain("Market DE has no series for product atlas");
+    ).toContain("Market de has no series for product veltrix");
   });
 
   it("rejects a series that does not cover every period in order", () => {
@@ -112,11 +113,11 @@ describe("DatasetSchema", () => {
         markets: [
           {
             ...germany,
-            series: { atlas: [point("2026-02"), point("2026-01")] },
+            series: { veltrix: [point("2026-02"), point("2026-01")] },
           },
         ],
       }),
-    ).toContain("Series DE/atlas does not match the dataset periods");
+    ).toContain("Series de/veltrix does not match the dataset periods");
   });
 
   it("rejects an anomaly that points at an unknown market or period", () => {
@@ -124,15 +125,24 @@ describe("DatasetSchema", () => {
     expect(
       issuesOf({
         ...validDataset,
-        anomalies: [{ ...anomaly, ref: { level: "market", id: "FR" } }],
+        anomalies: [{ ...anomaly, ref: { level: "market", id: "fr" } }],
       }),
-    ).toContain("Anomaly refers to unknown entity market FR");
+    ).toContain("Anomaly refers to unknown entity market fr");
     expect(
       issuesOf({
         ...validDataset,
         anomalies: [{ ...anomaly, period: "2025-12" }],
       }),
     ).toContain("Anomaly refers to unknown period 2025-12");
+  });
+
+  it("rejects a market size for a month outside the data", () => {
+    expect(
+      issuesOf({
+        ...validDataset,
+        markets: [{ ...germany, marketSize: { "2026-03": 1000 } }],
+      }),
+    ).toContain("Market de has a market size for unknown month 2026-03");
   });
 
   it("rejects negative values", () => {
@@ -143,7 +153,7 @@ describe("DatasetSchema", () => {
           {
             ...germany,
             series: {
-              atlas: [{ ...point("2026-01"), actual: -1 }, point("2026-02")],
+              veltrix: [{ ...point("2026-01"), actual: -1 }, point("2026-02")],
             },
           },
         ],
@@ -153,29 +163,29 @@ describe("DatasetSchema", () => {
 });
 
 const citation = {
-  id: 1,
-  ref: { level: "market", id: "DE" },
+  marketId: "de",
   period: "2026-03",
-  metric: "revenue",
+  label: "Germany, Mar 2026",
 };
 
 describe("StreamEventSchema", () => {
-  it("accepts each event in the contract", () => {
+  it("accepts each event in the pack's contract", () => {
     for (const event of [
-      { type: "token", text: "Germany fell [1" },
-      { type: "final", confidence: 0.82, citations: [citation] },
+      { type: "token", value: "Three " },
       {
-        type: "final",
-        confidence: 0.4,
+        type: "done",
+        kind: "normal",
+        citations: [citation, { regionId: "eu" }, {}],
+        confidence: "high",
+      },
+      {
+        type: "done",
+        kind: "low_confidence",
         citations: [],
-        uncertainty: "Only three months of launch data",
+        confidence: "low",
       },
-      {
-        type: "abstain",
-        reason: "Forecasts beyond the data are not available",
-        coverage: { from: "2024-10", to: "2026-09" },
-      },
-      { type: "error", message: "Upstream timeout", retryable: true },
+      { type: "done", kind: "abstain", citations: [], confidence: "low" },
+      { type: "error", message: "Upstream timeout" },
     ]) {
       expect(StreamEventSchema.safeParse(event).success).toBe(true);
     }
@@ -183,18 +193,17 @@ describe("StreamEventSchema", () => {
 
   it("rejects events that break the contract", () => {
     for (const event of [
-      { type: "token", text: 42 },
-      { type: "final", confidence: 1.2, citations: [] },
+      { type: "token", value: 42 },
+      { type: "token", text: "Three " },
+      { type: "done", kind: "normal", citations: [], confidence: 0.8 },
+      { type: "done", kind: "partial", citations: [], confidence: "high" },
       {
-        type: "final",
-        confidence: 0.8,
-        citations: [{ ...citation, metric: "profit" }],
+        type: "done",
+        kind: "normal",
+        citations: [{ ...citation, period: "2026-Q1" }],
+        confidence: "high",
       },
-      {
-        type: "final",
-        confidence: 0.8,
-        citations: [citation, { ...citation }],
-      },
+      { type: "error", message: "" },
       { type: "ping" },
     ]) {
       expect(StreamEventSchema.safeParse(event).success).toBe(false);
@@ -222,49 +231,70 @@ describe("ChatRequestSchema", () => {
 describe("FixturesSchema", () => {
   const answer = {
     id: "germany-dip",
-    question: "Why did Germany dip?",
-    suggested: true,
-    response: {
-      kind: "answer",
-      text: "Revenue fell to $4.1M [1].",
-      confidence: 0.82,
+    keywords: ["germany"],
+    kind: "normal",
+    answer: {
+      text: "Germany's revenue fell in early 2026.",
       citations: [citation],
+      confidence: "high",
     },
   };
+  const fallback = {
+    id: "default",
+    kind: "low_confidence",
+    answer: { text: "I don't have enough.", citations: [], confidence: "low" },
+  };
 
-  it("accepts answer, abstention and error fixtures", () => {
+  it("accepts the pack's fixture kinds", () => {
     expect(
-      FixturesSchema.safeParse([
-        answer,
-        {
-          id: "next-year",
-          question: "What will revenue be in Q1 2027?",
-          suggested: true,
-          response: {
-            kind: "abstention",
-            reason: "The data ends in September 2026.",
+      FixturesSchema.safeParse({
+        note: "Canned answers",
+        default: fallback,
+        fixtures: [
+          answer,
+          {
+            id: "next-year",
+            keywords: ["next year"],
+            kind: "abstain",
+            answer: {
+              text: "I can't answer that.",
+              citations: [],
+              confidence: "low",
+            },
           },
-        },
-        {
-          id: "broken",
-          question: "Break down Germany by sales rep",
-          suggested: false,
-          response: {
+          {
+            id: "error",
+            keywords: ["force error"],
             kind: "error",
-            text: "Looking at Germany",
-            message: "Upstream timeout",
+            answer: { text: "", citations: [], confidence: "low" },
+            error: "Simulated upstream failure.",
           },
-        },
-      ]).success,
+        ],
+      }).success,
     ).toBe(true);
   });
 
-  it("rejects duplicate questions, ignoring case and spacing", () => {
+  it("rejects duplicate ids, the default's included", () => {
     expect(
-      FixturesSchema.safeParse([
-        answer,
-        { ...answer, id: "dup", question: " why did  GERMANY dip? " },
-      ]).success,
+      FixturesSchema.safeParse({
+        default: fallback,
+        fixtures: [answer, { ...answer, keywords: ["german"] }],
+      }).success,
+    ).toBe(false);
+    expect(
+      FixturesSchema.safeParse({
+        default: fallback,
+        fixtures: [{ ...answer, id: "default" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects an answer with no text, unless it is an error", () => {
+    expect(
+      FixturesSchema.safeParse({
+        default: fallback,
+        fixtures: [{ ...answer, answer: { ...answer.answer, text: "" } }],
+      }).success,
     ).toBe(false);
   });
 });
@@ -277,11 +307,11 @@ describe("DatasetSchema: review fixes", () => {
         markets: [
           {
             ...germany,
-            series: { ...germany.series, zeta: germany.series.atlas },
+            series: { ...germany.series, zeta: germany.series.veltrix },
           },
         ],
       }),
-    ).toContain("Market DE has a series for unknown product zeta");
+    ).toContain("Market de has a series for unknown product zeta");
   });
 
   it("rejects periods that are not consecutive months", () => {
@@ -298,7 +328,7 @@ describe("DatasetSchema: unique ids", () => {
   it("rejects duplicate region, market and product ids", () => {
     expect(
       issuesOf({ ...validDataset, markets: [germany, germany] }),
-    ).toContain("Duplicate market id DE");
+    ).toContain("Duplicate market id de");
     expect(
       issuesOf({
         ...validDataset,
@@ -308,8 +338,11 @@ describe("DatasetSchema: unique ids", () => {
     expect(
       issuesOf({
         ...validDataset,
-        products: [...validDataset.products, { id: "atlas", name: "Atlas 2" }],
+        products: [
+          ...validDataset.products,
+          { id: "veltrix", name: "Veltrix 2" },
+        ],
       }),
-    ).toContain("Duplicate product id atlas");
+    ).toContain("Duplicate product id veltrix");
   });
 });

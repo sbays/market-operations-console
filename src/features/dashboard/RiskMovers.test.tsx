@@ -13,8 +13,8 @@ import { type Mode, useSelection } from "@/state/url";
 import { RiskMovers } from "./RiskMovers";
 
 /*
- * Expected figures are read off the generated data pack (src/pack/data.json) once and written
- * down as literals. A period the URL doesn't name is the latest full quarter, Q3 2026.
+ * Expected figures are read off the starter pack (src/pack/data.json) once and written down
+ * as literals. A period the URL doesn't name is the pack's latest month, May 2026.
  */
 
 /** Reads the selection from the URL exactly as the dashboard does, then renders the panel. */
@@ -55,48 +55,47 @@ const topRisks = () => screen.queryByRole("region", { name: "Top risks" });
 const movers = () => screen.queryByRole("region", { name: "Biggest movers" });
 
 describe("RiskMovers: top risks", () => {
-  it("names the risk and gives the note the data records for it", () => {
-    // Latin America in Q2 2026: Brazil is 85.4%, off track, and has an April currency note.
-    renderRiskMovers("?path=latam&period=2026-Q2");
+  it("puts off track first, and says why a market ahead of forecast is off track", () => {
+    // Europe in May 2026: Germany 92.2% and Spain 104.7% are off track (both shrinking),
+    // then Italy 93.8%, the United Kingdom 94.6% and France 96.7% at risk.
+    renderRiskMovers("?path=eu");
 
     const risks = within(riskSection());
-    expect(risks.getByRole("button", { name: "Brazil" })).toBeInTheDocument();
-    expect(risks.getByText("Off track")).toBeInTheDocument();
-    expect(risks.getByText("85.4%")).toBeInTheDocument();
+    expect(
+      risks.getAllByRole("button").map((button) => button.textContent),
+    ).toEqual(["Germany", "Spain", "Italy"]);
+    expect(risks.getAllByText("Off track")).toHaveLength(2);
     expect(
       risks.getByText(
-        "Demand in Brazil softened after the April currency devaluation and has not recovered.",
+        "Revenue -4.6% on the prior year, at 104.7% of forecast.",
       ),
     ).toBeInTheDocument();
-    expect(risks.queryByRole("button", { name: "Mexico" })).toBeNull();
+    expect(
+      risks.getByText("Revenue -9.7% on the prior year, at 92.2% of forecast."),
+    ).toBeInTheDocument();
   });
 
-  it("lists the lowest attainment first", () => {
-    // Portfolio in Q2 2026: Latin America 91.2% (off track), Asia Pacific 94.4% (at risk).
-    renderRiskMovers("?period=2026-Q2");
+  it("gives the note the pack records for a market's dip in that month", () => {
+    renderRiskMovers("?path=eu&period=2026-03");
+
+    const risks = within(riskSection());
+    expect(risks.getByRole("button", { name: "Germany" })).toBeInTheDocument();
+    expect(
+      risks.getByText("Revenue fell 27% versus the prior month."),
+    ).toBeInTheDocument();
+  });
+
+  it("lists a region under forecast at the portfolio", () => {
+    // Portfolio in May 2026: only Europe, 95.4%, is at risk.
+    renderRiskMovers();
 
     const names = within(riskSection())
       .getAllByRole("button")
       .map((button) => button.textContent);
-    expect(names).toEqual(["Latin America", "Asia Pacific"]);
+    expect(names).toEqual(["Europe"]);
     expect(
       within(riskSection()).getByText(
-        "Attainment 91.2%, 8.8 points under forecast.",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("uses the stock-out note for Beacon in Germany in Q1 2026", () => {
-    renderRiskMovers("?path=eu.DE&period=2026-Q1");
-
-    const risks = within(riskSection());
-    expect(
-      risks.getByRole("button", { name: "Beacon in Germany" }),
-    ).toBeInTheDocument();
-    expect(risks.getByText("81.1%")).toBeInTheDocument();
-    expect(
-      risks.getByText(
-        "A distributor stock-out in Germany held back most Beacon shipments in March.",
+        "Attainment 95.4%, 4.6 points under forecast.",
       ),
     ).toBeInTheDocument();
   });
@@ -104,23 +103,23 @@ describe("RiskMovers: top risks", () => {
   it("says so when nothing under the selection is at risk", () => {
     renderRiskMovers("?path=na");
 
-    expect(topRisks()).toHaveTextContent("Nothing at risk in Q3 2026.");
+    expect(topRisks()).toHaveTextContent("Nothing at risk in May 2026.");
   });
 
   it("drills to a risk when its name is pressed, pushing history", async () => {
-    const { user, onUrlUpdate } = renderRiskMovers("?period=2026-Q2");
+    const { user, onUrlUpdate } = renderRiskMovers();
 
     await user.click(
-      within(riskSection()).getByRole("button", { name: "Latin America" }),
+      within(riskSection()).getByRole("button", { name: "Europe" }),
     );
 
     const event = onUrlUpdate.mock.calls.at(-1)?.[0];
-    expect(event?.queryString).toContain("path=latam");
+    expect(event?.queryString).toContain("path=eu");
     expect(event?.options.history).toBe("push");
   });
 
   it("renders nothing below a product, where there is nothing to rank", () => {
-    renderRiskMovers("?path=eu.DE.atlas");
+    renderRiskMovers("?path=eu.de.veltrix");
 
     expect(topRisks()).toBeNull();
     expect(movers()).toBeNull();
@@ -129,51 +128,47 @@ describe("RiskMovers: top risks", () => {
 
 describe("RiskMovers: biggest movers", () => {
   it("is hidden in exec mode", () => {
-    renderRiskMovers("?path=eu&period=2026-Q3", "exec");
+    renderRiskMovers("?path=eu", "exec");
 
     expect(movers()).toBeNull();
     expect(topRisks()).toBeInTheDocument();
   });
 
   it("ranks the selection's children by growth, up and down", () => {
-    renderRiskMovers("?path=eu&period=2026-Q3", "analyst");
+    renderRiskMovers("?path=eu", "analyst");
 
     const up = within(screen.getByRole("list", { name: "Up" }));
     expect(up.getAllByRole("listitem").map((item) => item.textContent)).toEqual(
-      ["Germany+2.4%", "Spain+2.2%", "United Kingdom+2.1%"],
-    );
-    // Every European market grew, so nothing is listed as a decline.
-    expect(screen.queryByRole("list", { name: "Down" })).toBeNull();
-    expect(screen.getByText("None in Q3 2026.")).toBeInTheDocument();
-  });
-
-  it("lists only declining children under down", () => {
-    renderRiskMovers("?path=latam&period=2026-Q3", "analyst");
-
-    const up = within(screen.getByRole("list", { name: "Up" }));
-    expect(up.getAllByRole("listitem").map((item) => item.textContent)).toEqual(
-      ["Mexico+5.9%"],
+      ["France+11.6%", "United Kingdom+8.8%", "Italy+0.3%"],
     );
     const down = within(screen.getByRole("list", { name: "Down" }));
     expect(
       down.getAllByRole("listitem").map((item) => item.textContent),
-    ).toEqual(["Brazil-8.6%"]);
+    ).toEqual(["Germany-9.7%", "Spain-4.6%"]);
+  });
+
+  it("says so when nothing declined", () => {
+    renderRiskMovers("?path=latam", "analyst");
+
+    const up = within(screen.getByRole("list", { name: "Up" }));
+    expect(up.getAllByRole("listitem").map((item) => item.textContent)).toEqual(
+      ["Mexico+3.3%", "Brazil+2.0%"],
+    );
+    expect(screen.queryByRole("list", { name: "Down" })).toBeNull();
+    expect(screen.getByText("None in May 2026.")).toBeInTheDocument();
   });
 
   it("drills to a mover when its name is pressed", async () => {
-    const { user, onUrlUpdate } = renderRiskMovers(
-      "?path=eu&period=2026-Q3",
-      "analyst",
-    );
+    const { user, onUrlUpdate } = renderRiskMovers("?path=eu", "analyst");
 
     await user.click(
-      within(screen.getByRole("list", { name: "Up" })).getByRole("button", {
+      within(screen.getByRole("list", { name: "Down" })).getByRole("button", {
         name: "Spain",
       }),
     );
 
     const event = onUrlUpdate.mock.calls.at(-1)?.[0];
-    expect(event?.queryString).toContain("path=eu.ES");
+    expect(event?.queryString).toContain("path=eu.es");
     expect(event?.options.history).toBe("push");
   });
 });

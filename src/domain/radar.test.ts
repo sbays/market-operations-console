@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DatasetSchema } from "./schema";
+import { tinyDataset } from "@/test/tinyDataset";
 import { radarAxes, radarSummary, RADAR_METRICS } from "./radar";
 
 /*
  * The same tiny dataset as selectors.test.ts, so the expected values can be worked out by hand.
- * Q1 2026 (Jan to Mar) totals, with March DE/beacon actual at 20 instead of 50:
+ * Q1 2026 (Jan to Mar) totals, with March DE/nuvora actual at 20 instead of 50:
  *
  *            revenue  units  forecast  priorYear  marketSize
  * DE         420      45     600       390        4500
@@ -30,16 +30,16 @@ const input = {
     { id: "na", name: "North America" },
   ],
   products: [
-    { id: "atlas", name: "Atlas" },
-    { id: "beacon", name: "Beacon" },
+    { id: "veltrix", name: "Veltrix" },
+    { id: "nuvora", name: "Nuvora" },
   ],
   markets: [
     {
-      id: "DE",
+      id: "de",
       name: "Germany",
       regionId: "eu",
       series: {
-        atlas: months.map((period) => ({
+        veltrix: months.map((period) => ({
           period,
           actual: 100,
           forecast: 100,
@@ -47,7 +47,7 @@ const input = {
           marketSize: 1000,
           units: 10,
         })),
-        beacon: months.map((period) => ({
+        nuvora: months.map((period) => ({
           period,
           actual: period === "2026-03" ? 20 : 50,
           forecast: 100,
@@ -58,11 +58,11 @@ const input = {
       },
     },
     {
-      id: "US",
+      id: "us",
       name: "United States",
       regionId: "na",
       series: {
-        atlas: months.map((period) => ({
+        veltrix: months.map((period) => ({
           period,
           actual: 200,
           forecast: 200,
@@ -70,7 +70,7 @@ const input = {
           marketSize: 2000,
           units: 20,
         })),
-        beacon: months.map((period) => ({
+        nuvora: months.map((period) => ({
           period,
           actual: 100,
           forecast: 100,
@@ -84,9 +84,9 @@ const input = {
   anomalies: [],
 };
 
-const dataset = DatasetSchema.parse(input);
-const germany = { level: "market", id: "DE" } as const;
-const unitedStates = { level: "market", id: "US" } as const;
+const dataset = tinyDataset(input);
+const germany = { level: "market", id: "de" } as const;
+const unitedStates = { level: "market", id: "us" } as const;
 
 describe("radarAxes", () => {
   it("names the five metrics in display order", () => {
@@ -152,7 +152,7 @@ describe("radarAxes", () => {
   });
 
   it("scales an axis whose largest value is zero to zero for every entity", () => {
-    const unitless = DatasetSchema.parse({
+    const unitless = tinyDataset({
       ...input,
       markets: input.markets.map((market) => ({
         ...market,

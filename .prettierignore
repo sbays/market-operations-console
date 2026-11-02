@@ -1,6 +1,7 @@
 .pnpm-store
 pnpm-lock.yaml
 *.md
-src/pack/data.json
+# The starter pack, verbatim: never reformatted (CLAUDE.md, Starter pack).
+src/pack/
 # Agent worktrees: full checkouts with their own build output.
 .claude

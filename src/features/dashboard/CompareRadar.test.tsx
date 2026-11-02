@@ -13,9 +13,9 @@ import { useSelection } from "@/state/url";
 import { CompareRadar } from "./CompareRadar";
 
 /*
- * Expected figures are read off the generated data pack (src/pack/data.json) once and
- * written down as literals. The radar's period is the dashboard's: the latest full quarter,
- * Q3 2026, when the URL names none.
+ * Expected figures are read off the starter pack (src/pack/data.json) once and written down
+ * as literals. The radar's period is the dashboard's: the pack's latest month, May 2026, when
+ * the URL names none.
  */
 
 /** Reads the selection from the URL exactly as the dashboard does, then renders the radar. */
@@ -57,32 +57,32 @@ describe("CompareRadar", () => {
 
     expect(
       screen.getByRole("img", {
-        name: /^Comparing Germany, France, United Kingdom and Italy in Q3 2026 /,
+        name: /^Comparing Germany, United Kingdom, France and Italy in May 2026 /,
       }),
     ).toBeInTheDocument();
-    expect(legend()).toHaveTextContent(/^GermanyFranceUnited KingdomItaly$/);
+    expect(legend()).toHaveTextContent(/^GermanyUnited KingdomFranceItaly$/);
   });
 
   it("compares exactly the entities the URL names, in the order it names them", () => {
-    renderRadar("?path=eu&compare=eu.ES,eu.DE");
+    renderRadar("?path=eu&compare=eu.es,eu.de");
 
     expect(legend()).toHaveTextContent(/^SpainGermany$/);
     expect(
       screen.getByRole("img", {
-        name: /^Comparing Spain and Germany in Q3 2026 on revenue/,
+        name: /^Comparing Spain and Germany in May 2026 on revenue/,
       }),
     ).toHaveAccessibleName(/Germany leads on revenue\.$/);
   });
 
   it("ignores compared entities that aren't children of the selection", () => {
     // United States is in North America, so it can't sit on a radar of European markets.
-    renderRadar("?path=eu&compare=eu.DE,na.US");
+    renderRadar("?path=eu&compare=eu.de,na.us");
 
     expect(legend()).toHaveTextContent(/^Germany$/);
   });
 
   it("renders nothing below a product, where there is nothing to compare", () => {
-    renderRadar("?path=eu.DE.atlas");
+    renderRadar("?path=eu.de.veltrix");
 
     expect(
       screen.queryByRole("img", { name: /^Comparing/ }),
@@ -91,52 +91,56 @@ describe("CompareRadar", () => {
   });
 
   it("names each vertex with its real formatted value", () => {
-    renderRadar("?path=eu&compare=eu.DE,eu.ES");
+    renderRadar("?path=eu&compare=eu.de,eu.es");
 
     expect(
-      screen.getByRole("button", { name: "Germany, Revenue: $13.6M" }),
+      screen.getByRole("button", { name: "Germany, Revenue: $1.7M" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: "Germany, Growth vs prior year: +2.4%",
+        name: "Germany, Growth vs prior year: -9.7%",
       }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: "Spain, Forecast attainment: 99.0%",
+        name: "Spain, Forecast attainment: 104.7%",
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Spain, Market share: 18.1%" }),
     ).toBeInTheDocument();
   });
 
   it("moves focus between vertices with the arrow keys", async () => {
-    const { user } = renderRadar("?path=eu&compare=eu.DE,eu.ES");
+    const { user } = renderRadar("?path=eu&compare=eu.de,eu.es");
     const germanyRevenue = screen.getByRole("button", {
-      name: "Germany, Revenue: $13.6M",
+      name: "Germany, Revenue: $1.7M",
     });
     expect(germanyRevenue).toHaveAttribute("tabindex", "0");
 
     act(() => germanyRevenue.focus());
     await user.keyboard("{ArrowRight}");
     expect(
-      screen.getByRole("button", { name: "Germany, Units: 141.9K" }),
+      screen.getByRole("button", { name: "Germany, Units: 7.6K" }),
     ).toHaveFocus();
 
     await user.keyboard("{ArrowDown}");
     expect(
-      screen.getByRole("button", { name: "Spain, Units: 54.7K" }),
+      screen.getByRole("button", { name: "Spain, Units: 3.5K" }),
     ).toHaveFocus();
   });
 
   it("shows the raw values and each axis position in the table alternative", async () => {
-    const { user } = renderRadar("?path=eu&compare=eu.DE,eu.ES");
+    const { user } = renderRadar("?path=eu&compare=eu.de,eu.es");
 
     await user.click(screen.getByRole("button", { name: "View as table" }));
 
     const table = screen.getByRole("table", { name: "Compared values" });
     const spain = within(table).getByRole("row", { name: /^Spain/ });
-    expect(spain).toHaveTextContent("$5.2M");
-    expect(spain).toHaveTextContent("99.0%");
-    expect(spain).toHaveTextContent("axis position 38.6%");
+    expect(spain).toHaveTextContent("$764.6K");
+    expect(spain).toHaveTextContent("104.7%");
+    // Spain's revenue as a share of the largest compared, Germany's.
+    expect(spain).toHaveTextContent("axis position 45.6%");
     expect(
       screen.queryByRole("img", { name: /^Comparing/ }),
     ).not.toBeInTheDocument();

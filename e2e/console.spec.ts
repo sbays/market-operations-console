@@ -4,8 +4,8 @@ import { expect, test } from "@playwright/test";
 test("root redirects to the console", async ({ page }) => {
   await page.goto("/");
 
-  // The shown quarter is pinned into the URL, so a shared link never drifts.
-  await expect(page).toHaveURL(/\/console\?period=2026-Q3$/);
+  // The shown month is pinned into the URL, so a shared link never drifts.
+  await expect(page).toHaveURL(/\/console\?period=2026-05$/);
   await expect(
     page.getByRole("heading", { level: 1, name: "Market Operations" }),
   ).toBeVisible();
@@ -36,33 +36,34 @@ test("a cited answer drills the dashboard, and Back undoes it", async ({
     .getByRole("table", { name: /Europe by market/ })
     .getByRole("button", { name: "Germany" })
     .click();
-  await expect(page).toHaveURL(/\?period=2026-Q3&path=eu\.DE$/);
+  await expect(page).toHaveURL(/\?period=2026-05&path=eu\.de$/);
 
   await assistant
     .getByRole("button", {
-      name: "Why did Germany's revenue dip in March 2026?",
+      name: "Why did Germany's revenue dip in March?",
     })
     .click();
   await expect(assistant.getByText("High confidence")).toBeVisible();
 
   const chip = assistant.getByRole("button", {
-    name: "DE · Mar 2026 · Revenue",
+    name: "DE · Mar 2026",
   });
   await chip.focus();
-  await expect(page.getByRole("tooltip")).toContainText(
-    "Source data: Germany, Mar 2026, Revenue: $4M",
-  );
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toContainText("Source data: Germany, Mar 2026");
+  // The dataset's figure, whatever the answer says.
+  await expect(tooltip).toContainText("Revenue: $1.2M");
 
   await chip.click();
-  await expect(page).toHaveURL(/\?period=2026-03&path=eu\.DE$/);
+  await expect(page).toHaveURL(/\?period=2026-03&path=eu\.de$/);
   // Focus lands on the figures that check the answer.
   const keyFigures = page.getByRole("region", { name: "Key figures" });
   await expect(keyFigures).toBeFocused();
   await expect(keyFigures).toContainText("Mar 2026");
 
   await page.goBack();
-  await expect(page).toHaveURL(/\?period=2026-Q3&path=eu\.DE$/);
-  await expect(keyFigures).toContainText("Q3 2026");
+  await expect(page).toHaveURL(/\?period=2026-05&path=eu\.de$/);
+  await expect(keyFigures).toContainText("May 2026");
 });
 
 test("exec mode has no axe violations", async ({ page }) => {
@@ -85,7 +86,7 @@ test("console with an answer on screen has no axe violations", async ({
   const assistant = page.getByRole("complementary", { name: "Assistant" });
   await assistant
     .getByRole("button", {
-      name: "Why did Germany's revenue dip in March 2026?",
+      name: "Why did Germany's revenue dip in March?",
     })
     .click();
   await expect(assistant.getByText("High confidence")).toBeVisible();
@@ -112,7 +113,7 @@ test("the dashboard drills through the breakdown, and Back goes up", async ({
     .getByRole("button", { name: "Germany" })
     .click();
 
-  await expect(page).toHaveURL(/\?period=2026-Q3&path=eu\.DE$/);
+  await expect(page).toHaveURL(/\?period=2026-05&path=eu\.de$/);
   await expect(breadcrumb).toHaveText(/Portfolio.*Europe.*Germany/);
   await expect(
     page.getByRole("img", { name: /^Germany revenue, / }),
@@ -124,7 +125,7 @@ test("the dashboard drills through the breakdown, and Back goes up", async ({
   expect(results.violations).toEqual([]);
 
   await page.goBack();
-  await expect(page).toHaveURL(/\?period=2026-Q3&path=eu$/);
+  await expect(page).toHaveURL(/\?period=2026-05&path=eu$/);
   await expect(breadcrumb.getByText("Europe")).toHaveAttribute(
     "aria-current",
     "page",
@@ -142,7 +143,7 @@ test("a comparison survives a reload, because it lives in the URL", async ({
     await table.getByRole("checkbox", { name: `Compare ${market}` }).uncheck();
   }
   await table.getByRole("checkbox", { name: "Compare Spain" }).check();
-  await expect(page).toHaveURL(/compare=eu\.DE,eu\.ES/);
+  await expect(page).toHaveURL(/compare=eu\.de,eu\.es/);
 
   await page.reload();
 
@@ -155,7 +156,7 @@ test("a comparison survives a reload, because it lives in the URL", async ({
 });
 
 test("the alert dialog has no axe violations", async ({ page }) => {
-  await page.goto("/console?path=eu.DE");
+  await page.goto("/console?path=eu.de");
   await page.getByRole("button", { name: "New alert" }).click();
   const dialog = page.getByRole("dialog", { name: "New alert rule" });
   await expect(dialog.getByRole("checkbox", { name: "Germany" })).toBeChecked();
@@ -173,7 +174,7 @@ test("the alert dialog has no axe violations", async ({ page }) => {
 });
 
 test("a refused save rolls the alert rule back", async ({ page }) => {
-  await page.goto("/console?path=eu.DE&fail=1");
+  await page.goto("/console?path=eu.de&fail=1");
   await page.getByRole("button", { name: "New alert" }).click();
   const dialog = page.getByRole("dialog", { name: "New alert rule" });
   await dialog.getByRole("textbox", { name: "Rule name" }).fill("Doomed");

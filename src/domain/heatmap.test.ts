@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { DatasetSchema, type Point } from "./schema";
+import { tinyDataset, type TinyPoint } from "@/test/tinyDataset";
 import { heatColour, heatmapRows, heatmapSummary } from "./heatmap";
 
 /*
  * The same hand-built dataset as selectors.test.ts (copied, not imported, so the two can
- * change independently). Every month is identical except DE/beacon in March (actual 20).
+ * change independently). Every month is identical except DE/nuvora in March (actual 20).
  *
  *            actual  forecast
- * DE/atlas     100      100
- * DE/beacon     50      100   (March: actual 20)
- * US/atlas     200      200
- * US/beacon    100      100
+ * DE/veltrix     100      100
+ * DE/nuvora     50      100   (March: actual 20)
+ * US/veltrix     200      200
+ * US/nuvora    100      100
  */
 const months = [
   "2026-01",
@@ -22,9 +22,9 @@ const months = [
 ] as const;
 
 function series(
-  values: Omit<Point, "period">,
-  overrides: Record<string, Partial<Point>> = {},
-): Point[] {
+  values: Omit<TinyPoint, "period">,
+  overrides: Record<string, Partial<TinyPoint>> = {},
+): TinyPoint[] {
   return months.map((period) => ({
     period,
     ...values,
@@ -32,7 +32,7 @@ function series(
   }));
 }
 
-const dataset = DatasetSchema.parse({
+const dataset = tinyDataset({
   currency: "USD",
   periods: months,
   regions: [
@@ -40,23 +40,23 @@ const dataset = DatasetSchema.parse({
     { id: "na", name: "North America" },
   ],
   products: [
-    { id: "atlas", name: "Atlas" },
-    { id: "beacon", name: "Beacon" },
+    { id: "veltrix", name: "Veltrix" },
+    { id: "nuvora", name: "Nuvora" },
   ],
   markets: [
     {
-      id: "DE",
+      id: "de",
       name: "Germany",
       regionId: "eu",
       series: {
-        atlas: series({
+        veltrix: series({
           actual: 100,
           forecast: 100,
           priorYear: 80,
           marketSize: 1000,
           units: 10,
         }),
-        beacon: series(
+        nuvora: series(
           {
             actual: 50,
             forecast: 100,
@@ -69,18 +69,18 @@ const dataset = DatasetSchema.parse({
       },
     },
     {
-      id: "US",
+      id: "us",
       name: "United States",
       regionId: "na",
       series: {
-        atlas: series({
+        veltrix: series({
           actual: 200,
           forecast: 200,
           priorYear: 200,
           marketSize: 2000,
           units: 20,
         }),
-        beacon: series({
+        nuvora: series({
           actual: 100,
           forecast: 100,
           priorYear: 100,
@@ -93,16 +93,16 @@ const dataset = DatasetSchema.parse({
   anomalies: [],
 });
 
-const germany = { level: "market", id: "DE" } as const;
+const germany = { level: "market", id: "de" } as const;
 const atlasInGermany = {
   level: "product",
-  marketId: "DE",
-  id: "atlas",
+  marketId: "de",
+  id: "veltrix",
 } as const;
 const beaconInGermany = {
   level: "product",
-  marketId: "DE",
-  id: "beacon",
+  marketId: "de",
+  id: "nuvora",
 } as const;
 
 describe("heatmapRows", () => {
@@ -118,12 +118,12 @@ describe("heatmapRows", () => {
   });
 
   it("reads attainment per child and month", () => {
-    const [atlas, beacon] = heatmapRows(dataset, germany);
+    const [veltrix, nuvora] = heatmapRows(dataset, germany);
 
-    // Atlas holds forecast every month; beacon's March dip is 20 / 100.
-    expect(atlas?.cells[2]).toEqual({ period: "2026-03", attainment: 1 });
-    expect(beacon?.cells[2]).toEqual({ period: "2026-03", attainment: 0.2 });
-    expect(beacon?.cells[0]).toEqual({ period: "2026-01", attainment: 0.5 });
+    // Veltrix holds forecast every month; nuvora's March dip is 20 / 100.
+    expect(veltrix?.cells[2]).toEqual({ period: "2026-03", attainment: 1 });
+    expect(nuvora?.cells[2]).toEqual({ period: "2026-03", attainment: 0.2 });
+    expect(nuvora?.cells[0]).toEqual({ period: "2026-01", attainment: 0.5 });
   });
 
   it("rolls children up when the rows are regions", () => {
@@ -186,7 +186,7 @@ describe("heatColour", () => {
 describe("heatmapSummary", () => {
   it("names the lowest cell in the grid", () => {
     expect(heatmapSummary(dataset, heatmapRows(dataset, germany))).toBe(
-      "Lowest: Beacon in Germany, Mar 2026, at 20.0% of forecast.",
+      "Lowest: Nuvora in Germany, Mar 2026, at 20.0% of forecast.",
     );
   });
 

@@ -1,73 +1,47 @@
 /**
- * How the mock assistant answers: exact (normalised) fixture matching, and turning a fixture
- * into the stream events of src/pack/CONTRACT.md. Pure; the route adds pacing.
+ * How the mock assistant answers, per the starter pack (src/pack/CONTRACT.md): keyword
+ * matching against the fixtures, and turning a fixture into stream events. Pure; the route
+ * adds pacing.
  */
-import type { Fixture, Month, StreamEvent } from "./schema";
+import type { Fixture, Fixtures, StreamEvent } from "./schema";
 
-/** How questions are compared for a match: case- and spacing-insensitive. */
-export function normaliseQuestion(question: string): string {
-  return question.trim().replace(/\s+/g, " ").toLowerCase();
+/**
+ * The first fixture, in order, with a keyword inside the question (ignoring case), else the
+ * pack's default answer.
+ */
+export function matchFixture(fixtures: Fixtures, question: string): Fixture {
+  const wanted = question.toLowerCase();
+  return (
+    fixtures.fixtures.find((fixture) =>
+      (fixture.keywords ?? []).some((keyword) =>
+        wanted.includes(keyword.toLowerCase()),
+      ),
+    ) ?? fixtures.default
+  );
 }
 
-export function matchFixture(
-  fixtures: Fixture[],
-  question: string,
-): Fixture | undefined {
-  const wanted = normaliseQuestion(question);
-  return fixtures.find((f) => normaliseQuestion(f.question) === wanted);
-}
-
-export const UNMATCHED_REASON =
-  "This demo assistant only answers its prepared questions, and this isn't one of them, so it won't guess. Try one of the suggested questions.";
-
-/** Token lengths cycle through these, so citation markers sometimes split across tokens. */
-const TOKEN_LENGTHS = [5, 3, 7, 4, 9, 6, 8];
-
+/** One word and the whitespace after it per token, as the pack's reference route streams. */
 export function tokenize(text: string): string[] {
-  const tokens: string[] = [];
-  let position = 0;
-  for (let i = 0; position < text.length; i++) {
-    const length = TOKEN_LENGTHS[i % TOKEN_LENGTHS.length] ?? 5;
-    tokens.push(text.slice(position, position + length));
-    position += length;
-  }
-  return tokens;
+  return text.match(/\S+\s*/g) ?? [];
 }
 
-const tokens = (text: string | undefined): StreamEvent[] =>
-  text ? tokenize(text).map((t) => ({ type: "token", text: t })) : [];
+export const FALLBACK_ERROR = "Something went wrong.";
 
-/** Every event a fixture streams: tokens, then exactly one terminal event. */
-export function fixtureEvents(
-  fixture: Fixture | undefined,
-  coverage: { from: Month; to: Month },
-): StreamEvent[] {
-  if (!fixture) {
-    return [{ type: "abstain", reason: UNMATCHED_REASON, coverage }];
+/** Every event a fixture streams: an error fixture fails at once, anything else streams then ends. */
+export function fixtureEvents(fixture: Fixture): StreamEvent[] {
+  if (fixture.kind === "error") {
+    return [{ type: "error", message: fixture.error ?? FALLBACK_ERROR }];
   }
-  const response = fixture.response;
-  switch (response.kind) {
-    case "answer":
-      return [
-        ...tokens(response.text),
-        {
-          type: "final",
-          confidence: response.confidence,
-          citations: response.citations,
-          ...(response.uncertainty
-            ? { uncertainty: response.uncertainty }
-            : {}),
-        },
-      ];
-    case "abstention":
-      return [
-        ...tokens(response.text),
-        { type: "abstain", reason: response.reason, coverage },
-      ];
-    case "error":
-      return [
-        ...tokens(response.text),
-        { type: "error", message: response.message, retryable: true },
-      ];
-  }
+  return [
+    ...tokenize(fixture.answer.text).map((value): StreamEvent => ({
+      type: "token",
+      value,
+    })),
+    {
+      type: "done",
+      kind: fixture.kind,
+      citations: fixture.answer.citations,
+      confidence: fixture.answer.confidence,
+    },
+  ];
 }

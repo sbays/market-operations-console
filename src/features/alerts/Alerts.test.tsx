@@ -266,7 +266,7 @@ describe("AlertDialog", () => {
   });
 
   it("prefills the scope from the selection in the URL", async () => {
-    const { user } = renderAlerts("?path=eu.DE");
+    const { user } = renderAlerts("?path=eu.de");
     const dialog = await openDialog(user);
 
     expect(
@@ -309,7 +309,7 @@ describe("AlertDialog", () => {
   });
 
   it("saves a valid rule at once as Saving…, then as saved", async () => {
-    const { user, release } = renderAlerts("?path=eu.DE");
+    const { user, release } = renderAlerts("?path=eu.de");
     const dialog = await openDialog(user);
     await fillRule(user, {
       name: "Watch Germany",
@@ -360,7 +360,7 @@ describe("AlertList", () => {
         {
           id: "r1",
           name: "Watch Germany",
-          scope: [entityPath("eu.DE"), entityPath("eu.FR")],
+          scope: [entityPath("eu.de"), entityPath("eu.fr")],
           metric: "attainment",
           operator: "below",
           threshold: 95,
@@ -388,7 +388,7 @@ describe("a save before the list has loaded", () => {
       operator: "below",
       threshold: 95,
     };
-    const { user, release, releaseFirstList } = renderAlerts("?path=eu.DE", {
+    const { user, release, releaseFirstList } = renderAlerts("?path=eu.de", {
       initial: [existing],
       holdFirstList: true,
     });
@@ -408,7 +408,7 @@ describe("a save before the list has loaded", () => {
 
 describe("a saved rule's scope", () => {
   it("shows the scope as ticked while saving, then as the server stored it", async () => {
-    const { user, release } = renderAlerts("?path=eu.DE");
+    const { user, release } = renderAlerts("?path=eu.de");
     const dialog = await openDialog(user);
     await fillRule(user, {
       name: "Watch Europe",
@@ -434,27 +434,32 @@ describe("a saved rule's scope", () => {
 });
 
 describe("the markets a rule flags", () => {
-  const apacRule: AlertRule = {
+  // May 2026, the pack's latest month: Germany 92.2%, Italy 93.8% and the United Kingdom
+  // 94.6% are under 95% of forecast; France 96.7% and Spain 104.7% aren't.
+  const europeRule: AlertRule = {
     id: "r1",
-    name: "APAC attainment",
-    scope: [entityPath("apac")],
+    name: "Europe attainment",
+    scope: [entityPath("eu")],
     metric: "attainment",
     operator: "below",
     threshold: 95,
   };
 
   it("names the flagged markets for the period shown, and each drills to its market", async () => {
-    const { user, onUrlUpdate } = renderAlerts("", { initial: [apacRule] });
+    const { user, onUrlUpdate } = renderAlerts("", { initial: [europeRule] });
 
     const rules = await rulesList();
     expect(
-      within(rules).getByText("Flags 2 markets in Q3 2026:"),
+      within(rules).getByText("Flags 3 markets in May 2026:"),
     ).toBeInTheDocument();
-    await user.click(within(rules).getByRole("button", { name: "Japan" }));
-    expect(within(rules).getByRole("button", { name: "India" })).toBeVisible();
+    await user.click(within(rules).getByRole("button", { name: "Germany" }));
+    expect(
+      within(rules).getByRole("button", { name: "United Kingdom" }),
+    ).toBeVisible();
+    expect(within(rules).getByRole("button", { name: "Italy" })).toBeVisible();
 
     expect(onUrlUpdate).toHaveBeenLastCalledWith(
-      expect.objectContaining({ queryString: "?path=apac.JP" }),
+      expect.objectContaining({ queryString: "?path=eu.de" }),
     );
     // The list sits below the dashboard: focus goes to the figures that just changed.
     expect(screen.getByRole("region", { name: "Key figures" })).toHaveFocus();
@@ -462,7 +467,7 @@ describe("the markets a rule flags", () => {
 
   it("follows the period in the URL", async () => {
     renderAlerts("?period=2025-01", {
-      initial: [{ ...apacRule, threshold: 0 }],
+      initial: [{ ...europeRule, threshold: 0 }],
     });
     const rules = await rulesList();
     expect(
@@ -473,12 +478,12 @@ describe("the markets a rule flags", () => {
   it("says so when no market in scope crosses the threshold", async () => {
     renderAlerts("", {
       initial: [
-        { ...apacRule, scope: [entityPath("eu.DE"), entityPath("eu.FR")] },
+        { ...europeRule, scope: [entityPath("eu.fr"), entityPath("eu.es")] },
       ],
     });
     const rules = await rulesList();
     expect(
-      within(rules).getByText("No markets flagged in Q3 2026."),
+      within(rules).getByText("No markets flagged in May 2026."),
     ).toBeInTheDocument();
   });
 });

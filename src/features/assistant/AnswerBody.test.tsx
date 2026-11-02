@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AnswerBody } from "./AnswerBody";
-import { NO_EVIDENCE } from "./citations";
 
 const parsed = vi.hoisted(() => vi.fn<(text: string) => void>());
 
@@ -21,13 +20,9 @@ describe("AnswerBody", () => {
 
   it("parses a settled block once while a later block grows", () => {
     const settled = "First paragraph.";
-    const { rerender } = render(
-      <AnswerBody text={`${settled}\n\nSec`} evidence={NO_EVIDENCE} />,
-    );
+    const { rerender } = render(<AnswerBody text={`${settled}\n\nSec`} />);
 
-    rerender(
-      <AnswerBody text={`${settled}\n\nSecond`} evidence={NO_EVIDENCE} />,
-    );
+    rerender(<AnswerBody text={`${settled}\n\nSecond`} />);
 
     expect(screen.getByText("Second")).toBeInTheDocument();
     expect(parsesOf(settled)).toBe(1);

@@ -8,7 +8,7 @@ function Broken(): never {
 
 /** Fails only for one selection, as a chart might on one entity's odd data. */
 function FailsFor({ path }: { path: string }) {
-  if (path === "eu.DE") throw new Error("bad data");
+  if (path === "eu.de") throw new Error("bad data");
   return <p>Chart for {path}</p>;
 }
 
@@ -45,11 +45,11 @@ describe("ErrorBoundary", () => {
       </ErrorBoundary>
     );
 
-    const { rerender } = render(panel("eu.DE"));
+    const { rerender } = render(panel("eu.de"));
     expect(screen.getByRole("status")).toBeInTheDocument();
 
-    rerender(panel("eu.FR"));
-    expect(screen.getByText("Chart for eu.FR")).toBeInTheDocument();
+    rerender(panel("eu.fr"));
+    expect(screen.getByText("Chart for eu.fr")).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     logged.mockRestore();
   });
