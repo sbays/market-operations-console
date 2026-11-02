@@ -48,7 +48,6 @@ Package manager: pnpm. Fonts come from the `geist` package (self-hosted; builds 
 - `pnpm test`: Vitest (unit + component, jsdom)
 - `pnpm test:e2e`: Playwright on Chromium and WebKit, including axe scans (builds and serves on port 3100)
 - `pnpm build`
-- `pnpm data:generate`: rewrite `src/pack/data.json` and `fixtures.json` (deterministic; never hand-edit them)
 
 CI (`.github/workflows/ci.yml`) runs all of the above on every PR as the `ci` check.
 
@@ -64,8 +63,7 @@ src/
   domain/         schema.ts (Zod), selectors.ts (pure derivations), format.ts (Intl)
   state/url.ts    nuqs parsers: path, period, compare, mode
   ui/             shadcn primitives, chart shell, tokens
-  pack/           generated data.json + fixtures.json, CONTRACT.md (read only through data/pack.ts)
-scripts/          generate-data.ts (seeded; plants the brief's stories), fixture-templates.ts
+  pack/           the starter pack, verbatim: data.json, fixtures.json, CONTRACT.md (read only through data/pack.ts)
 ```
 
 Feature code imports from `data/`, `domain/`, `state/` and `ui/`. Features never import from each other;
@@ -76,7 +74,8 @@ shared logic moves down into `data/`, `domain/` or `ui/`. Only `data/` talks to 
 - **No `any`.** Also no `as` casts to escape the type system. Use `unknown` and narrow it.
 - **Zod at every boundary.** Types come from `z.infer`. Validate `data.json`, every stream event and every API body. Nothing downstream re-checks shape.
 - **One `EntityRef` type** for the URL, charts and citations: a union on `level`; the product variant also carries
-  `marketId` (`{ level: 'product', marketId, id }`). Don't create parallel id formats.
+  `marketId` (`{ level: 'product', marketId, id }`). Don't create parallel id formats. The pack's citations arrive as
+  loose optional ids; `domain/citations.ts` (`resolveCitation`) is the one place they become an `EntityRef`.
 - **State has one home.** If someone opening the link should see it, it goes in the URL. Server state that can change (alert rules) goes in TanStack Query. The static dataset is validated on the server and read through `useDataset` (context); nothing fetches it, and against a real API only that hook would change. Derived values are computed with selectors, never stored. Zustand is only for ephemeral cross-view UI state: the hover highlight (`state/highlight.ts`). The stream buffer is a ref plus `useReducer` in `useChatStream`, batched per animation frame.
 - **Views don't talk to each other.** They read and write URL state; everything else is derived. The one other shared channel is the hover highlight store (`state/highlight.ts`), for emphasis only: it never changes what a view shows, only what it emphasises.
 - **Design tokens only.** No hex values or arbitrary Tailwind values in components. Chart colours come from tokens too.
@@ -90,11 +89,16 @@ shared logic moves down into `data/`, `domain/` or `ui/`. Only `data/` talks to 
 
 ## Starter pack
 
-The assignment's pack won't be provided (confirmed 30 Oct), so we author and submit our own equivalent (decided 28 Oct): `data.json` from a
-seeded generator script, `fixtures.json`, `CONTRACT.md` and the mock `/api/chat` route. It follows the brief's described
-contract; `docs/PLAN.md` (Data layer, Assistant surface) holds the decided shapes. Once written, treat these files as
-the source of truth. All data goes through `loadDataset()` and the stream hook's interface, so a real dataset would
-replace one module. Fixture text must quote numbers that match the dataset; a test enforces it.
+The assignment's starter pack arrived on 2 Nov and is the **source of truth**: `src/pack/data.json`, `fixtures.json`,
+`CONTRACT.md` and `README.md` are the pack's files, byte for byte. Never edit them, and never work around what they say:
+no corrected copies, no patched fixture text, no in-app notes explaining the pack away. Where the pack's own parts
+disagree (e.g. the "at risk" answer names three markets, its stored statuses flag six), the app shows each part
+faithfully and the README may mention it. Our own generated pack and its generator were removed (decided 2 Nov).
+
+The app adapts to the pack, not the other way round: `domain/starterPack.ts` translates `data.json` into the app's
+`Dataset`, and `/api/chat` and the stream hook speak the pack's event contract (`CONTRACT.md`). Derived values must
+reproduce the pack's stated ones; tests check selectors against its `kpis` (status, growth, attainment, share).
+`docs/PLAN.md` (Data layer, Assistant surface) records how each gap is bridged.
 
 ## Assistant specifics
 
