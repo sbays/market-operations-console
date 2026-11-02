@@ -113,11 +113,13 @@ flowchart LR
 
 ## c. Productionising it
 What I've added:
+- The application (/console) is partially prerendered, the shell is static and the dashboard is rendered on the server with the dataset validated once (on the server).
 - `web-vitals` are reported through `useReportWebVitals`, currently logged in the console.
 - Added an error boundary per chart that resets whenever a selection is changed to avoid one broken chart hindering any of the others.
 - To avoid jank when streaming answers from chat, token updates are batched per animation frame and only the markdown block that is still streaming is re-rendered.
 - Choropleth map is lazy-loaded as it's the largest asset on the page and it's lower down in the view so no need to immediately render it, so LCP can be improved.
 - Used GitHub Actions to run CI on every PR which includes typechecking, linting, formatting, running all tests (unit & e2e with axe) and build.
+- Used react-markdown with raw HTML disabled (skipHtml), rendered links as plain text and didn't use dangerouslySetInnerHTML at any point.
 
 Moving forward, more things to add:
 - Error tracking with a tool like Sentry, with tagged events for easier grouping e.g. stream failures
@@ -174,6 +176,18 @@ Used `eslint-plugin-jsx-a11y` for linting and Axe as part of e2e tests in CI. Ch
 
 Added `prefers-reduced-motion` media query to remove animations.
 
+Contrast is checked on every CI test run using tokens.test.ts and if at any point a contrast issue is introduced then the build will fail in CI.
+
+Tested the application using VoiceOver, all worked as expected.
+
+Used aria-live regions for answers and toast messages to inform the user when dynamic text changes.
+
+What I'd add:
+
+- Using links instead of buttons for drilling so they'd work before the page hydrates on the client. 
+- Add a manual testing step using NVDA or JAWS.
+- Add WCAG-compliant dismissable tooltips on the heatmap if it wasn't intuitive to users to use the heatmap alongside the Portfolio by Region table.
+
 ## f. Testing
 
 - **Unit:** all selectors, formatters, parsers and schemas.
@@ -207,5 +221,8 @@ If I'm not entirely sure why something has been suggested I'll drill into it mor
 I also try to avoid compounding dependency issues, which agents can lean on fairly readily, like pnpm filling `overrides` with overly specific version numbers.
 
 ## j. What I'd do differently with more time
+
+At portfolio level, looking at the map we can see that Brazil is "at risk". The "Off Track" or "At Risk" tiles count markets for a region (e.g. 6 of 13), as defined in the brief. Top risks lists the children of the portfolio, which are regions. An "at risk" market inside an "on track" region, i.e. Brazil in LATAM, could be confusing upon first glance.
+With more time I'd explore whether top-risks at a portfolio level should list markets, matching the map view and the question in the brief "which markets are at risk?".
 
 Would build a live mode, a virtualised table to handle huge amounts of data, context-aware assistant and Storybook. Fuzzier question matching would be great, although in reality that would be handled by an agentic API. Per-user locale and real observability.
