@@ -32,7 +32,6 @@ pnpm dev           # http://localhost:3000/console
 | `pnpm test` | Vitest: unit, component and integration (jsdom, MSW) |
 | `pnpm test:e2e` | Playwright on Chromium and WebKit, with axe scans |
 | `pnpm build` | Production build |
-| `pnpm data:generate` | Regenerates `src/pack/data.json` and `fixtures.json` (seeded, deterministic) |
 | `pnpm screenshots` | Regenerates the images in `docs/screenshots` |
 
 Some things to try first:

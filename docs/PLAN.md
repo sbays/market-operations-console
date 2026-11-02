@@ -95,14 +95,16 @@ Zod schemas are the single source of types: we write the schema, infer the TypeS
 - **Selectors** — pure functions in `domain/selectors.ts`: rollup by level, growth vs prior year, attainment, top movers, at-risk count, period windows. Unit-tested hard, since every view trusts them.
 - **Formatting** — one `format.ts` over `Intl.NumberFormat` and `Intl.DateTimeFormat`: compact notation (1.2M), currency in one reporting currency (USD) with the code shown, signed percentages (+4.2%), periods as "Mar 2026". Locale is a fixed `en-US` constant for server and client (decided 28 Oct): no hydration mismatch, a static page, pure formatters, and AI text and source numbers format identically. Per-user locale goes in the README as a next step.
 
-The starter pack won't be provided (confirmed 30 Oct), so we author our own `data.json` and fixtures following the brief's described contract (decided 28 Oct), and submit with them; the README says so. All data is read through a single `loadDataset()` seam, so a real dataset would replace one module. Revenue is stored in one reporting currency, USD, so rollups are plain sums (decided 28 Oct).
+**The starter pack is the source of truth (decided 2 Nov).** The assignment's pack arrived on 2 Nov and replaced the pack we had generated ourselves (28 to 30 Oct). Its files sit verbatim in `src/pack/` (`data.json`, `fixtures.json`, `CONTRACT.md`, `README.md`) and are never edited or worked around: where its parts disagree, the app shows each faithfully and the README may say so. The app adapts to the pack at two seams: `domain/starterPack.ts` (`data.json` → `Dataset`, read through `data/pack.ts`) and the stream contract (`/api/chat` and `useChatStream` speak the pack's events). Revenue is in USD, so rollups are plain sums.
 
-Pack decisions (28 Oct, `feat/data-pack`):
+How each gap between the pack and the app is bridged (decided 2 Nov, Simon):
 
-- The pack lives in `src/pack/` (`data.json`, `fixtures.json`, `CONTRACT.md`) and is read only through `src/data/pack.ts` (`loadDataset`, `loadFixtures`); a lint rule enforces it. `pack.ts` is `server-only`: the dataset reaches the client through `DatasetProvider` and the fixtures never leave the server.
-- The dataset stores facts only (`actual`, `units`, `forecast`, `priorYear`, `marketSize` per product, market and month). Growth, attainment, share and status are selectors, so rollups are exact. Status uses attainment over the shown period (the latest quarter by default; a picked month is judged on that month): on-track from 98%, at-risk from 92%, off-track below, compared on the value as displayed (one decimal), so a badge never contradicts its number (decided 28 Oct, PR #4 review). Anomalies are stored because they carry a reason.
-- 24 months, Oct 2024 to Sep 2026; "this quarter" is Q3 2026. Citations may refer to a month or a quarter.
-- `scripts/generate-data.ts` (seeded, deterministic) plants the stories as named adjustments. Fixtures are templates whose `{{n}}` placeholders are filled from the data, so quoted numbers match by construction; pack tests re-check it.
+- **Ids:** the pack's ids are used verbatim everywhere, URL included (`eu.de.veltrix`). Markets also keep `iso2` (`DE`) for short labels. No second id format.
+- **Facts and derived values:** `series` is the fact table; growth, attainment and status are recomputed from it by selectors so every level and period works. Tests hold the selectors to the pack's `kpis` at its latest month: every stored `status` is reproduced exactly, and growth and attainment within the pack's own rounding.
+- **Status:** off track when attainment is under 92% or revenue is down on the prior year; at risk when attainment is under 98%; on track otherwise, compared on the displayed value (one decimal). This is the rule that reproduces all 13 stored statuses (Spain is off track at 104.5% attainment because it is shrinking), applied to every period.
+- **Share:** the pack states share only as `kpis.sharePct` at its latest month. It is stored as that month's market size (revenue ÷ share), so share rolls up to regions; other periods show share as not in the data.
+- **Anomalies:** a market's `kpis.anomalies` become revenue anomalies on that market (the trend chart's markers and the risk reasons).
+- **Default period:** the latest month (May 2026), which is when the pack's `kpis` and its "latest period" citations are stated. Quarters stay selectable; a partial quarter (Q2 2026) is not offered.
 
 ## Assistant surface
 
@@ -110,24 +112,24 @@ The assistant is where we win or lose on trust, so every answer renders as a str
 
 **Streaming**
 
-- `useChatStream` hook: POST to `/api/chat`, read the body with a `TextDecoder`, parse SSE frames, validate each event with Zod, append tokens to a buffer.
+- `useChatStream` hook: POST to `/api/chat`, read the body with a `TextDecoder`, parse SSE frames, validate each event with Zod, append tokens to a buffer. Since 2 Nov the events are the starter pack's (`src/pack/CONTRACT.md`): `token { value }`, then `done { kind, citations, confidence }`, or a lone `error { message }`. Frames are `data:` lines only; the route follows the pack's reference handler, plus body and fixture validation.
 - Batch token updates per animation frame so long answers don't re-render per token (no jank while streaming).
-- States: idle → connecting (skeleton + "Reading the data…") → streaming (caret, Stop button) → complete | stopped | error. Stop calls `AbortController.abort()` and keeps the partial answer, marked "Stopped — partial answer".
+- States: idle → connecting (skeleton + "Reading the data…") → streaming (caret, Stop button) → complete | abstained | stopped | error. `done.kind` decides: `normal` and `low_confidence` complete, `abstain` abstains (its streamed text is the reason), `error` fails. Stop calls `AbortController.abort()` and keeps the partial answer, marked "Stopped — partial answer".
 - Errors keep what streamed, show a retry, and never pretend the answer finished.
 - Invalid events fail visibly (decided 28 Oct): a known event type with a bad shape aborts the stream, keeps the partial text, shows "Answer interrupted" with retry, and is logged. A dropped token or citation could silently change meaning. Unknown event types are ignored for forward compatibility.
 - `aria-live="polite"` region announces start and completion only, not every token.
 
 **Citations**
 
-- Inline markers (decided 28 Oct): tokens contain markers like `[1]`; the final event maps each number to `{ id, ref: EntityRef, period, metric }` alongside `confidence`. Markers render as pending chips until the final event resolves them; a rehype plugin (`rehypeCitations`) turns each complete `[n]` into a citation element, so a marker split across tokens stays text until it completes.
-- Each marker renders as a chip ("DE · Mar 2026 · Revenue"). Hover or focus shows the actual figure from the dataset, pulled live, not from the model.
+- A sources list (2 Nov, replacing our inline `[n]` markers): the pack's text has no markers and its citations carry no id or metric, only optional `marketId`, `regionId`, `productId`, `period` and `label`. `domain/citations.ts` (`resolveCitation`) turns one into an `EntityRef` and month the data contains; the `done` event's citations render as a "Sources" chip row under the answer ("DE · Mar 2026"). A citation the data can't resolve shows as "<label> · not in the data", never dropped.
+- Hover or focus shows the dataset's own figures for that entity and month (revenue, attainment, growth and status), pulled live, not from the model.
 - Clicking a chip drills the dashboard to that entity and period. Verifying is one click, and the dashboard becomes the proof.
 
 **Confidence**
 
-- Three bands from the numeric value: High, Medium, Low. Shown as a labelled badge with an icon and text, never colour alone.
-- A "Why it's uncertain" line shows whenever the final event carries a reason, at any confidence band (review fix, 30 Oct: a medium answer's caveat was being hidden).
-- Abstentions get their own state: a neutral card, "This isn't in the data", and what the data does cover (e.g. the last period in the dataset).
+- The pack sends the band itself (`high` | `medium` | `low`). Shown as a labelled badge with an icon and text, never colour alone.
+- A `low_confidence` answer also says in words that it is tentative and should be checked against its sources. (Until 2 Nov our fixtures carried an `uncertainty` reason; the pack's don't.) An answer with no citations says that nothing in it is checked against the data.
+- Abstentions get their own state: a neutral card, "This isn't in the data", the assistant's reason on the AI surface, and what the data covers, taken from the dataset (Jun 2024 to May 2026).
 
 **AI vs authoritative**
 
@@ -138,11 +140,11 @@ The assistant is where we win or lose on trust, so every answer renders as a str
 Answer-card decisions (29 Oct, `feat/answer-card`):
 
 - The dataset reaches the client in this PR through `useDataset`, so citation chips check real values from day one. (Replaced 30 Oct: Query hydration became `DatasetProvider`, see Data layer.)
-- nuqs `path` and `period` land with the chips, so a chip click drills the URL now. The path uses the real ids, region to product (`eu.DE.beacon`); `refFromPath` rejects ids the data doesn't contain and the URL falls back to the portfolio (no toast yet).
-- Answers render per Markdown block (`splitBlocks`, which keeps a loose list in one block): a `memo` on `MarkdownBlock` means only the growing block is re-parsed per frame, and `AnswerBody.test.tsx` holds that (explicit since 30 Oct, because Vitest doesn't run the compiler). Citations reach the chips through context, so resolving them doesn't re-parse the text.
+- nuqs `path` and `period` land with the chips, so a chip click drills the URL now. The path uses the real ids, region to product (`eu.de.veltrix` since 2 Nov); `refFromPath` rejects ids the data doesn't contain and the URL falls back to the portfolio (no toast yet).
+- Answers render per Markdown block (`splitBlocks`, which keeps a loose list in one block): a `memo` on `MarkdownBlock` means only the growing block is re-parsed per frame, and `AnswerBody.test.tsx` holds that (explicit since 30 Oct, because Vitest doesn't run the compiler). Since 2 Nov the sources sit outside the Markdown, so resolving them never re-parses the text.
 - `ChatState` is a union on `status`, and the reducer ignores everything but a new question once a run settles. HTTP failures read "The assistant isn't available right now."; the status goes to the console.
 
-Fixture coverage to demo: the four example questions, low-confidence, abstention, error, long response. Suggested-question chips seed these on first open; they are the main way in, because free text only matches fixtures exactly and everything else abstains (decided 28 Oct).
+Fixture coverage to demo: the pack's fixtures cover the four example questions, low-confidence, abstention, error and a long response. Matching is the pack's: a keyword anywhere in the question, first fixture wins, else its low-confidence `default`. The pack has no suggested questions, so `data/suggestions.ts` holds one per fixture; `pack.test.ts` checks each one reaches its fixture.
 
 ## Dashboard
 
@@ -167,7 +169,7 @@ Status is never colour alone: on-track, at-risk and off-track each get an icon a
 Gate decisions (29 Oct, `feat/dashboard-gate`):
 
 - The drill-down surface for the gate is a breakdown table of the current level's children (name, revenue, attainment, status); a row's name drills in. It grows into the analyst detail table on day 2.
-- With no `period` in the URL, panels show the latest full quarter; a URL month or quarter overrides it (`selectionPeriod`). The period is **pinned** (Simon, 30 Oct): when a link has no period, or one the data doesn't cover, the dashboard writes the shown period into the URL, replacing history. A link without a period would mean "the latest quarter when opened", so a link shared today would show other figures once the next quarter's data lands. `mode` and `mapMetric` stay default-free, since their defaults don't change over time. A period picker in the dashboard header offers every fully covered quarter and every month (review fix, 30 Oct: after clicking a month nothing could select a quarter again; quarters stay because the default view, status and citations use them). Status badges use `statusAt` over the shown period, so a badge always matches the attainment beside it.
+- With no `period` in the URL, panels show the latest full quarter (since 2 Nov: the pack's latest month, see Data layer); a URL month or quarter overrides it (`selectionPeriod`). The period is **pinned** (Simon, 30 Oct): when a link has no period, or one the data doesn't cover, the dashboard writes the shown period into the URL, replacing history. A link without a period would mean "the latest quarter when opened", so a link shared today would show other figures once the next quarter's data lands. `mode` and `mapMetric` stay default-free, since their defaults don't change over time. A period picker in the dashboard header offers every fully covered quarter and every month (review fix, 30 Oct: after clicking a month nothing could select a quarter again; quarters stay because the default view, status and citations use them). Status badges use `statusAt` over the shown period, so a badge always matches the attainment beside it.
 - The chart shell (`ui/ChartFrame`) draws the static chart in `<svg role="img">` with the generated summary as its name, and puts focusable data points in an HTML overlay above it: `role="img"` makes svg children presentational, so points can't live inside it. Points use a roving tabindex (`ui/useRovingIndex`); charts have no transitions.
 - Breadcrumb and breakdown drills push history and keep the period; focusing a month from a chart replaces history (`useSetPeriod`).
 - `/console` is a partial prerender: the shell and the assistant are static, and the dashboard's Suspense hole reads the request's `searchParams`, so it is server-rendered for each URL and streamed in the same response rather than waiting for client JavaScript. Charts still draw after hydration, because they measure their container.
@@ -307,12 +309,12 @@ Speed versus review: two days of Claude-driven implementation can outrun review.
 Open questions:
 
 - [x] What's our deadline and total hours? 2 days (decided 28 Oct); Claude Code implements, Simon steers. The schedule needs rewriting for this.
-- [x] Do fixtures carry inline citation markers, or only a final citation list? Inline markers, resolved by the final event.
+- [x] Do fixtures carry inline citation markers, or only a final citation list? Inline markers, resolved by the final event. (Superseded 2 Nov: the starter pack sends a final citation list only, shown as sources.)
 - [x] Is revenue in one currency or local currencies? One reporting currency, USD.
 - [x] Country codes: markets keyed by ISO alpha-2 (`DE`, `JP`); one static table in the map module maps them to world-atlas numeric ids, with a test that every market resolves (decided 28 Oct).
 - [x] How are products keyed? Discriminated-union `EntityRef`; the product variant carries its `marketId`.
 - [x] Fixture content for low confidence: we author the fixtures, so low-confidence answers carry an optional `reason`. The abstention's "nearby question" was cut.
-- [x] Free-text questions not in the fixtures: exact match only (normalised for case and whitespace); anything else streams the abstention (decided 28 Oct). Next step for the README: broaden with keyword matching; with a live model behind the route this matching layer wouldn't exist at all.
+- [x] Free-text questions not in the fixtures: exact match only (normalised for case and whitespace); anything else streams the abstention (decided 28 Oct). (Superseded 2 Nov: the pack's keyword matching and low-confidence default.) Next step for the README: broaden with keyword matching; with a live model behind the route this matching layer wouldn't exist at all.
 
 Submission checklist:
 
