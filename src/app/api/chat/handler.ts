@@ -1,7 +1,8 @@
 /**
  * The mock assistant, after the starter pack's reference route: matches the question to a
  * fixture and streams it as SSE, paced so the connecting and streaming states are visible.
- * Unlike the reference, it validates the body and the fixtures. A mock by design (CLAUDE.md): no model calls.
+ * Unlike the reference, it validates the body and the fixtures. A mock by design (CLAUDE.md):
+ * no model calls.
  */
 import { loadFixtures } from "@/data/pack";
 import { fixtureEvents, matchFixture } from "@/domain/fixtures";

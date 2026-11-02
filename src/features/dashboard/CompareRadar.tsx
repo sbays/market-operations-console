@@ -44,8 +44,8 @@ const SERIES_STYLES = [
 ] as const;
 
 /**
- * The compared entities on up to five axes (see comparedRefs, radarMetrics). Nothing is compared below a product,
- * so the radar renders nothing there.
+ * The compared entities on up to five axes (see comparedRefs, radarMetrics). Nothing is
+ * compared below a product, so the radar renders nothing there.
  */
 export function CompareRadar({ dataset, selected, period }: Props) {
   const series = radarAxes(dataset, useCompare(selected), period);
