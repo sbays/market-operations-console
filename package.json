@@ -9,6 +9,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "facts": "node scripts/facts-cli.mjs",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
