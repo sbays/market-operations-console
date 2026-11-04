@@ -48,6 +48,7 @@ Package manager: pnpm. Fonts come from the `geist` package (self-hosted; builds 
 - `pnpm test`: Vitest (unit + component, jsdom)
 - `pnpm test:e2e`: Playwright on Chromium and WebKit, including axe scans (builds and serves on port 3100)
 - `pnpm build`
+- `pnpm facts [period] [path]`: what the dashboard derives for a period and drill path (`pnpm facts 2026-05 latam`), from the real selectors. Use it for any question about the app's figures instead of re-deriving them.
 
 CI (`.github/workflows/ci.yml`) runs all of the above on every PR as the `ci` check.
 
